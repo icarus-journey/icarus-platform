@@ -1,14 +1,18 @@
+using Icarus.Infrastructure;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// Adiciona os serviços ao container.
 
 builder.Services.AddControllers();
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+// Saiba mais sobre como configurar o OpenAPI em https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+
+builder.Services.AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// Configura o pipeline de requisições HTTP.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
