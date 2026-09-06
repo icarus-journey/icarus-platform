@@ -18,7 +18,9 @@ public static class DependencyInjection
         var connectionString = configuration.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException("String de conexão 'DefaultConnection' não encontrada.");
 
-        services.AddDbContext<IcarusDbContext>(options => options.UseNpgsql(connectionString));
+        services.AddDbContext<IcarusDbContext>(options => options
+            .UseNpgsql(connectionString)
+            .UseSnakeCaseNamingConvention());
 
         return services;
     }

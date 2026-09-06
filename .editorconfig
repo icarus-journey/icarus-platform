@@ -18,6 +18,11 @@ indent_size = 2
 [*.md]
 trim_trailing_whitespace = false
 
+# Migrations do EF Core são código gerado (nunca editado à mão) — não aplica
+# os analisadores de qualidade/estilo do .NET a esses arquivos.
+[**/Migrations/*.cs]
+generated_code = true
+
 ###############################################################################
 # Convenções de código C# — baseadas no padrão da comunidade .NET
 # (mesmo estilo usado pelo runtime/SDK oficiais da Microsoft)
