@@ -409,6 +409,32 @@ dotnet run --project src/Icarus.Api
 - URLs padrão: `http://localhost:5138` (http) e `https://localhost:7220` (https).
 - Testes: `dotnet test`
 
+### 6.3 Mensageria (RabbitMQ) — vive em outro repositório
+
+O RabbitMQ (transporte assíncrono entre a API e o trabalhador Python, ver
+`01-arquitetura-da-solucao.md` no `icarus-context`) **não fica neste
+repositório**. A seção 18 desse documento ("Responsabilidades entre
+repositórios") atribui explicitamente RabbitMQ/filas/durabilidade/rede ao
+repositório `icarus-infrastructure`, enquanto o `icarus-platform` fica só com
+"autorização, domínio, trabalhos, inbox/outbox e PostgreSQL" — ou seja, a API
+consome a fila, mas não hospeda/configura o broker.
+
+Decisão tomada em 2026-09-06: o container roda em
+`icarus-infrastructure/compose.yaml` (`docker compose up -d rabbitmq`),
+seguindo as mesmas convenções já usadas lá para o MinIO (`ICARUS_RABBITMQ_*`
+com defaults, portas publicadas só em `127.0.0.1`, volume nomeado,
+healthcheck). Documentação completa (portas, credenciais padrão) fica no
+`README.md` do `icarus-infrastructure`, não duplicada aqui.
+
+Hoje a API roda fora de container (`dotnet run`, seção 6.2), então ela se
+conecta ao RabbitMQ do mesmo jeito que se conecta ao Postgres: via
+`localhost:5672` (porta publicada no host), sem precisar de rede Docker
+compartilhada entre os repositórios. Isso só passa a ser necessário quando a
+API (ou o trabalhador Python do `icarus-data`) for containerizada — nesse
+momento os dois `compose` (`icarus-platform` e `icarus-infrastructure`)
+precisarão declarar uma rede Docker externa compartilhada para se
+comunicarem pelo nome do serviço em vez de porta publicada no host.
+
 ## 7. Lacunas conhecidas / próximos passos naturais
 
 - Modelo de dados criado (seção 4.3), mas nenhum caso de uso/serviço em `Icarus.Application` ainda usa essas entidades.
@@ -418,6 +444,12 @@ dotnet run --project src/Icarus.Api
 - Pendências de produto herdadas do DER (não bloqueiam a estrutura, mas afetam regras futuras): estados finais da missão, escala de prioridade, regra de sobreposição de vigência da rotina, se o diário aceita múltiplas entradas por dia, estrutura definitiva dos dados externos (ATUS/Vigitel).
 - **Missões recorrentes não têm status por ocorrência no DER oficial** — `Missao` tem um único `Status`/`ConcluidaEm`, então não há hoje como saber se a ocorrência de segunda foi concluída e a de quarta não (ver seção 4.3, "Revisão do DER v1.0"). Levantar com quem mantém o `icarus-context` antes de implementar conclusão de missão recorrente.
 - Nulidade de vários campos novos do DER v1.1 (`Epico.AreaDaVida`, `Campanha.ValorMensurado/Unidade/ValorAtual`, `Missao.DataLimite`) foi uma interpretação da equipe, não algo explícito no documento — ver seção 4.3.
+- API ainda não é containerizada nem usa RabbitMQ (broker existe no `icarus-infrastructure`, mas nenhum outbox/inbox foi implementado aqui ainda — ver seção 6.3). Quando a API for containerizada, será preciso criar a rede Docker compartilhada entre `icarus-platform` e `icarus-infrastructure`.
+- **Decisão pendente: estratégia de versionamento das imagens Docker.** Hoje cada serviço usa uma convenção diferente, sem termos parado para decidir isso de propósito:
+  - `postgres:16` (`icarus-platform/docker-compose.yml`) — só a versão major fixada; minor/patch "flutuam" a cada `pull` novo.
+  - `minio/minio:RELEASE.2025-09-07T16-13-09Z` (`icarus-infrastructure/compose.yaml`) — tag de release imutável, 100% fixada.
+  - `rabbitmq:4.0-management` (`icarus-infrastructure/compose.yaml`) — major.minor fixados, patch "flutua".
+  - O trade-off: tag flutuante pega correção de segurança automaticamente mas não é 100% reprodutível entre execuções/máquinas diferentes; tag imutável é reprodutível mas exige atualização manual periódica (e checar CVEs manualmente). Precisamos decidir **uma convenção única** para todos os serviços (provável candidato: tag imutável/digest para todos, seguindo o exemplo do MinIO) e aplicá-la de forma consistente. Não decidido ainda — discutir antes de adicionar novos serviços (ex.: trabalhador Python, Nginx).
 
 ## 8. Histórico de decisões e features (a atualizar conforme avançarmos)
 
@@ -477,3 +509,15 @@ dotnet run --project src/Icarus.Api
   Migration inicial substituída de novo (banco de dev recriado do zero).
   `dotnet build` (0 avisos/erros) e `dotnet test` validados; 12 tabelas do
   modelo v1.1 conferidas no container via `psql`.
+- 2026-09-06 — Container de RabbitMQ criado a pedido do usuário. Verificado no
+  `icarus-context` (`01-arquitetura-da-solucao.md`, seção 18) que RabbitMQ é
+  responsabilidade do repositório `icarus-infrastructure`, não do
+  `icarus-platform` — só o PostgreSQL pertence a este repositório. Serviço
+  `rabbitmq` (imagem `rabbitmq:4.0-management`) adicionado a
+  `icarus-infrastructure/compose.yaml`, seguindo as mesmas convenções já
+  usadas lá para o MinIO (env vars `ICARUS_RABBITMQ_*`, portas publicadas só
+  em `127.0.0.1`, volume nomeado, healthcheck). Container validado: `healthy`,
+  `rabbitmqctl status` confirmando RabbitMQ 4.0.9, portas 5672 (AMQP) e 15672
+  (console administrativo) respondendo em `localhost`. Ver seção 6.3 para o
+  detalhamento e a nota sobre a futura rede Docker compartilhada, necessária
+  só quando a API for containerizada.
