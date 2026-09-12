@@ -305,6 +305,31 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "ocorrencia",
+                columns: table => new
+                {
+                    id = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    missao_id = table.Column<long>(type: "bigint", nullable: false),
+                    data_prevista = table.Column<DateOnly>(type: "date", nullable: false),
+                    status = table.Column<string>(type: "character varying(25)", maxLength: 25, nullable: false),
+                    realizada_em = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    concluida_em = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    criado_em = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    atualizado_em = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("pk_ocorrencia", x => x.id);
+                    table.ForeignKey(
+                        name: "fk_ocorrencia_missao_missao_id",
+                        column: x => x.missao_id,
+                        principalTable: "missao",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "movimentacao_pontos",
                 columns: table => new
                 {
@@ -312,7 +337,7 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     usuario_id = table.Column<Guid>(type: "uuid", nullable: false),
                     item_id = table.Column<long>(type: "bigint", nullable: true),
-                    missao_id = table.Column<long>(type: "bigint", nullable: true),
+                    ocorrencia_id = table.Column<long>(type: "bigint", nullable: true),
                     tipo = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: false),
                     quantidade = table.Column<long>(type: "bigint", nullable: false),
                     descricao = table.Column<string>(type: "text", nullable: true),
@@ -328,9 +353,9 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
-                        name: "fk_movimentacao_pontos_missao_missao_id",
-                        column: x => x.missao_id,
-                        principalTable: "missao",
+                        name: "fk_movimentacao_pontos_ocorrencia_ocorrencia_id",
+                        column: x => x.ocorrencia_id,
+                        principalTable: "ocorrencia",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
@@ -443,14 +468,25 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                 column: "usuario_id");
 
             migrationBuilder.CreateIndex(
+                name: "ix_ocorrencia_missao_id_data_prevista",
+                table: "ocorrencia",
+                columns: new[] { "missao_id", "data_prevista" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "ix_ocorrencia_status",
+                table: "ocorrencia",
+                column: "status");
+
+            migrationBuilder.CreateIndex(
                 name: "ix_movimentacao_pontos_item_id",
                 table: "movimentacao_pontos",
                 column: "item_id");
 
             migrationBuilder.CreateIndex(
-                name: "ix_movimentacao_pontos_missao_id",
+                name: "ix_movimentacao_pontos_ocorrencia_id",
                 table: "movimentacao_pontos",
-                column: "missao_id");
+                column: "ocorrencia_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_movimentacao_pontos_usuario_id_criado_em",
@@ -499,6 +535,9 @@ namespace Icarus.Infrastructure.Persistence.Migrations
 
             migrationBuilder.DropTable(
                 name: "movimentacao_pontos");
+
+            migrationBuilder.DropTable(
+                name: "ocorrencia");
 
             migrationBuilder.DropTable(
                 name: "recorrencia");

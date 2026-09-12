@@ -24,6 +24,6 @@ public class Missao : EntidadeBase
     public Usuario Usuario { get; set; } = null!;
     public Campanha? Campanha { get; set; }
     public Recorrencia? Recorrencia { get; set; }
-    public ICollection<MovimentacaoPontos> MovimentacoesPontos { get; set; } = new List<MovimentacaoPontos>();
+    public ICollection<Ocorrencia> Ocorrencias { get; set; } = new List<Ocorrencia>();
     public ICollection<MissaoIA> MissoesIA { get; set; } = new List<MissaoIA>();
 }
