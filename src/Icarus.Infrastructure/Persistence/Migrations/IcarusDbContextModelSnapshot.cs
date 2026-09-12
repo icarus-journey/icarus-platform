@@ -483,6 +483,58 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Icarus.Domain.Entities.Ocorrencia", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("AtualizadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("atualizado_em");
+
+                    b.Property<DateTimeOffset?>("ConcluidaEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("concluida_em");
+
+                    b.Property<DateTimeOffset>("CriadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("criado_em");
+
+                    b.Property<DateOnly>("DataPrevista")
+                        .HasColumnType("date")
+                        .HasColumnName("data_prevista");
+
+                    b.Property<long>("MissaoId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("missao_id");
+
+                    b.Property<DateTimeOffset?>("RealizadaEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("realizada_em");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(25)
+                        .HasColumnType("character varying(25)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ocorrencia");
+
+                    b.HasIndex("MissaoId", "DataPrevista")
+                        .IsUnique()
+                        .HasDatabaseName("ix_ocorrencia_missao_id_data_prevista");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("ix_ocorrencia_status");
+
+                    b.ToTable("ocorrencia", (string)null);
+                });
+
             modelBuilder.Entity("Icarus.Domain.Entities.MovimentacaoPontos", b =>
                 {
                     b.Property<long>("Id")
@@ -504,9 +556,9 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("item_id");
 
-                    b.Property<long?>("MissaoId")
+                    b.Property<long?>("OcorrenciaId")
                         .HasColumnType("bigint")
-                        .HasColumnName("missao_id");
+                        .HasColumnName("ocorrencia_id");
 
                     b.Property<long>("Quantidade")
                         .HasColumnType("bigint")
@@ -528,8 +580,8 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                     b.HasIndex("ItemId")
                         .HasDatabaseName("ix_movimentacao_pontos_item_id");
 
-                    b.HasIndex("MissaoId")
-                        .HasDatabaseName("ix_movimentacao_pontos_missao_id");
+                    b.HasIndex("OcorrenciaId")
+                        .HasDatabaseName("ix_movimentacao_pontos_ocorrencia_id");
 
                     b.HasIndex("UsuarioId", "CriadoEm")
                         .HasDatabaseName("ix_movimentacao_pontos_usuario_id_criado_em");
@@ -868,6 +920,18 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                     b.Navigation("Usuario");
                 });
 
+            modelBuilder.Entity("Icarus.Domain.Entities.Ocorrencia", b =>
+                {
+                    b.HasOne("Icarus.Domain.Entities.Missao", "Missao")
+                        .WithMany("Ocorrencias")
+                        .HasForeignKey("MissaoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_ocorrencia_missao_missao_id");
+
+                    b.Navigation("Missao");
+                });
+
             modelBuilder.Entity("Icarus.Domain.Entities.MovimentacaoPontos", b =>
                 {
                     b.HasOne("Icarus.Domain.Entities.Item", "Item")
@@ -876,11 +940,11 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_movimentacao_pontos_item_item_id");
 
-                    b.HasOne("Icarus.Domain.Entities.Missao", "Missao")
+                    b.HasOne("Icarus.Domain.Entities.Ocorrencia", "Ocorrencia")
                         .WithMany("MovimentacoesPontos")
-                        .HasForeignKey("MissaoId")
+                        .HasForeignKey("OcorrenciaId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_movimentacao_pontos_missao_missao_id");
+                        .HasConstraintName("fk_movimentacao_pontos_ocorrencia_ocorrencia_id");
 
                     b.HasOne("Icarus.Domain.Entities.Usuario", "Usuario")
                         .WithMany("MovimentacoesPontos")
@@ -891,7 +955,7 @@ namespace Icarus.Infrastructure.Persistence.Migrations
 
                     b.Navigation("Item");
 
-                    b.Navigation("Missao");
+                    b.Navigation("Ocorrencia");
 
                     b.Navigation("Usuario");
                 });
@@ -955,9 +1019,14 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                 {
                     b.Navigation("MissoesIA");
 
-                    b.Navigation("MovimentacoesPontos");
+                    b.Navigation("Ocorrencias");
 
                     b.Navigation("Recorrencia");
+                });
+
+            modelBuilder.Entity("Icarus.Domain.Entities.Ocorrencia", b =>
+                {
+                    b.Navigation("MovimentacoesPontos");
                 });
 
             modelBuilder.Entity("Icarus.Domain.Entities.Usuario", b =>

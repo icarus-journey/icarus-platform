@@ -1,7 +1,7 @@
 # Icarus Platform — Documentação do Projeto
 
 > Documento vivo. Mantido e atualizado à medida que novas decisões e features forem implementadas.
-> Última atualização: 2026-09-06
+> Última atualização: 2026-09-08
 
 ## 0. Regra permanente do projeto
 
@@ -39,13 +39,12 @@ assíncrono, regras de negócio e persistência dos dados transacionais do Icaru
 
 Estado atual: **projeto em estágio inicial**. A estrutura de solução (Clean
 Architecture), a persistência com Entity Framework Core / PostgreSQL e o
-modelo de dados completo do MVP (12 entidades, ver seção 4.3) já foram
+modelo de dados completo do MVP (13 entidades, ver seção 4.3) já foram
 criados. Ainda não há casos de uso, controllers nem nenhuma feature de negócio
 (regras de aplicação) codificada — a API não expõe nenhum endpoint funcional.
 
-O modelo de dados segue o DER do `icarus-context` na versão **1.1**
-(2026-09-05) — ver seção 4.3 para o histórico de reconciliação entre nossa
-implementação e as atualizações do DER.
+O modelo de dados segue o DER do `icarus-context` na versão **1.2**
+(2026-09-08), incluindo ocorrências persistidas para missões recorrentes.
 
 ## 2. Repositório e fluxo Git
 
@@ -131,7 +130,7 @@ Icarus.Api  ──> Icarus.Infrastructure ──> Icarus.Application ──> Ica
 Icarus.Api.Tests ──> Icarus.Api
 ```
 
-- `Icarus.Domain`: sem dependências (camada mais interna). Contém as 12 entidades do modelo de dados e os enums (ver seção 4.3).
+- `Icarus.Domain`: sem dependências (camada mais interna). Contém as 13 entidades do modelo de dados e os enums (ver seção 4.3).
 - `Icarus.Application`: referencia `Icarus.Domain`. Ainda vazio (sem casos de uso).
 - `Icarus.Infrastructure`: referencia `Icarus.Application`. Contém `DependencyInjection.cs`, o `DbContext`, as configurações EF Core e as migrations.
 - `Icarus.Api`: referencia `Icarus.Application` e `Icarus.Infrastructure`. Ponto de entrada (`Program.cs`).
@@ -156,7 +155,7 @@ Icarus.Api.Tests ──> Icarus.Api
 **`src/Icarus.Domain`** (`Icarus.Domain.csproj`)
 - SDK: `Microsoft.NET.Sdk`.
 - Sem dependências (nem de EF Core) — entidades são POCOs puros, mapeamento fica todo em `Icarus.Infrastructure`.
-- `Entities/`: as 12 entidades do modelo de dados (ver seção 4.3).
+- `Entities/`: as 13 entidades do modelo de dados (ver seção 4.3).
 - `Common/EntidadeBase.cs`: classe abstrata com `CriadoEm`/`AtualizadoEm`, herdada por todas as entidades exceto `MovimentacaoPontos` (que só tem `CriadoEm`, por ser um registro imutável). Fica em `Common/` (não em `Entities/`) seguindo o padrão dos templates de Clean Architecture .NET mais adotados pela comunidade (Jason Taylor, Ardalis): abstrações compartilhadas do domínio (bases, futuras interfaces de evento de domínio etc.) ficam separadas das entidades concretas.
 - `Enums/`: `StatusMissao`, `EstadoEpico`, `EstadoCampanha`, `StatusAprovacaoMissaoIA`, `ControlaApp`, `TipoRelatorio`, `TipoMovimentacaoPontos` — listas iniciais sugeridas pelo DER, ainda decisões de domínio em aberto.
 
@@ -207,37 +206,28 @@ português**, sem exceção (nem os campos técnicos de auditoria).
 - `Campanha.ValorMensurado`/`ValorAtual`: `decimal?` (`numeric(12,2)`) — nulo quando a campanha não é mensurável.
 
 **Entidades criadas** (namespace `Icarus.Domain.Entities`): `Usuario`,
-`Rotina`, `Epico`, `Campanha`, `Missao`, `MissaoIA`, `Recorrencia`, `Diario`,
-`Relatorio`, `Item`, `InventarioItem`, `MovimentacaoPontos` — as 12 do DER v1.1.
+`Rotina`, `Epico`, `Campanha`, `Missao`, `MissaoIA`, `Recorrencia`,
+`Ocorrencia`, `Diario`, `Relatorio`, `Item`, `InventarioItem` e
+`MovimentacaoPontos` — as 13 do DER v1.2.
 
-#### Revisão do DER v1.0 (2026-08-29): lacuna da entidade `Ocorrencia` — revertida em 2026-09-06
+#### DER v1.2 (2026-09-08): ocorrências persistidas de missão
 
-Ao revisar o DER v1.0 contra o documento de arquitetura mais amplo
-(`01-arquitetura-da-solucao.md`, seções 8.1, 8.2, 9.2 e 9.4), foi identificada
-uma aparente inconsistência: a arquitetura menciona "ocorrência única por
-missão e data prevista" e "conclusão única por ocorrência", enquanto o DER só
-tinha `MISSAO` com um único `status`/`concluida_em` — o que não representa uma
-missão recorrente com histórico por data. Como correção, criamos uma entidade
-`Ocorrencia` própria (não documentada no `icarus-context`), com `Missao`
-perdendo `Status`/`ConcluidaEm` e `MovimentacaoPontos` passando a referenciar
-`OcorrenciaId`.
+Decisão validada com o usuário: `Recorrencia` é exclusivamente a configuração
+de geração; `Ocorrencia` é a execução planejada e persistida de uma missão. A
+ativação de uma recorrência gera os próximos 30 dias e uma rotina diária mantém
+essa janela. Missões não recorrentes também recebem uma única ocorrência.
 
-**Em 2026-09-05, quem mantém o `icarus-context` publicou o DER v1.1**
-(commit `7c51d46`, "docs: adiciona ajustes no DER e contextos") **sem**
-incorporar essa entidade: `MISSAO` continua com `status`/`concluida_em`
-diretos, e o único ajuste relacionado foi acrescentar o valor de status
-`CONCLUIDA_COM_ATRASO`. Ou seja, a equipe do `icarus-context` seguiu evoluindo
-o modelo original (status único por missão) sem ciência da nossa mudança.
+`Ocorrencia` possui `MissaoId`, `DataPrevista`, `Status`, `RealizadaEm` e
+`ConcluidaEm`, além da auditoria comum. A constraint
+`UNIQUE(missao_id, data_prevista)` impede duplicidade na geração. A conclusão
+da ocorrência e a respectiva `MovimentacaoPontos` devem ocorrer na mesma
+transação; por isso a movimentação referencia `OcorrenciaId`, e não mais
+`MissaoId`.
 
-**Decisão tomada com o usuário em 2026-09-06:** reverter para o modelo do DER
-oficial. `Ocorrencia` foi removida; `Missao` voltou a ter `Status`
-(`StatusMissao`, com `Pendente`/`Concluida`/`Cancelada`/`ConcluidaComAtraso`) e
-`ConcluidaEm` diretos; `MovimentacaoPontos` voltou a referenciar `MissaoId`. A
-lacuna de missões recorrentes com histórico por ocorrência **continua sem
-solução física no DER** — é uma pendência do produto, não mais algo que
-resolvemos por conta própria na implementação. Deve ser levantada com quem
-mantém o `icarus-context` antes de qualquer feature que dependa disso (ex.:
-concluir/desfazer uma data específica de uma missão recorrente).
+Alterar uma recorrência afeta apenas ocorrências futuras. Inativá-la
+exclui/cancela as futuras ou pendentes não vencidas e preserva as atrasadas e
+concluídas. A migration inicial foi atualizada diretamente, sem criar uma nova
+versão, pois o banco ainda não foi publicado.
 
 #### DER v1.1 (2026-09-05): novos campos e entidade `MissaoIA`
 
@@ -289,8 +279,8 @@ compostas `Epico → Campanha`, `Campanha → Missao`, `Campanha → MissaoIA`,
 `Missao → Recorrencia`, `Item → InventarioItem`) usam `ON DELETE CASCADE`,
 coerente com a decisão do MVP de exclusão física simples (seção 29 do DER).
 **Exceções deliberadas:**
-- as FKs opcionais de `MovimentacaoPontos` para `Item` e `Missao` usam
-  `ON DELETE RESTRICT` — excluir um item ou uma missão não pode apagar o
+- as FKs opcionais de `MovimentacaoPontos` para `Item` e `Ocorrencia` usam
+  `ON DELETE RESTRICT` — excluir um item ou uma ocorrência não pode apagar o
   histórico de pontos (extrato imutável, seções 17–18 do DER);
 - a FK opcional de `MissaoIA` para `Missao` usa `ON DELETE SET NULL` —
   excluir a missão gerada não precisa apagar o registro de auditoria da
@@ -313,24 +303,17 @@ dotnet ef migrations add NomeDaMigration --project ../Icarus.Infrastructure --st
 dotnet ef database update --project ../Icarus.Infrastructure --startup-project .
 ```
 
-Como nenhum dado real existe ainda, a migration inicial foi **substituída**
-outra vez em 2026-09-06 (banco local derrubado com `dotnet ef database drop` e
-recriado do zero) em vez de empilhar migrations incrementais em cima da versão
-com `Ocorrencia` — mesma decisão de manter o histórico de migrations limpo
-enquanto não há dado de produção.
-
-Validado em 2026-09-06: as 12 tabelas do modelo v1.1 (`usuario`, `rotina`,
-`epico`, `campanha`, `missao`, `missao_ia`, `recorrencia`, `diario`,
-`relatorio`, `item`, `inventario_item`, `movimentacao_pontos`) foram criadas
-no container (`docker exec icarus-postgres psql -U postgres -d icarus -c "\dt"`),
-com `dotnet build` (0 avisos, 0 erros) e `dotnet test` passando limpos.
+Como o banco ainda não foi publicado, a migration inicial foi atualizada em
+2026-09-08 em vez de ser criada uma migration incremental. Ela agora cria as
+13 tabelas do modelo v1.2, incluindo `ocorrencia` e a FK de
+`movimentacao_pontos.ocorrencia_id`.
 `Migrations/*.cs` continua marcado como `generated_code = true` no
 `.editorconfig` para os analisadores do .NET não gerarem ruído em código que
 nunca é editado à mão.
 
 **`tests/Icarus.Api.Tests`** (`Icarus.Api.Tests.csproj`)
 - Framework: xUnit (versões centralizadas em `Directory.Packages.props`): `xunit`, `xunit.runner.visualstudio`, `Microsoft.NET.Test.Sdk`, `coverlet.collector`.
-- Único teste: `TesteExemplo.Teste1` — vazio, apenas placeholder, não testa nada ainda.
+- Testes de domínio devem cobrir as transições de status e a geração de ocorrências antes dos casos de uso serem implementados.
 
 ## 5. CI/CD
 
@@ -442,7 +425,7 @@ comunicarem pelo nome do serviço em vez de porta publicada no host.
 - CI não roda build/test do .NET, apenas validações estruturais (nem `dotnet format`/analisadores, apesar do `.editorconfig` já estar configurado); também não roda `dotnet ef migrations` em pipeline algum.
 - Sem autenticação/autorização configurada (só `UseAuthorization()` chamado, sem esquema definido) — o DER já assume `Usuario.Id` vindo do JWT, mas isso ainda não existe na API.
 - Pendências de produto herdadas do DER (não bloqueiam a estrutura, mas afetam regras futuras): estados finais da missão, escala de prioridade, regra de sobreposição de vigência da rotina, se o diário aceita múltiplas entradas por dia, estrutura definitiva dos dados externos (ATUS/Vigitel).
-- **Missões recorrentes não têm status por ocorrência no DER oficial** — `Missao` tem um único `Status`/`ConcluidaEm`, então não há hoje como saber se a ocorrência de segunda foi concluída e a de quarta não (ver seção 4.3, "Revisão do DER v1.0"). Levantar com quem mantém o `icarus-context` antes de implementar conclusão de missão recorrente.
+- A rotina diária de geração e os casos de uso para concluir, editar e inativar ocorrências ainda precisam ser implementados; o modelo persistido já suporta a regra validada na seção 4.3.
 - Nulidade de vários campos novos do DER v1.1 (`Epico.AreaDaVida`, `Campanha.ValorMensurado/Unidade/ValorAtual`, `Missao.DataLimite`) foi uma interpretação da equipe, não algo explícito no documento — ver seção 4.3.
 - API ainda não é containerizada nem usa RabbitMQ (broker existe no `icarus-infrastructure`, mas nenhum outbox/inbox foi implementado aqui ainda — ver seção 6.3). Quando a API for containerizada, será preciso criar a rede Docker compartilhada entre `icarus-platform` e `icarus-infrastructure`.
 - **Decisão pendente: estratégia de versionamento das imagens Docker.** Hoje cada serviço usa uma convenção diferente, sem termos parado para decidir isso de propósito:
@@ -454,6 +437,14 @@ comunicarem pelo nome do serviço em vez de porta publicada no host.
 ## 8. Histórico de decisões e features (a atualizar conforme avançarmos)
 
 > Esta seção será atualizada a cada nova instrução/feature implementada.
+
+- 2026-09-08 — Regra de contexto para missões recorrentes validada: `Recorrencia`
+  configura a geração, enquanto `Ocorrencia` persiste cada execução planejada.
+  A entidade, enum e configuração EF Core foram adicionados ao platform;
+  `MovimentacaoPontos` passou a referenciar `OcorrenciaId`; a constraint
+  única `(missao_id, data_prevista)` e seus índices foram incluídos. A única
+  migration `CriarModeloInicial` (inclusive designer e snapshot) foi atualizada
+  diretamente, sem criar nova versão, pois o banco ainda não foi publicado.
 
 - 2026-08-26 — Mapeamento inicial do projeto (este documento).
 - 2026-08-26 — PostgreSQL passou a rodar em container Docker (Docker Desktop)
