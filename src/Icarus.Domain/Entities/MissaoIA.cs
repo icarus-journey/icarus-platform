@@ -24,7 +24,10 @@ public class MissaoIA : EntidadeBase
     public string? Beneficio { get; set; }
     public DateOnly? DataLimite { get; set; }
     public DateTimeOffset Horario { get; set; }
-    public StatusMissao Status { get; set; } = StatusMissao.Pendente;
+
+    /// <summary>Sempre nasce como rascunho — só vira uma <see cref="Missao"/> real após aprovação.</summary>
+    public StatusMissao Status { get; set; } = StatusMissao.Rascunho;
+
     public StatusAprovacaoMissaoIA StatusAprovacao { get; set; }
     public DateTimeOffset? ConcluidaEm { get; set; }
 

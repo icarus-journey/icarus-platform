@@ -3,6 +3,7 @@ using System;
 using Icarus.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Icarus.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(IcarusDbContext))]
-    partial class IcarusDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260914053351_PersistirOcorrencias")]
+    partial class PersistirOcorrencias
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

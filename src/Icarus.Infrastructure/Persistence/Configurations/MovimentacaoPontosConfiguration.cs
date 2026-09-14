@@ -25,20 +25,21 @@ public class MovimentacaoPontosConfiguration : IEntityTypeConfiguration<Moviment
             .HasForeignKey(m => m.UsuarioId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Restrict propositalmente: excluir um item/missão não pode apagar o histórico de pontos (ver seção 18 do DER).
+        // Restrict propositalmente: excluir um item/ocorrência não pode apagar o histórico de pontos (ver seção 18 do DER).
         builder.HasOne(m => m.Item)
             .WithMany(i => i.MovimentacoesPontos)
             .HasForeignKey(m => m.ItemId)
             .IsRequired(false)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasOne(m => m.Missao)
-            .WithMany(mi => mi.MovimentacoesPontos)
-            .HasForeignKey(m => m.MissaoId)
+        builder.HasOne(m => m.Ocorrencia)
+            .WithMany(o => o.MovimentacoesPontos)
+            .HasForeignKey(m => m.OcorrenciaId)
             .IsRequired(false)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(m => new { m.UsuarioId, m.CriadoEm });
         builder.HasIndex(m => new { m.UsuarioId, m.Tipo });
+        builder.HasIndex(m => m.OcorrenciaId);
     }
 }

@@ -13,8 +13,8 @@ public class MovimentacaoPontos
     public Guid UsuarioId { get; set; }
     public long? ItemId { get; set; }
 
-    /// <summary>Origem de negócio de um crédito por missão concluída.</summary>
-    public long? MissaoId { get; set; }
+    /// <summary>Origem de negócio de um crédito por ocorrência concluída.</summary>
+    public long? OcorrenciaId { get; set; }
 
     public TipoMovimentacaoPontos Tipo { get; set; }
 
@@ -26,5 +26,5 @@ public class MovimentacaoPontos
 
     public Usuario Usuario { get; set; } = null!;
     public Item? Item { get; set; }
-    public Missao? Missao { get; set; }
+    public Ocorrencia? Ocorrencia { get; set; }
 }
