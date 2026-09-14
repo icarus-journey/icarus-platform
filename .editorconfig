@@ -23,6 +23,13 @@ trim_trailing_whitespace = false
 [**/Migrations/*.cs]
 generated_code = true
 
+# Métodos de teste seguem a convenção Metodo_Cenario_ResultadoEsperado (com
+# underscore), amplamente aceita e mais legível que PascalCase puro para
+# descrever cenários de teste — desliga CA1707 (nomenclatura sem underscore)
+# só nos projetos de teste.
+[tests/**/*.cs]
+dotnet_diagnostic.CA1707.severity = none
+
 ###############################################################################
 # Convenções de código C# — baseadas no padrão da comunidade .NET
 # (mesmo estilo usado pelo runtime/SDK oficiais da Microsoft)

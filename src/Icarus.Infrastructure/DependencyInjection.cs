@@ -1,4 +1,6 @@
+using Icarus.Application.Abstractions;
 using Icarus.Infrastructure.Persistence;
+using Icarus.Infrastructure.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,6 +23,8 @@ public static class DependencyInjection
         services.AddDbContext<IcarusDbContext>(options => options
             .UseNpgsql(connectionString)
             .UseSnakeCaseNamingConvention());
+
+        services.AddSingleton<IPasswordHasher, PasswordHasher>();
 
         return services;
     }
