@@ -640,3 +640,23 @@ comunicarem pelo nome do serviço em vez de porta publicada no host.
   projetos de teste, para permitir a convenção
   `Metodo_Cenario_ResultadoEsperado` nos nomes de teste. `dotnet build`
   (0 avisos/erros) e `dotnet test` (4 aprovados) validados.
+- 2026-09-14 — Mesclado o trabalho do colega Fabiam (`fb994f0`, "feat:
+  persistir ocorrencias recorrentes"): reintrodução da entidade `Ocorrencia`
+  e do enum `StatusOcorrencia`, `MovimentacaoPontos` voltando a referenciar
+  `OcorrenciaId`. Diferente da tentativa nossa em 2026-08-29, dessa vez a
+  direção é validada oficialmente pelo `icarus-context` (DER v1.2, commit
+  `2a2ffc7`, ADR-013) — não é mais uma interpretação própria. Decidido com o
+  usuário: trazer o trabalho do colega preservando a autoria, em vez de
+  reverter e reescrever como nosso.
+  Duas correções feitas durante o merge: (1) a migration `CriarModeloInicial`
+  tinha sido editada diretamente, apesar de já publicada (`826c46d`) —
+  restaurada ao conteúdo original; o `Ocorrencia` agora entra como migration
+  incremental própria (`PersistirOcorrencias`); (2) `StatusMissao` mantinha
+  os valores antigos de execução, desatualizados em relação ao DER v1.2/RF-04
+  (que redefinem `Missao.Status` como ciclo `Rascunho`/`Ativa`/`Inativa`,
+  já que execução passa a pertencer à `Ocorrencia`) — corrigido o enum e os
+  defaults (`Missao` nasce `Ativa`; `MissaoIA` nasce `Rascunho`, por ser
+  sugestão ainda não aprovada). Banco local recriado do zero; 14 tabelas
+  (3 migrations empilhadas: `CriarModeloInicial`, `AdicionarAutenticacao`,
+  `PersistirOcorrencias`) conferidas via `psql`. `dotnet build` (0
+  avisos/erros) e `dotnet test` (4 aprovados) validados.
