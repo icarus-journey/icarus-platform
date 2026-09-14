@@ -39,9 +39,9 @@ assíncrono, regras de negócio e persistência dos dados transacionais do Icaru
 
 Estado atual: **projeto em estágio inicial**. A estrutura de solução (Clean
 Architecture), a persistência com Entity Framework Core / PostgreSQL e o
-modelo de dados completo do MVP (12 entidades, ver seção 4.3) já foram
-criados. Ainda não há casos de uso, controllers nem nenhuma feature de negócio
-(regras de aplicação) codificada — a API não expõe nenhum endpoint funcional.
+modelo de dados completo do MVP (13 entidades, ver seção 4.3) já foram
+criados. Autenticação (cadastro/login) está em construção — ver seção 4.4.
+Ainda não há controllers nem endpoint funcional exposto pela API.
 
 O modelo de dados segue o DER do `icarus-context` na versão **1.1**
 (2026-09-05) — ver seção 4.3 para o histórico de reconciliação entre nossa
@@ -131,7 +131,7 @@ Icarus.Api  ──> Icarus.Infrastructure ──> Icarus.Application ──> Ica
 Icarus.Api.Tests ──> Icarus.Api
 ```
 
-- `Icarus.Domain`: sem dependências (camada mais interna). Contém as 12 entidades do modelo de dados e os enums (ver seção 4.3).
+- `Icarus.Domain`: sem dependências (camada mais interna). Contém as 13 entidades do modelo de dados e os enums (ver seção 4.3).
 - `Icarus.Application`: referencia `Icarus.Domain`. Ainda vazio (sem casos de uso).
 - `Icarus.Infrastructure`: referencia `Icarus.Application`. Contém `DependencyInjection.cs`, o `DbContext`, as configurações EF Core e as migrations.
 - `Icarus.Api`: referencia `Icarus.Application` e `Icarus.Infrastructure`. Ponto de entrada (`Program.cs`).
@@ -156,7 +156,7 @@ Icarus.Api.Tests ──> Icarus.Api
 **`src/Icarus.Domain`** (`Icarus.Domain.csproj`)
 - SDK: `Microsoft.NET.Sdk`.
 - Sem dependências (nem de EF Core) — entidades são POCOs puros, mapeamento fica todo em `Icarus.Infrastructure`.
-- `Entities/`: as 12 entidades do modelo de dados (ver seção 4.3).
+- `Entities/`: as 13 entidades do modelo de dados (ver seção 4.3).
 - `Common/EntidadeBase.cs`: classe abstrata com `CriadoEm`/`AtualizadoEm`, herdada por todas as entidades exceto `MovimentacaoPontos` (que só tem `CriadoEm`, por ser um registro imutável). Fica em `Common/` (não em `Entities/`) seguindo o padrão dos templates de Clean Architecture .NET mais adotados pela comunidade (Jason Taylor, Ardalis): abstrações compartilhadas do domínio (bases, futuras interfaces de evento de domínio etc.) ficam separadas das entidades concretas.
 - `Enums/`: `StatusMissao`, `EstadoEpico`, `EstadoCampanha`, `StatusAprovacaoMissaoIA`, `ControlaApp`, `TipoRelatorio`, `TipoMovimentacaoPontos` — listas iniciais sugeridas pelo DER, ainda decisões de domínio em aberto.
 
@@ -208,7 +208,8 @@ português**, sem exceção (nem os campos técnicos de auditoria).
 
 **Entidades criadas** (namespace `Icarus.Domain.Entities`): `Usuario`,
 `Rotina`, `Epico`, `Campanha`, `Missao`, `MissaoIA`, `Recorrencia`, `Diario`,
-`Relatorio`, `Item`, `InventarioItem`, `MovimentacaoPontos` — as 12 do DER v1.1.
+`Relatorio`, `Item`, `InventarioItem`, `MovimentacaoPontos` — as 12 do DER v1.1
+— mais `TokenRenovacao`, criada em 2026-09-06 para autenticação (ver seção 4.4).
 
 #### Revisão do DER v1.0 (2026-08-29): lacuna da entidade `Ocorrencia` — revertida em 2026-09-06
 
@@ -331,6 +332,80 @@ nunca é editado à mão.
 **`tests/Icarus.Api.Tests`** (`Icarus.Api.Tests.csproj`)
 - Framework: xUnit (versões centralizadas em `Directory.Packages.props`): `xunit`, `xunit.runner.visualstudio`, `Microsoft.NET.Test.Sdk`, `coverlet.collector`.
 - Único teste: `TesteExemplo.Teste1` — vazio, apenas placeholder, não testa nada ainda.
+
+## 4.4 Autenticação (em construção)
+
+Fonte funcional: RF-01 (cadastro) e RF-02 (login/autorização) em
+`docs/product-specification/04-requisitos.md`, e seção 10.2 (controles da API)
+em `01-arquitetura-da-solucao.md`, ambos no `icarus-context`.
+
+**Lacuna encontrada no DER:** a tabela `USUARIO` do DER não tinha nenhum
+campo de senha, apesar do RF-01/RF-02 exigirem hash Argon2id. Adicionamos
+`Usuario.SenhaHash` (`string`, `varchar(255)`, guarda o hash Argon2id — nunca
+a senha em texto puro, RNF-12) como campo fora do DER original, mesmo padrão
+da lacuna do `Ocorrencia` (seção 4.3).
+
+**Divergências deliberadas do MVP documentado** (decisão tomada com o usuário
+em 2026-09-06, não são lacunas — o RF-02 original está correto e validado,
+optamos por ir além dele):
+
+- **Access token curto + refresh token de longa duração**, em vez do "JWT de
+  24h sem renovação" do RF-02. Para isso criamos a entidade `TokenRenovacao`
+  (`Id`, `UsuarioId`, `TokenHash`, `ExpiraEm`, `RevogadoEm`,
+  `SubstituidoPorId`) — guarda só o **hash** do refresh token (nunca o valor
+  em texto puro, mesmo cuidado da senha), com **rotação**: cada uso de um
+  refresh token gera um par novo e marca o antigo como substituído
+  (`SubstituidoPorId`), permitindo detectar reuso indevido de um token já
+  trocado. FK para `Usuario` em cascade (apagar o usuário apaga seus tokens);
+  FK própria (`SubstituidoPor`) em `Restrict` — o token antigo nunca é
+  apagado, só marcado, para preservar o histórico/auditoria da rotação.
+  `TokenHash` é único (`ix_token_renovacao_token_hash`).
+- **Validação de senha mantida como o RF-01.2 já define** (8 a 128
+  caracteres, **sem** regra obrigatória de composição maiúscula/minúscula/
+  número/especial) — o usuário considerou adicionar regra de composição, mas
+  decidimos manter o que já está validado: exigir composição é uma prática
+  ultrapassada (NIST SP 800-63B e OWASP recomendam hoje comprimento sobre
+  composição, já que regras de composição levam a senhas previsíveis).
+- **Sem adoção do pacote `Microsoft.AspNetCore.Identity`** — o "padrão de
+  prateleira" do .NET para cadastro/login, mas seu esquema de tabelas
+  (`AspNetUsers` etc., nomes em inglês) bateria de frente com a regra da
+  seção 0 (campos de tabela sempre em português, entidades espelhando o
+  DER). Construímos autenticação por cima de peças padrão do .NET
+  (`Microsoft.AspNetCore.Authentication.JwtBearer`, `Microsoft.AspNetCore.RateLimiting`
+  para o limite de tentativas do RF-02) sem adotar o *user store* do
+  `Identity` inteiro.
+
+**Migration:** `AdicionarAutenticacao` (2026-09-06), aplicada de forma
+incremental sobre `CriarModeloInicial` (não foi mais substituída — a partir
+daqui as migrations passam a ser empilhadas normalmente, já que
+`CriarModeloInicial` já foi publicada/compartilhada). Validado: 13 tabelas
+(`usuario` com `senha_hash`, mais `token_renovacao`) conferidas via `psql`;
+`dotnet build` (0 avisos/erros) e `dotnet test` passando.
+
+**Hash de senha (Argon2id):** implementado via `IPasswordHasher`
+(`Icarus.Application/Abstractions/IPasswordHasher.cs`), com implementação
+`PasswordHasher` em `Icarus.Infrastructure/Security/` usando o pacote
+`Konscious.Security.Cryptography.Argon2` (registrado como `AddSingleton`,
+já que não guarda estado). Parâmetros de custo seguem a segunda recomendação
+do RFC 9106 (m=65536 KiB, t=3, p=4). O hash é serializado como uma única
+string autodescritiva (parâmetros + salt + hash em Base64, formato inspirado
+no PHC string format), permitindo aumentar o custo no futuro sem invalidar
+hashes já salvos. Comparação em `Verify` usa
+`CryptographicOperations.FixedTimeEquals` (tempo constante, evita vazar por
+timing em qual byte o hash diverge). Testado em
+`tests/Icarus.Api.Tests/PasswordHasherTests.cs` (hashes diferentes para a
+mesma senha graças ao salt aleatório; verificação correta/incorreta).
+
+Ajuste de tooling: `.editorconfig` ganhou uma regra `[tests/**/*.cs]` com
+`dotnet_diagnostic.CA1707.severity = none` — os analisadores por padrão
+reclamam de underscore em nome de método (`CA1707`), mas a convenção
+`Metodo_Cenario_ResultadoEsperado` é comum e mais legível especificamente
+para testes; desligamos a regra só nos projetos de teste, mantendo o padrão
+em código de produção.
+
+**Ainda não implementado** (próximos passos do plano em andamento): casos de
+uso de cadastro/login/refresh/logout em `Icarus.Application`,
+geração/validação de JWT, endpoints em `Icarus.Api`, rate limiting de login.
 
 ## 5. CI/CD
 
@@ -521,3 +596,31 @@ comunicarem pelo nome do serviço em vez de porta publicada no host.
   (console administrativo) respondendo em `localhost`. Ver seção 6.3 para o
   detalhamento e a nota sobre a futura rede Docker compartilhada, necessária
   só quando a API for containerizada.
+- 2026-09-06 — Iniciada a construção de cadastro/login (RF-01/RF-02).
+  Passo 1 do plano: adicionado `Usuario.SenhaHash` (lacuna do DER, campo de
+  senha não existia) e criada a entidade `TokenRenovacao` para o par access
+  token + refresh token com rotação — decisão tomada com o usuário de
+  divergir do "JWT de 24h sem renovação" do RF-02 original. Mantida a
+  validação de senha do RF-01.2 como já documentada (8-128 caracteres, sem
+  regra de composição), após discussão sobre NIST/OWASP recomendarem
+  comprimento sobre composição. Decidido também não adotar
+  `Microsoft.AspNetCore.Identity` (esquema de tabelas em inglês bateria com a
+  regra de nomes em português da seção 0); autenticação será construída com
+  peças padrão do .NET (`JwtBearer`, `RateLimiting`) sem o *user store* do
+  `Identity`. Migration `AdicionarAutenticacao` gerada e aplicada de forma
+  incremental (não substitui mais `CriarModeloInicial`, já publicada). Ver
+  seção 4.4 para o detalhamento completo. `dotnet build`/`dotnet test`
+  validados; 13 tabelas conferidas via `psql`.
+- 2026-09-13 — Passo 2 do plano de autenticação: hash de senha com Argon2id.
+  Criada a interface `IPasswordHasher` em `Icarus.Application/Abstractions`
+  (primeiro código real dessa camada) e a implementação `PasswordHasher` em
+  `Icarus.Infrastructure/Security`, usando o pacote
+  `Konscious.Security.Cryptography.Argon2` (parâmetros conforme a segunda
+  recomendação do RFC 9106), registrada via `AddSingleton` em
+  `DependencyInjection.cs`. Hash serializado como string autodescritiva
+  (parâmetros + salt + hash em Base64). Adicionados testes em
+  `PasswordHasherTests.cs`. Ajuste de tooling: `.editorconfig` ganhou a regra
+  `[tests/**/*.cs]` desligando `CA1707` (nomenclatura sem underscore) só nos
+  projetos de teste, para permitir a convenção
+  `Metodo_Cenario_ResultadoEsperado` nos nomes de teste. `dotnet build`
+  (0 avisos/erros) e `dotnet test` (4 aprovados) validados.
