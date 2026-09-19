@@ -1,0 +1,25 @@
+<Project>
+
+  <!--
+    Propriedades comuns a todos os projetos da solução, seguindo o padrão
+    da comunidade .NET (evita duplicação entre os .csproj e garante
+    consistência de análise/estilo de código em todo o repositório).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+
+    <!-- Analisadores .NET (built-in) e aplicação das regras de estilo do .editorconfig no build -->
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <AnalysisMode>Recommended</AnalysisMode>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+
+    <!-- Gera warning para APIs obsoletas e uso incorreto de nulabilidade -->
+    <WarningsAsErrors />
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+</Project>
