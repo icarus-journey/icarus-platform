@@ -18,12 +18,19 @@ public class Missao : EntidadeBase
     public string? Beneficio { get; set; }
     public DateOnly? DataLimite { get; set; }
     public DateTimeOffset Horario { get; set; }
-    public StatusMissao Status { get; set; } = StatusMissao.Pendente;
+
+    /// <summary>Ciclo da missão. Estado de execução pertence a cada <see cref="Ocorrencia"/> (DER v1.2).</summary>
+    public StatusMissao Status { get; set; } = StatusMissao.Ativa;
+
+    /// <summary>
+    /// Em missão não recorrente, espelha a conclusão de sua única ocorrência
+    /// para consulta operacional (RF-04); não é a fonte de verdade.
+    /// </summary>
     public DateTimeOffset? ConcluidaEm { get; set; }
 
     public Usuario Usuario { get; set; } = null!;
     public Campanha? Campanha { get; set; }
     public Recorrencia? Recorrencia { get; set; }
-    public ICollection<MovimentacaoPontos> MovimentacoesPontos { get; set; } = new List<MovimentacaoPontos>();
+    public ICollection<Ocorrencia> Ocorrencias { get; set; } = new List<Ocorrencia>();
     public ICollection<MissaoIA> MissoesIA { get; set; } = new List<MissaoIA>();
 }

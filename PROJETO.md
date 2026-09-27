@@ -1,7 +1,7 @@
 # Icarus Platform — Documentação do Projeto
 
 > Documento vivo. Mantido e atualizado à medida que novas decisões e features forem implementadas.
-> Última atualização: 2026-09-06
+> Última atualização: 2026-09-08
 
 ## 0. Regra permanente do projeto
 
@@ -39,13 +39,13 @@ assíncrono, regras de negócio e persistência dos dados transacionais do Icaru
 
 Estado atual: **projeto em estágio inicial**. A estrutura de solução (Clean
 Architecture), a persistência com Entity Framework Core / PostgreSQL e o
-modelo de dados completo do MVP (12 entidades, ver seção 4.3) já foram
-criados. Ainda não há casos de uso, controllers nem nenhuma feature de negócio
-(regras de aplicação) codificada — a API não expõe nenhum endpoint funcional.
+modelo de dados completo do MVP (14 entidades, ver seção 4.3), incluindo
+ocorrências persistidas para missões recorrentes, já foram criados.
+Autenticação (cadastro/login) está em construção — ver seção 4.4. Ainda não
+há controllers nem endpoint funcional exposto pela API.
 
-O modelo de dados segue o DER do `icarus-context` na versão **1.1**
-(2026-09-05) — ver seção 4.3 para o histórico de reconciliação entre nossa
-implementação e as atualizações do DER.
+O modelo de dados segue o DER do `icarus-context` na versão **1.2**
+(2026-09-08), incluindo ocorrências persistidas para missões recorrentes.
 
 ## 2. Repositório e fluxo Git
 
@@ -131,7 +131,7 @@ Icarus.Api  ──> Icarus.Infrastructure ──> Icarus.Application ──> Ica
 Icarus.Api.Tests ──> Icarus.Api
 ```
 
-- `Icarus.Domain`: sem dependências (camada mais interna). Contém as 12 entidades do modelo de dados e os enums (ver seção 4.3).
+- `Icarus.Domain`: sem dependências (camada mais interna). Contém as 14 entidades do modelo de dados e os enums (ver seção 4.3).
 - `Icarus.Application`: referencia `Icarus.Domain`. Ainda vazio (sem casos de uso).
 - `Icarus.Infrastructure`: referencia `Icarus.Application`. Contém `DependencyInjection.cs`, o `DbContext`, as configurações EF Core e as migrations.
 - `Icarus.Api`: referencia `Icarus.Application` e `Icarus.Infrastructure`. Ponto de entrada (`Program.cs`).
@@ -156,9 +156,9 @@ Icarus.Api.Tests ──> Icarus.Api
 **`src/Icarus.Domain`** (`Icarus.Domain.csproj`)
 - SDK: `Microsoft.NET.Sdk`.
 - Sem dependências (nem de EF Core) — entidades são POCOs puros, mapeamento fica todo em `Icarus.Infrastructure`.
-- `Entities/`: as 12 entidades do modelo de dados (ver seção 4.3).
+- `Entities/`: as 14 entidades do modelo de dados (ver seção 4.3).
 - `Common/EntidadeBase.cs`: classe abstrata com `CriadoEm`/`AtualizadoEm`, herdada por todas as entidades exceto `MovimentacaoPontos` (que só tem `CriadoEm`, por ser um registro imutável). Fica em `Common/` (não em `Entities/`) seguindo o padrão dos templates de Clean Architecture .NET mais adotados pela comunidade (Jason Taylor, Ardalis): abstrações compartilhadas do domínio (bases, futuras interfaces de evento de domínio etc.) ficam separadas das entidades concretas.
-- `Enums/`: `StatusMissao`, `EstadoEpico`, `EstadoCampanha`, `StatusAprovacaoMissaoIA`, `ControlaApp`, `TipoRelatorio`, `TipoMovimentacaoPontos` — listas iniciais sugeridas pelo DER, ainda decisões de domínio em aberto.
+- `Enums/`: `StatusMissao`, `StatusOcorrencia`, `EstadoEpico`, `EstadoCampanha`, `StatusAprovacaoMissaoIA`, `ControlaApp`, `TipoRelatorio`, `TipoMovimentacaoPontos` — listas iniciais sugeridas pelo DER, ainda decisões de domínio em aberto.
 
 **`src/Icarus.Infrastructure`** (`Icarus.Infrastructure.csproj`)
 - SDK: `Microsoft.NET.Sdk`.
@@ -203,41 +203,55 @@ português**, sem exceção (nem os campos técnicos de auditoria).
 - Datas "de calendário" (`DataNascimento`, `PrazoInicio/Fim`, `VigenciaInicio/Fim`, `DataRegistro`, `PeriodoInicio/Fim`, `DataInicio/Fim` da recorrência, `DataLimite` da missão/missão IA): `DateOnly`/`DateOnly?` (`date`) — tipo idiomático do .NET moderno para data sem hora.
 - Instantes (`CriadoEm`, `AtualizadoEm`, `Horario`, `ConcluidaEm`): `DateTimeOffset` (`timestamptz`), conforme exigido pelo DER.
 - `Recorrencia.Regra` e `Relatorio.Conteudo`: `string` mapeado para `jsonb` via `HasColumnType("jsonb")`.
-- `Missao.Status`, `MissaoIA.Status`/`StatusAprovacao`, `Epico.Estado`, `Campanha.Estado`, `Item.ControlaApp`, `Relatorio.Tipo`, `MovimentacaoPontos.Tipo`: enums C# persistidos como texto (`HasConversion<string>()`), não como inteiro — mais legível direto no banco e mais fácil de estender.
+- `Missao.Status`, `Ocorrencia.Status`, `MissaoIA.Status`/`StatusAprovacao`, `Epico.Estado`, `Campanha.Estado`, `Item.ControlaApp`, `Relatorio.Tipo`, `MovimentacaoPontos.Tipo`: enums C# persistidos como texto (`HasConversion<string>()`), não como inteiro — mais legível direto no banco e mais fácil de estender.
 - `Campanha.ValorMensurado`/`ValorAtual`: `decimal?` (`numeric(12,2)`) — nulo quando a campanha não é mensurável.
 
 **Entidades criadas** (namespace `Icarus.Domain.Entities`): `Usuario`,
-`Rotina`, `Epico`, `Campanha`, `Missao`, `MissaoIA`, `Recorrencia`, `Diario`,
-`Relatorio`, `Item`, `InventarioItem`, `MovimentacaoPontos` — as 12 do DER v1.1.
+`Rotina`, `Epico`, `Campanha`, `Missao`, `MissaoIA`, `Recorrencia`,
+`Ocorrencia`, `Diario`, `Relatorio`, `Item`, `InventarioItem`,
+`MovimentacaoPontos` — as 13 do DER v1.2 — mais `TokenRenovacao`, criada em
+2026-09-06 para autenticação (ver seção 4.4). Total: 14 entidades.
 
-#### Revisão do DER v1.0 (2026-08-29): lacuna da entidade `Ocorrencia` — revertida em 2026-09-06
+#### DER v1.2 (2026-09-08): ocorrências persistidas de missão
 
-Ao revisar o DER v1.0 contra o documento de arquitetura mais amplo
-(`01-arquitetura-da-solucao.md`, seções 8.1, 8.2, 9.2 e 9.4), foi identificada
-uma aparente inconsistência: a arquitetura menciona "ocorrência única por
-missão e data prevista" e "conclusão única por ocorrência", enquanto o DER só
-tinha `MISSAO` com um único `status`/`concluida_em` — o que não representa uma
-missão recorrente com histórico por data. Como correção, criamos uma entidade
-`Ocorrencia` própria (não documentada no `icarus-context`), com `Missao`
-perdendo `Status`/`ConcluidaEm` e `MovimentacaoPontos` passando a referenciar
-`OcorrenciaId`.
+Decisão validada com o usuário: `Recorrencia` é exclusivamente a configuração
+de geração; `Ocorrencia` é a execução planejada e persistida de uma missão. A
+ativação de uma recorrência gera os próximos 30 dias e uma rotina diária mantém
+essa janela. Missões não recorrentes também recebem uma única ocorrência.
 
-**Em 2026-09-05, quem mantém o `icarus-context` publicou o DER v1.1**
-(commit `7c51d46`, "docs: adiciona ajustes no DER e contextos") **sem**
-incorporar essa entidade: `MISSAO` continua com `status`/`concluida_em`
-diretos, e o único ajuste relacionado foi acrescentar o valor de status
-`CONCLUIDA_COM_ATRASO`. Ou seja, a equipe do `icarus-context` seguiu evoluindo
-o modelo original (status único por missão) sem ciência da nossa mudança.
+`Ocorrencia` possui `MissaoId`, `DataPrevista`, `Status`, `RealizadaEm` e
+`ConcluidaEm`, além da auditoria comum. A constraint
+`UNIQUE(missao_id, data_prevista)` impede duplicidade na geração. A conclusão
+da ocorrência e a respectiva `MovimentacaoPontos` devem ocorrer na mesma
+transação; por isso a movimentação referencia `OcorrenciaId`, e não mais
+`MissaoId`.
 
-**Decisão tomada com o usuário em 2026-09-06:** reverter para o modelo do DER
-oficial. `Ocorrencia` foi removida; `Missao` voltou a ter `Status`
-(`StatusMissao`, com `Pendente`/`Concluida`/`Cancelada`/`ConcluidaComAtraso`) e
-`ConcluidaEm` diretos; `MovimentacaoPontos` voltou a referenciar `MissaoId`. A
-lacuna de missões recorrentes com histórico por ocorrência **continua sem
-solução física no DER** — é uma pendência do produto, não mais algo que
-resolvemos por conta própria na implementação. Deve ser levantada com quem
-mantém o `icarus-context` antes de qualquer feature que dependa disso (ex.:
-concluir/desfazer uma data específica de uma missão recorrente).
+Alterar uma recorrência afeta apenas ocorrências futuras. Inativá-la
+exclui/cancela as futuras ou pendentes não vencidas e preserva as atrasadas e
+concluídas.
+
+**Correção feita durante o merge (2026-09-14):** a implementação original
+desta feature editou a migration `CriarModeloInicial` diretamente em vez de
+criar uma nova. Isso funciona só enquanto nenhum banco existe a partir dela —
+mas essa migration **já tinha sido commitada e publicada** antes (`826c46d`),
+e o banco local deste ambiente já a tinha aplicado. Editar uma migration já
+compartilhada é um problema real: quem já rodou `dotnet ef database update`
+contra a versão original fica com um `__EFMigrationsHistory` que diz "já
+apliquei `CriarModeloInicial`", mas o conteúdo real da migration mudou por
+baixo — `dotnet ef database update` não pega as tabelas/colunas novas
+sozinho. Ao trazer essa mudança para o branch principal, restauramos
+`CriarModeloInicial` (`.cs`, `.Designer.cs`) para o conteúdo original
+publicado e criamos uma migration nova (`PersistirOcorrencias`) só com o
+delta do `Ocorrencia` — migrations já publicadas não devem ser editadas,
+sempre uma nova migration em cima.
+
+**Também corrigido durante o merge:** o DER v1.2 muda o significado de
+`Missao.Status` — deixa de ser status de execução (que passa a viver em
+`Ocorrencia`) e passa a representar o ciclo da missão (`RASCUNHO`/`ATIVA`/
+`INATIVA`, ver RF-04 em `04-requisitos.md`). A implementação original manteve
+`Missao.Status` com o enum antigo (`Pendente`/`Concluida`/`Cancelada`/
+`ConcluidaComAtraso`), desatualizado em relação ao DER v1.2. Corrigido:
+`StatusMissao` agora tem `Rascunho`/`Ativa`/`Inativa`.
 
 #### DER v1.1 (2026-09-05): novos campos e entidade `MissaoIA`
 
@@ -280,17 +294,18 @@ diferente.
 **Regras de integridade implementadas** (Fluent API, seguindo a seção 26–27 do DER):
 - `usuario.email` único;
 - `recorrencia.missao_id` único (no máximo uma recorrência por missão);
+- `ocorrencia(missao_id, data_prevista)` único (idempotência da geração — seção 27.4 do DER);
 - `inventario_item(usuario_id, item_id)` único (uma linha por item no inventário);
 - `CHECK` de não-negatividade em `usuario.saldo_pontos`, `missao.pontuacao`, `missao_ia.pontuacao`, `item.valor`, `inventario_item.quantidade`;
-- índices de consulta em `rotina(usuario_id, vigencia_inicio, vigencia_fim)`, `missao(usuario_id/campanha_id/horario/status)`, `missao_ia(usuario_id/status_aprovacao)`, `movimentacao_pontos(usuario_id, criado_em)`, entre outros listados no DER.
+- índices de consulta em `rotina(usuario_id, vigencia_inicio, vigencia_fim)`, `missao(usuario_id/campanha_id/horario/status)`, `missao_ia(usuario_id/status_aprovacao)`, `ocorrencia(status)`, `movimentacao_pontos(usuario_id, criado_em)`/`(ocorrencia_id)`, entre outros listados no DER.
 
 **Exclusão em cascata:** todas as relações a partir de `Usuario` (e as
 compostas `Epico → Campanha`, `Campanha → Missao`, `Campanha → MissaoIA`,
-`Missao → Recorrencia`, `Item → InventarioItem`) usam `ON DELETE CASCADE`,
+`Missao → Recorrencia`, `Missao → Ocorrencia`, `Item → InventarioItem`) usam `ON DELETE CASCADE`,
 coerente com a decisão do MVP de exclusão física simples (seção 29 do DER).
 **Exceções deliberadas:**
-- as FKs opcionais de `MovimentacaoPontos` para `Item` e `Missao` usam
-  `ON DELETE RESTRICT` — excluir um item ou uma missão não pode apagar o
+- as FKs opcionais de `MovimentacaoPontos` para `Item` e `Ocorrencia` usam
+  `ON DELETE RESTRICT` — excluir um item ou uma ocorrência não pode apagar o
   histórico de pontos (extrato imutável, seções 17–18 do DER);
 - a FK opcional de `MissaoIA` para `Missao` usa `ON DELETE SET NULL` —
   excluir a missão gerada não precisa apagar o registro de auditoria da
@@ -313,24 +328,92 @@ dotnet ef migrations add NomeDaMigration --project ../Icarus.Infrastructure --st
 dotnet ef database update --project ../Icarus.Infrastructure --startup-project .
 ```
 
-Como nenhum dado real existe ainda, a migration inicial foi **substituída**
-outra vez em 2026-09-06 (banco local derrubado com `dotnet ef database drop` e
-recriado do zero) em vez de empilhar migrations incrementais em cima da versão
-com `Ocorrencia` — mesma decisão de manter o histórico de migrations limpo
-enquanto não há dado de produção.
-
-Validado em 2026-09-06: as 12 tabelas do modelo v1.1 (`usuario`, `rotina`,
-`epico`, `campanha`, `missao`, `missao_ia`, `recorrencia`, `diario`,
-`relatorio`, `item`, `inventario_item`, `movimentacao_pontos`) foram criadas
-no container (`docker exec icarus-postgres psql -U postgres -d icarus -c "\dt"`),
-com `dotnet build` (0 avisos, 0 erros) e `dotnet test` passando limpos.
+`CriarModeloInicial` permanece exatamente como foi publicada originalmente
+(seção 8, 2026-09-06) — nunca mais editada depois de commitada/compartilhada.
+As mudanças do `Ocorrencia` (DER v1.2, 2026-09-08) e da autenticação (seção
+4.4) entram como migrations incrementais próprias em cima dela
+(`AdicionarAutenticacao`, `PersistirOcorrencias`), empilhadas normalmente.
 `Migrations/*.cs` continua marcado como `generated_code = true` no
 `.editorconfig` para os analisadores do .NET não gerarem ruído em código que
 nunca é editado à mão.
 
 **`tests/Icarus.Api.Tests`** (`Icarus.Api.Tests.csproj`)
 - Framework: xUnit (versões centralizadas em `Directory.Packages.props`): `xunit`, `xunit.runner.visualstudio`, `Microsoft.NET.Test.Sdk`, `coverlet.collector`.
-- Único teste: `TesteExemplo.Teste1` — vazio, apenas placeholder, não testa nada ainda.
+- Testes de domínio devem cobrir as transições de status e a geração de ocorrências antes dos casos de uso serem implementados.
+
+## 4.4 Autenticação (em construção)
+
+Fonte funcional: RF-01 (cadastro) e RF-02 (login/autorização) em
+`docs/product-specification/04-requisitos.md`, e seção 10.2 (controles da API)
+em `01-arquitetura-da-solucao.md`, ambos no `icarus-context`.
+
+**Lacuna encontrada no DER:** a tabela `USUARIO` do DER não tinha nenhum
+campo de senha, apesar do RF-01/RF-02 exigirem hash Argon2id. Adicionamos
+`Usuario.SenhaHash` (`string`, `varchar(255)`, guarda o hash Argon2id — nunca
+a senha em texto puro, RNF-12) como campo fora do DER original, mesmo padrão
+da lacuna do `Ocorrencia` (seção 4.3).
+
+**Divergências deliberadas do MVP documentado** (decisão tomada com o usuário
+em 2026-09-06, não são lacunas — o RF-02 original está correto e validado,
+optamos por ir além dele):
+
+- **Access token curto + refresh token de longa duração**, em vez do "JWT de
+  24h sem renovação" do RF-02. Para isso criamos a entidade `TokenRenovacao`
+  (`Id`, `UsuarioId`, `TokenHash`, `ExpiraEm`, `RevogadoEm`,
+  `SubstituidoPorId`) — guarda só o **hash** do refresh token (nunca o valor
+  em texto puro, mesmo cuidado da senha), com **rotação**: cada uso de um
+  refresh token gera um par novo e marca o antigo como substituído
+  (`SubstituidoPorId`), permitindo detectar reuso indevido de um token já
+  trocado. FK para `Usuario` em cascade (apagar o usuário apaga seus tokens);
+  FK própria (`SubstituidoPor`) em `Restrict` — o token antigo nunca é
+  apagado, só marcado, para preservar o histórico/auditoria da rotação.
+  `TokenHash` é único (`ix_token_renovacao_token_hash`).
+- **Validação de senha mantida como o RF-01.2 já define** (8 a 128
+  caracteres, **sem** regra obrigatória de composição maiúscula/minúscula/
+  número/especial) — o usuário considerou adicionar regra de composição, mas
+  decidimos manter o que já está validado: exigir composição é uma prática
+  ultrapassada (NIST SP 800-63B e OWASP recomendam hoje comprimento sobre
+  composição, já que regras de composição levam a senhas previsíveis).
+- **Sem adoção do pacote `Microsoft.AspNetCore.Identity`** — o "padrão de
+  prateleira" do .NET para cadastro/login, mas seu esquema de tabelas
+  (`AspNetUsers` etc., nomes em inglês) bateria de frente com a regra da
+  seção 0 (campos de tabela sempre em português, entidades espelhando o
+  DER). Construímos autenticação por cima de peças padrão do .NET
+  (`Microsoft.AspNetCore.Authentication.JwtBearer`, `Microsoft.AspNetCore.RateLimiting`
+  para o limite de tentativas do RF-02) sem adotar o *user store* do
+  `Identity` inteiro.
+
+**Migration:** `AdicionarAutenticacao` (2026-09-06), aplicada de forma
+incremental sobre `CriarModeloInicial` (não foi mais substituída — a partir
+daqui as migrations passam a ser empilhadas normalmente, já que
+`CriarModeloInicial` já foi publicada/compartilhada). Validado: 13 tabelas
+(`usuario` com `senha_hash`, mais `token_renovacao`) conferidas via `psql`;
+`dotnet build` (0 avisos/erros) e `dotnet test` passando.
+
+**Hash de senha (Argon2id):** implementado via `IPasswordHasher`
+(`Icarus.Application/Abstractions/IPasswordHasher.cs`), com implementação
+`PasswordHasher` em `Icarus.Infrastructure/Security/` usando o pacote
+`Konscious.Security.Cryptography.Argon2` (registrado como `AddSingleton`,
+já que não guarda estado). Parâmetros de custo seguem a segunda recomendação
+do RFC 9106 (m=65536 KiB, t=3, p=4). O hash é serializado como uma única
+string autodescritiva (parâmetros + salt + hash em Base64, formato inspirado
+no PHC string format), permitindo aumentar o custo no futuro sem invalidar
+hashes já salvos. Comparação em `Verify` usa
+`CryptographicOperations.FixedTimeEquals` (tempo constante, evita vazar por
+timing em qual byte o hash diverge). Testado em
+`tests/Icarus.Api.Tests/PasswordHasherTests.cs` (hashes diferentes para a
+mesma senha graças ao salt aleatório; verificação correta/incorreta).
+
+Ajuste de tooling: `.editorconfig` ganhou uma regra `[tests/**/*.cs]` com
+`dotnet_diagnostic.CA1707.severity = none` — os analisadores por padrão
+reclamam de underscore em nome de método (`CA1707`), mas a convenção
+`Metodo_Cenario_ResultadoEsperado` é comum e mais legível especificamente
+para testes; desligamos a regra só nos projetos de teste, mantendo o padrão
+em código de produção.
+
+**Ainda não implementado** (próximos passos do plano em andamento): casos de
+uso de cadastro/login/refresh/logout em `Icarus.Application`,
+geração/validação de JWT, endpoints em `Icarus.Api`, rate limiting de login.
 
 ## 5. CI/CD
 
@@ -442,7 +525,7 @@ comunicarem pelo nome do serviço em vez de porta publicada no host.
 - CI não roda build/test do .NET, apenas validações estruturais (nem `dotnet format`/analisadores, apesar do `.editorconfig` já estar configurado); também não roda `dotnet ef migrations` em pipeline algum.
 - Sem autenticação/autorização configurada (só `UseAuthorization()` chamado, sem esquema definido) — o DER já assume `Usuario.Id` vindo do JWT, mas isso ainda não existe na API.
 - Pendências de produto herdadas do DER (não bloqueiam a estrutura, mas afetam regras futuras): estados finais da missão, escala de prioridade, regra de sobreposição de vigência da rotina, se o diário aceita múltiplas entradas por dia, estrutura definitiva dos dados externos (ATUS/Vigitel).
-- **Missões recorrentes não têm status por ocorrência no DER oficial** — `Missao` tem um único `Status`/`ConcluidaEm`, então não há hoje como saber se a ocorrência de segunda foi concluída e a de quarta não (ver seção 4.3, "Revisão do DER v1.0"). Levantar com quem mantém o `icarus-context` antes de implementar conclusão de missão recorrente.
+- A rotina diária de geração e os casos de uso para concluir, editar e inativar ocorrências ainda precisam ser implementados; o modelo persistido já suporta a regra validada na seção 4.3.
 - Nulidade de vários campos novos do DER v1.1 (`Epico.AreaDaVida`, `Campanha.ValorMensurado/Unidade/ValorAtual`, `Missao.DataLimite`) foi uma interpretação da equipe, não algo explícito no documento — ver seção 4.3.
 - API ainda não é containerizada nem usa RabbitMQ (broker existe no `icarus-infrastructure`, mas nenhum outbox/inbox foi implementado aqui ainda — ver seção 6.3). Quando a API for containerizada, será preciso criar a rede Docker compartilhada entre `icarus-platform` e `icarus-infrastructure`.
 - **Decisão pendente: estratégia de versionamento das imagens Docker.** Hoje cada serviço usa uma convenção diferente, sem termos parado para decidir isso de propósito:
@@ -454,6 +537,14 @@ comunicarem pelo nome do serviço em vez de porta publicada no host.
 ## 8. Histórico de decisões e features (a atualizar conforme avançarmos)
 
 > Esta seção será atualizada a cada nova instrução/feature implementada.
+
+- 2026-09-08 — Regra de contexto para missões recorrentes validada: `Recorrencia`
+  configura a geração, enquanto `Ocorrencia` persiste cada execução planejada.
+  A entidade, enum e configuração EF Core foram adicionados ao platform;
+  `MovimentacaoPontos` passou a referenciar `OcorrenciaId`; a constraint
+  única `(missao_id, data_prevista)` e seus índices foram incluídos. A única
+  migration `CriarModeloInicial` (inclusive designer e snapshot) foi atualizada
+  diretamente, sem criar nova versão, pois o banco ainda não foi publicado.
 
 - 2026-08-26 — Mapeamento inicial do projeto (este documento).
 - 2026-08-26 — PostgreSQL passou a rodar em container Docker (Docker Desktop)
@@ -521,3 +612,51 @@ comunicarem pelo nome do serviço em vez de porta publicada no host.
   (console administrativo) respondendo em `localhost`. Ver seção 6.3 para o
   detalhamento e a nota sobre a futura rede Docker compartilhada, necessária
   só quando a API for containerizada.
+- 2026-09-06 — Iniciada a construção de cadastro/login (RF-01/RF-02).
+  Passo 1 do plano: adicionado `Usuario.SenhaHash` (lacuna do DER, campo de
+  senha não existia) e criada a entidade `TokenRenovacao` para o par access
+  token + refresh token com rotação — decisão tomada com o usuário de
+  divergir do "JWT de 24h sem renovação" do RF-02 original. Mantida a
+  validação de senha do RF-01.2 como já documentada (8-128 caracteres, sem
+  regra de composição), após discussão sobre NIST/OWASP recomendarem
+  comprimento sobre composição. Decidido também não adotar
+  `Microsoft.AspNetCore.Identity` (esquema de tabelas em inglês bateria com a
+  regra de nomes em português da seção 0); autenticação será construída com
+  peças padrão do .NET (`JwtBearer`, `RateLimiting`) sem o *user store* do
+  `Identity`. Migration `AdicionarAutenticacao` gerada e aplicada de forma
+  incremental (não substitui mais `CriarModeloInicial`, já publicada). Ver
+  seção 4.4 para o detalhamento completo. `dotnet build`/`dotnet test`
+  validados; 13 tabelas conferidas via `psql`.
+- 2026-09-13 — Passo 2 do plano de autenticação: hash de senha com Argon2id.
+  Criada a interface `IPasswordHasher` em `Icarus.Application/Abstractions`
+  (primeiro código real dessa camada) e a implementação `PasswordHasher` em
+  `Icarus.Infrastructure/Security`, usando o pacote
+  `Konscious.Security.Cryptography.Argon2` (parâmetros conforme a segunda
+  recomendação do RFC 9106), registrada via `AddSingleton` em
+  `DependencyInjection.cs`. Hash serializado como string autodescritiva
+  (parâmetros + salt + hash em Base64). Adicionados testes em
+  `PasswordHasherTests.cs`. Ajuste de tooling: `.editorconfig` ganhou a regra
+  `[tests/**/*.cs]` desligando `CA1707` (nomenclatura sem underscore) só nos
+  projetos de teste, para permitir a convenção
+  `Metodo_Cenario_ResultadoEsperado` nos nomes de teste. `dotnet build`
+  (0 avisos/erros) e `dotnet test` (4 aprovados) validados.
+- 2026-09-14 — Mesclado o trabalho do colega Fabiam (`fb994f0`, "feat:
+  persistir ocorrencias recorrentes"): reintrodução da entidade `Ocorrencia`
+  e do enum `StatusOcorrencia`, `MovimentacaoPontos` voltando a referenciar
+  `OcorrenciaId`. Diferente da tentativa nossa em 2026-08-29, dessa vez a
+  direção é validada oficialmente pelo `icarus-context` (DER v1.2, commit
+  `2a2ffc7`, ADR-013) — não é mais uma interpretação própria. Decidido com o
+  usuário: trazer o trabalho do colega preservando a autoria, em vez de
+  reverter e reescrever como nosso.
+  Duas correções feitas durante o merge: (1) a migration `CriarModeloInicial`
+  tinha sido editada diretamente, apesar de já publicada (`826c46d`) —
+  restaurada ao conteúdo original; o `Ocorrencia` agora entra como migration
+  incremental própria (`PersistirOcorrencias`); (2) `StatusMissao` mantinha
+  os valores antigos de execução, desatualizados em relação ao DER v1.2/RF-04
+  (que redefinem `Missao.Status` como ciclo `Rascunho`/`Ativa`/`Inativa`,
+  já que execução passa a pertencer à `Ocorrencia`) — corrigido o enum e os
+  defaults (`Missao` nasce `Ativa`; `MissaoIA` nasce `Rascunho`, por ser
+  sugestão ainda não aprovada). Banco local recriado do zero; 14 tabelas
+  (3 migrations empilhadas: `CriarModeloInicial`, `AdicionarAutenticacao`,
+  `PersistirOcorrencias`) conferidas via `psql`. `dotnet build` (0
+  avisos/erros) e `dotnet test` (4 aprovados) validados.

@@ -20,11 +20,13 @@ public class IcarusDbContext : DbContext
     public DbSet<Missao> Missoes => Set<Missao>();
     public DbSet<MissaoIA> MissoesIA => Set<MissaoIA>();
     public DbSet<Recorrencia> Recorrencias => Set<Recorrencia>();
+    public DbSet<Ocorrencia> Ocorrencias => Set<Ocorrencia>();
     public DbSet<Diario> Diarios => Set<Diario>();
     public DbSet<Relatorio> Relatorios => Set<Relatorio>();
     public DbSet<Item> Itens => Set<Item>();
     public DbSet<InventarioItem> InventarioItens => Set<InventarioItem>();
     public DbSet<MovimentacaoPontos> MovimentacoesPontos => Set<MovimentacaoPontos>();
+    public DbSet<TokenRenovacao> TokensRenovacao => Set<TokenRenovacao>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

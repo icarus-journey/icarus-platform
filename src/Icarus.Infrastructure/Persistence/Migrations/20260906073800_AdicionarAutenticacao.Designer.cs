@@ -3,6 +3,7 @@ using System;
 using Icarus.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Icarus.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(IcarusDbContext))]
-    partial class IcarusDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260906073800_AdicionarAutenticacao")]
+    partial class AdicionarAutenticacao
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -504,9 +507,9 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("item_id");
 
-                    b.Property<long?>("OcorrenciaId")
+                    b.Property<long?>("MissaoId")
                         .HasColumnType("bigint")
-                        .HasColumnName("ocorrencia_id");
+                        .HasColumnName("missao_id");
 
                     b.Property<long>("Quantidade")
                         .HasColumnType("bigint")
@@ -528,8 +531,8 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                     b.HasIndex("ItemId")
                         .HasDatabaseName("ix_movimentacao_pontos_item_id");
 
-                    b.HasIndex("OcorrenciaId")
-                        .HasDatabaseName("ix_movimentacao_pontos_ocorrencia_id");
+                    b.HasIndex("MissaoId")
+                        .HasDatabaseName("ix_movimentacao_pontos_missao_id");
 
                     b.HasIndex("UsuarioId", "CriadoEm")
                         .HasDatabaseName("ix_movimentacao_pontos_usuario_id_criado_em");
@@ -538,58 +541,6 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_movimentacao_pontos_usuario_id_tipo");
 
                     b.ToTable("movimentacao_pontos", (string)null);
-                });
-
-            modelBuilder.Entity("Icarus.Domain.Entities.Ocorrencia", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTimeOffset>("AtualizadoEm")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("atualizado_em");
-
-                    b.Property<DateTimeOffset?>("ConcluidaEm")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("concluida_em");
-
-                    b.Property<DateTimeOffset>("CriadoEm")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("criado_em");
-
-                    b.Property<DateOnly>("DataPrevista")
-                        .HasColumnType("date")
-                        .HasColumnName("data_prevista");
-
-                    b.Property<long>("MissaoId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("missao_id");
-
-                    b.Property<DateTimeOffset?>("RealizadaEm")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("realizada_em");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(25)
-                        .HasColumnType("character varying(25)")
-                        .HasColumnName("status");
-
-                    b.HasKey("Id")
-                        .HasName("pk_ocorrencia");
-
-                    b.HasIndex("Status")
-                        .HasDatabaseName("ix_ocorrencia_status");
-
-                    b.HasIndex("MissaoId", "DataPrevista")
-                        .IsUnique()
-                        .HasDatabaseName("ix_ocorrencia_missao_id_data_prevista");
-
-                    b.ToTable("ocorrencia", (string)null);
                 });
 
             modelBuilder.Entity("Icarus.Domain.Entities.Recorrencia", b =>
@@ -989,11 +940,11 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_movimentacao_pontos_item_item_id");
 
-                    b.HasOne("Icarus.Domain.Entities.Ocorrencia", "Ocorrencia")
+                    b.HasOne("Icarus.Domain.Entities.Missao", "Missao")
                         .WithMany("MovimentacoesPontos")
-                        .HasForeignKey("OcorrenciaId")
+                        .HasForeignKey("MissaoId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_movimentacao_pontos_ocorrencias_ocorrencia_id");
+                        .HasConstraintName("fk_movimentacao_pontos_missao_missao_id");
 
                     b.HasOne("Icarus.Domain.Entities.Usuario", "Usuario")
                         .WithMany("MovimentacoesPontos")
@@ -1004,21 +955,9 @@ namespace Icarus.Infrastructure.Persistence.Migrations
 
                     b.Navigation("Item");
 
-                    b.Navigation("Ocorrencia");
+                    b.Navigation("Missao");
 
                     b.Navigation("Usuario");
-                });
-
-            modelBuilder.Entity("Icarus.Domain.Entities.Ocorrencia", b =>
-                {
-                    b.HasOne("Icarus.Domain.Entities.Missao", "Missao")
-                        .WithMany("Ocorrencias")
-                        .HasForeignKey("MissaoId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_ocorrencia_missao_missao_id");
-
-                    b.Navigation("Missao");
                 });
 
             modelBuilder.Entity("Icarus.Domain.Entities.Recorrencia", b =>
@@ -1100,14 +1039,9 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                 {
                     b.Navigation("MissoesIA");
 
-                    b.Navigation("Ocorrencias");
+                    b.Navigation("MovimentacoesPontos");
 
                     b.Navigation("Recorrencia");
-                });
-
-            modelBuilder.Entity("Icarus.Domain.Entities.Ocorrencia", b =>
-                {
-                    b.Navigation("MovimentacoesPontos");
                 });
 
             modelBuilder.Entity("Icarus.Domain.Entities.Usuario", b =>

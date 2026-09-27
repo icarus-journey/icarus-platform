@@ -7,6 +7,10 @@ public class Usuario : EntidadeBase
     public Guid Id { get; set; }
     public string Nome { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
+
+    /// <summary>Hash Argon2id da senha — nunca a senha em texto puro (RNF-12).</summary>
+    public string SenhaHash { get; set; } = string.Empty;
+
     public DateOnly DataNascimento { get; set; }
 
     /// <summary>
@@ -23,4 +27,5 @@ public class Usuario : EntidadeBase
     public ICollection<Item> Itens { get; set; } = new List<Item>();
     public ICollection<InventarioItem> InventarioItens { get; set; } = new List<InventarioItem>();
     public ICollection<MovimentacaoPontos> MovimentacoesPontos { get; set; } = new List<MovimentacaoPontos>();
+    public ICollection<TokenRenovacao> TokensRenovacao { get; set; } = new List<TokenRenovacao>();
 }

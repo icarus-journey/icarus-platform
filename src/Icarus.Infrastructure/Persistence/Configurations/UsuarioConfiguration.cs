@@ -20,6 +20,10 @@ public class UsuarioConfiguration : IEntityTypeConfiguration<Usuario>
             .IsRequired()
             .HasMaxLength(320);
 
+        builder.Property(u => u.SenhaHash)
+            .IsRequired()
+            .HasMaxLength(255);
+
         builder.HasIndex(u => u.Email)
             .IsUnique();
 
