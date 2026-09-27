@@ -1,4 +1,4 @@
-namespace Icarus.Application.Abstractions;
+namespace Icarus.Application.Interfaces;
 
 /// <summary>
 /// Gera e verifica hash de senha. A implementação concreta (algoritmo,

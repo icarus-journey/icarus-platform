@@ -6,6 +6,8 @@
     <Project Path="src/Icarus.Infrastructure/Icarus.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/Icarus.Api.Tests/Icarus.Api.Tests.csproj" />
+    <Project Path="tests/Icarus.Api.UnitTests/Icarus.Api.UnitTests.csproj" />
+    <Project Path="tests/Icarus.Application.UnitTests/Icarus.Application.UnitTests.csproj" />
+    <Project Path="tests/Icarus.Infrastructure.UnitTests/Icarus.Infrastructure.UnitTests.csproj" />
   </Folder>
 </Solution>

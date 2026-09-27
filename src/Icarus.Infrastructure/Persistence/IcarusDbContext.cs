@@ -1,3 +1,4 @@
+using Icarus.Application.Interfaces;
 using Icarus.Domain.Common;
 using Icarus.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -7,7 +8,7 @@ namespace Icarus.Infrastructure.Persistence;
 /// <summary>
 /// Contexto principal de acesso a dados da aplicação Icarus.
 /// </summary>
-public class IcarusDbContext : DbContext
+public class IcarusDbContext : DbContext, IUnitOfWork
 {
     public IcarusDbContext(DbContextOptions<IcarusDbContext> options) : base(options)
     {
@@ -45,6 +46,9 @@ public class IcarusDbContext : DbContext
         AtualizarTimestamps();
         return base.SaveChangesAsync(cancellationToken);
     }
+
+    async Task IUnitOfWork.SalvarAlteracoesAsync(CancellationToken cancellationToken)
+        => await SaveChangesAsync(cancellationToken);
 
     private void AtualizarTimestamps()
     {

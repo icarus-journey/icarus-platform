@@ -1,6 +1,44 @@
 @Icarus.Api_HostAddress = http://localhost:5138
 
-GET {{Icarus.Api_HostAddress}}/weatherforecast/
-Accept: application/json
+### Cadastro: sucesso (201 Created com o usuarioId).
+### Rode uma vez; para repetir troque o e-mail (ou o próximo caso responde 409).
+POST {{Icarus.Api_HostAddress}}/api/auth/cadastro
+Content-Type: application/json
+
+{
+  "nome": "Ana Silva",
+  "email": "ana@exemplo.com",
+  "senha": "minhaSenha123",
+  "dataNascimento": "2000-01-01"
+}
+
+### Cadastro: e-mail já cadastrado (409 ProblemDetails). A comparação ignora maiúsculas.
+### Rode depois do caso de sucesso acima.
+POST {{Icarus.Api_HostAddress}}/api/auth/cadastro
+Content-Type: application/json
+
+{
+  "nome": "Outra Ana",
+  "email": "ANA@exemplo.com",
+  "senha": "outraSenha456",
+  "dataNascimento": "1999-05-05"
+}
+
+### Cadastro: dados inválidos (400 ValidationProblemDetails, mensagens em português).
+POST {{Icarus.Api_HostAddress}}/api/auth/cadastro
+Content-Type: application/json
+
+{
+  "nome": "",
+  "email": "isso-nao-e-email",
+  "senha": "curta",
+  "dataNascimento": "2000-01-01"
+}
+
+### Cadastro: corpo vazio (400, todos os campos obrigatórios acusados).
+POST {{Icarus.Api_HostAddress}}/api/auth/cadastro
+Content-Type: application/json
+
+{}
 
 ###

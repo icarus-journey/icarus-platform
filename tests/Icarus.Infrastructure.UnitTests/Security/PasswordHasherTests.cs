@@ -1,6 +1,6 @@
 using Icarus.Infrastructure.Security;
 
-namespace Icarus.Api.Tests;
+namespace Icarus.Infrastructure.UnitTests.Security;
 
 public class PasswordHasherTests
 {

@@ -1,5 +1,6 @@
-using Icarus.Application.Abstractions;
+using Icarus.Application.Interfaces;
 using Icarus.Infrastructure.Persistence;
+using Icarus.Infrastructure.Persistence.Repositories;
 using Icarus.Infrastructure.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -25,6 +26,12 @@ public static class DependencyInjection
             .UseSnakeCaseNamingConvention());
 
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
+
+        services.AddScoped<IUsuarioRepository, UsuarioRepository>();
+
+        // Mesma instância de IcarusDbContext do escopo (não uma nova) — repositório e
+        // unit of work precisam compartilhar o ChangeTracker para salvar na mesma transação.
+        services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<IcarusDbContext>());
 
         return services;
     }
