@@ -1,7 +1,7 @@
 # Icarus Platform — Documentação do Projeto
 
 > Documento vivo. Mantido e atualizado à medida que novas decisões e features forem implementadas.
-> Última atualização: 2026-09-08
+> Última atualização: 2026-09-27
 
 ## 0. Regra permanente do projeto
 
@@ -41,8 +41,8 @@ Estado atual: **projeto em estágio inicial**. A estrutura de solução (Clean
 Architecture), a persistência com Entity Framework Core / PostgreSQL e o
 modelo de dados completo do MVP (14 entidades, ver seção 4.3), incluindo
 ocorrências persistidas para missões recorrentes, já foram criados.
-Autenticação (cadastro/login) está em construção — ver seção 4.4. Ainda não
-há controllers nem endpoint funcional exposto pela API.
+Autenticação (cadastro/login) está em construção — ver seção 4.4. O único
+endpoint exposto hoje é o de cadastro (`POST /api/auth/cadastro`).
 
 O modelo de dados segue o DER do `icarus-context` na versão **1.2**
 (2026-09-08), incluindo ocorrências persistidas para missões recorrentes.
@@ -97,7 +97,9 @@ icarus-platform/
 │   ├── Icarus.Domain/           (camada de domínio — entidades/regras de negócio)
 │   └── Icarus.Infrastructure/   (camada de infraestrutura — persistência, DI)
 └── tests/
-    └── Icarus.Api.Tests/        (testes da API)
+    ├── Icarus.Application.UnitTests/    (testa Icarus.Application)
+    ├── Icarus.Infrastructure.UnitTests/ (testa Icarus.Infrastructure)
+    └── Icarus.Api.UnitTests/            (testa Icarus.Api)
 ```
 
 ### 4.0 Convenções de build/estilo (padrão comunidade .NET)
@@ -128,14 +130,17 @@ cada `.csproj`:
 ```
 Icarus.Api  ──> Icarus.Application ──> Icarus.Domain
 Icarus.Api  ──> Icarus.Infrastructure ──> Icarus.Application ──> Icarus.Domain
-Icarus.Api.Tests ──> Icarus.Api
+
+Icarus.Application.UnitTests    ──> Icarus.Application
+Icarus.Infrastructure.UnitTests ──> Icarus.Infrastructure
+Icarus.Api.UnitTests            ──> Icarus.Api
 ```
 
-- `Icarus.Domain`: sem dependências (camada mais interna). Contém as 14 entidades do modelo de dados e os enums (ver seção 4.3).
-- `Icarus.Application`: referencia `Icarus.Domain`. Ainda vazio (sem casos de uso).
+- `Icarus.Domain`: sem dependências (camada mais interna). Contém as 14 entidades do modelo de dados e os enums (ver seção 4.3). Sem projeto de teste próprio por ora — ver seção 4.5 ("Por que não existe `Icarus.Domain.UnitTests`").
+- `Icarus.Application`: referencia `Icarus.Domain`. Contém os contratos (`Interfaces/`), o caso de uso de cadastro (`UseCases/RegisterUser/`) e `Exceptions/` (ver seção 4.4).
 - `Icarus.Infrastructure`: referencia `Icarus.Application`. Contém `DependencyInjection.cs`, o `DbContext`, as configurações EF Core e as migrations.
 - `Icarus.Api`: referencia `Icarus.Application` e `Icarus.Infrastructure`. Ponto de entrada (`Program.cs`).
-- `Icarus.Api.Tests`: referencia `Icarus.Api`. Contém 1 teste vazio de exemplo (`TesteExemplo.cs`).
+- Um projeto de teste por projeto de produção que **tem algo a testar** (`Icarus.Application.UnitTests`, `Icarus.Infrastructure.UnitTests`, `Icarus.Api.UnitTests`), cada um referenciando só a camada que testa — nunca a camada de teste de outro. Ver seção 4.5 para a convenção completa.
 
 ### 4.2 Detalhe por projeto
 
@@ -143,15 +148,17 @@ Icarus.Api.Tests ──> Icarus.Api
 - SDK: `Microsoft.NET.Sdk.Web` (`TargetFramework`/`Nullable`/`ImplicitUsings` herdados do `Directory.Build.props`).
 - `UserSecretsId` configurado (User Secrets habilitado — ver credenciais abaixo).
 - Pacotes (versão centralizada em `Directory.Packages.props`): `Microsoft.AspNetCore.OpenApi`, `Microsoft.EntityFrameworkCore.Design` (para suportar `dotnet ef migrations`).
-- `Program.cs`: configura `AddControllers()`, `AddOpenApi()`, chama `AddInfrastructure(builder.Configuration)`, expõe `/openapi` apenas em Development, `UseHttpsRedirection`, `UseAuthorization`, `MapControllers`.
-- Não há nenhum Controller implementado ainda (só o template `Icarus.Api.http` referencia `/weatherforecast/`, que não existe mais no código — arquivo de exemplo desatualizado/residual).
+- `Program.cs`: encadeia `AddApi()`, `AddApplication()` e `AddInfrastructure(builder.Configuration)`; pipeline com `UseExceptionHandler`, `UseStatusCodePages`, `/openapi` apenas em Development, `UseHttpsRedirection`, `UseAuthorization`, `MapControllers`.
+- Pastas: `Controllers/` (`AuthController`), `Contracts/Auth/` (Request/Response e validador), `Filters/` (`ValidationFilter`), `ExceptionHandling/` (`GlobalExceptionHandler`). Detalhes na seção 4.4.
+- Único endpoint hoje: `POST /api/auth/cadastro`. O `Icarus.Api.http` continua sendo o template residual (referencia `/weatherforecast/`, que não existe mais) — ver decisão pendente sobre ferramenta de teste na seção 4.4.
+- Pacotes: `FluentValidation` (validação dos Requests).
 - `appsettings.json`: **não contém mais credenciais**. `ConnectionStrings:DefaultConnection` foi movida para User Secrets (ver seção 6.1).
 - `launchSettings.json`: perfis `http` (porta 5138) e `https` (portas 7220/5138).
 
 **`src/Icarus.Application`** (`Icarus.Application.csproj`)
 - SDK: `Microsoft.NET.Sdk`.
 - Referencia `Icarus.Domain`.
-- Sem nenhuma classe implementada ainda (pasta só tem o `.csproj`).
+- Pastas: `Interfaces/` (`IPasswordHasher`, `IUsuarioRepository`, `IUnitOfWork`), `UseCases/RegisterUser/`, `Exceptions/`; `DependencyInjection.cs` com `AddApplication()`. Pacote: `Microsoft.Extensions.DependencyInjection.Abstractions`.
 
 **`src/Icarus.Domain`** (`Icarus.Domain.csproj`)
 - SDK: `Microsoft.NET.Sdk`.
@@ -337,9 +344,10 @@ As mudanças do `Ocorrencia` (DER v1.2, 2026-09-08) e da autenticação (seção
 `.editorconfig` para os analisadores do .NET não gerarem ruído em código que
 nunca é editado à mão.
 
-**`tests/Icarus.Api.Tests`** (`Icarus.Api.Tests.csproj`)
-- Framework: xUnit (versões centralizadas em `Directory.Packages.props`): `xunit`, `xunit.runner.visualstudio`, `Microsoft.NET.Test.Sdk`, `coverlet.collector`.
-- Testes de domínio devem cobrir as transições de status e a geração de ocorrências antes dos casos de uso serem implementados.
+**`tests/`** — ver seção 4.5 para a convenção completa (um projeto de teste
+por camada de produção). Framework: xUnit em todos (versões centralizadas em
+`Directory.Packages.props`): `xunit`, `xunit.runner.visualstudio`,
+`Microsoft.NET.Test.Sdk`, `coverlet.collector`.
 
 ## 4.4 Autenticação (em construção)
 
@@ -391,7 +399,7 @@ daqui as migrations passam a ser empilhadas normalmente, já que
 `dotnet build` (0 avisos/erros) e `dotnet test` passando.
 
 **Hash de senha (Argon2id):** implementado via `IPasswordHasher`
-(`Icarus.Application/Abstractions/IPasswordHasher.cs`), com implementação
+(`Icarus.Application/Interfaces/IPasswordHasher.cs`), com implementação
 `PasswordHasher` em `Icarus.Infrastructure/Security/` usando o pacote
 `Konscious.Security.Cryptography.Argon2` (registrado como `AddSingleton`,
 já que não guarda estado). Parâmetros de custo seguem a segunda recomendação
@@ -401,8 +409,9 @@ no PHC string format), permitindo aumentar o custo no futuro sem invalidar
 hashes já salvos. Comparação em `Verify` usa
 `CryptographicOperations.FixedTimeEquals` (tempo constante, evita vazar por
 timing em qual byte o hash diverge). Testado em
-`tests/Icarus.Api.Tests/PasswordHasherTests.cs` (hashes diferentes para a
-mesma senha graças ao salt aleatório; verificação correta/incorreta).
+`tests/Icarus.Infrastructure.UnitTests/Security/PasswordHasherTests.cs`
+(hashes diferentes para a mesma senha graças ao salt aleatório; verificação
+correta/incorreta).
 
 Ajuste de tooling: `.editorconfig` ganhou uma regra `[tests/**/*.cs]` com
 `dotnet_diagnostic.CA1707.severity = none` — os analisadores por padrão
@@ -411,9 +420,319 @@ reclamam de underscore em nome de método (`CA1707`), mas a convenção
 para testes; desligamos a regra só nos projetos de teste, mantendo o padrão
 em código de produção.
 
-**Ainda não implementado** (próximos passos do plano em andamento): casos de
-uso de cadastro/login/refresh/logout em `Icarus.Application`,
-geração/validação de JWT, endpoints em `Icarus.Api`, rate limiting de login.
+**Caso de uso de Cadastro (RF-01):** primeiro código real em
+`Icarus.Application`. Estrutura criada:
+- `Interfaces/IUsuarioRepository.cs` e `Interfaces/IUnitOfWork.cs`:
+  contratos de persistência — `Icarus.Application` não pode referenciar
+  `Icarus.Infrastructure` (inverteria a Clean Architecture), então define o
+  que precisa e deixa a implementação concreta (EF Core) para a
+  Infrastructure. `IUnitOfWork` fica separado do repositório porque fluxos
+  futuros (ex.: concluir uma ocorrência + lançar a movimentação de pontos)
+  precisam gravar mais de uma entidade na mesma transação.
+- `UseCases/RegisterUser/`: `RegisterUserCommand` (entrada), `RegisterUserResult`
+  (saída — só o `UsuarioId`) e `RegisterUserUseCase` (normaliza o e-mail,
+  checa duplicidade, gera o hash da senha via `IPasswordHasher`, persiste;
+  assume entrada já validada pelo chamador — a validação fica na borda HTTP,
+  ver "Endpoint de cadastro" abaixo). Nomes de tipos em inglês (regra da
+  seção 0 — não é modelo de dados), propriedades em português (mesmo padrão
+  de `IPasswordHasher`).
+- `Exceptions/EmailJaCadastradoException.cs`: lançada na duplicidade de
+  e-mail (RF-01.1); traduzida para HTTP 409 pelo `GlobalExceptionHandler` da
+  API.
+- `Icarus.Infrastructure/Persistence/Repositories/UsuarioRepository.cs`:
+  implementação com EF Core. `IcarusDbContext` passou a implementar
+  `IUnitOfWork` diretamente (implementação explícita de interface, não polui
+  a API pública do `DbContext`).
+- `Icarus.Application/DependencyInjection.cs` (`AddApplication`, primeiro DI
+  dessa camada) registra o caso de uso; chamado em `Program.cs` junto com
+  `AddApi` e `AddInfrastructure` (um `DependencyInjection` por camada, padrão
+  consolidado da comunidade .NET).
+
+Testado em `RegisterUserUseCaseTests.cs` com um repositório falso em memória
+(`UsuarioRepositoryEmMemoria`), sem precisar de Postgres real: e-mail
+normalizado (trim + minúsculas), senha nunca fica igual ao hash salvo, e
+e-mail duplicado lança `EmailJaCadastradoException`.
+
+#### Dúvida em aberto: `IUnitOfWork` deveria ser uma classe própria?
+
+Hoje `IcarusDbContext` implementa `IUnitOfWork` diretamente (implementação
+explícita de interface — `SalvarAlteracoesAsync` só repassa para
+`SaveChangesAsync`, sem nenhum comportamento extra). Isso **não é** a única
+opção nem existe um "padrão único da comunidade .NET" aqui — são pelo menos
+três escolas diferentes, todas com bom respaldo:
+
+1. **Nem repositório nem unit of work** — posição de referências influentes
+   como Jimmy Bogard (autor do MediatR/AutoMapper): `DbSet<T>` já é um
+   repositório, `DbContext` já é um unit of work; casos de uso deveriam usar
+   o `DbContext` direto, sem camadas extras.
+2. **Uma interface sobre o `DbContext`, sem repositório por entidade** — é o
+   que o template de Clean Architecture do Jason Taylor faz hoje (um dos mais
+   usados do ecossistema .NET): `IApplicationDbContext` implementada pelo
+   `DbContext`, injetada direto nos casos de uso.
+3. **Repositório + Unit of Work explícitos** — orientação do e-book oficial
+   "Architecting Modern Web Applications with ASP.NET Core" da Microsoft e do
+   eShopOnContainers (repositório de referência da própria Microsoft). É o
+   caminho que escolhemos aqui. Dentro dessa escola, o próprio
+   eShopOnContainers implementa `IUnitOfWork` direto no `DbContext` — mesma
+   escolha que fizemos —, mas outros exemplos da mesma escola usam uma classe
+   `UnitOfWork` separada.
+
+**Por que ficamos com `DbContext` implementando direto (opção "dentro"), por
+enquanto:** `SalvarAlteracoesAsync` hoje não faz nada além de chamar
+`SaveChangesAsync` — criar uma classe `UnitOfWork` só para repassar essa
+chamada seria indireção sem ganho (YAGNI). A extração para uma classe própria
+é mecânica e rápida (mover o método, trocar o registro no DI) quando/se
+`SalvarAlteracoesAsync` precisar fazer mais do que salvar — os candidatos
+mais concretos e já previstos no `icarus-context`:
+- disparar eventos de domínio depois de um save bem-sucedido (ex.: "ocorrência
+  concluída" notificando outra parte do código);
+- padrão outbox (seção 8.3 da arquitetura): gravar o estado **e** a mensagem
+  de saída para o RabbitMQ na mesma transação.
+
+**Decisão a retomar:** quando o primeiro desses casos concretos aparecer
+(provavelmente no fluxo de concluir uma ocorrência), decidir ali se vale a
+pena extrair uma classe `UnitOfWork` própria naquele momento.
+
+#### Decisão consciente de simplificação: sem MediatR/CQRS, exceção em vez de Result pattern
+
+Duas escolhas de estrutura do caso de uso que divergem do padrão mais
+replicado hoje na comunidade .NET, feitas deliberadamente para reduzir a
+quantidade de conceitos novos enquanto o usuário aprende, registradas aqui
+para reavaliar mais adiante:
+
+- **Sem MediatR/CQRS.** O template de Clean Architecture do Jason Taylor —
+  hoje um dos projetos .NET mais replicados do GitHub — usa `IMediator` para
+  despachar `Commands`/`Queries` a uma classe `Handler` própria por caso de
+  uso, desacoplando o Controller de qual classe trata cada operação. Aqui o
+  Controller vai chamar `RegisterUserUseCase` diretamente (chamada explícita,
+  mais fácil de seguir com "Ir para definição"). Se o número de casos de uso
+  crescer muito, ou se for necessário compor comportamento transversal
+  (logging, validação, transação) de forma uniforme em todos eles sem
+  repetir código em cada Controller, vale reconsiderar o MediatR — ele
+  resolve isso com *pipeline behaviors*.
+- **Exceção em vez de Result pattern.** Usamos `EmailJaCadastradoException`
+  para uma falha de negócio esperada (e-mail duplicado não é bug). Existe
+  uma tendência crescente na comunidade de usar um tipo `Result<T>`/
+  `ErrorOr<T>` para esses casos, reservando exceção só para o
+  verdadeiramente excepcional — pacotes como `ErrorOr` e `FluentResults` são
+  comumente citados. Vale reconsiderar se o número de regras de negócio
+  "esperadas para falhar" crescer a ponto de o tratamento por exceção global
+  ficar difícil de manter previsível.
+
+#### Endpoint de cadastro: `POST /api/auth/cadastro`
+
+Primeiro Controller da solução (`Icarus.Api/Controllers/AuthController.cs`,
+ação `Register`). Controller fino: traduz HTTP para o `RegisterUserUseCase` e
+de volta, sem regra de negócio. Resposta de sucesso: `201 Created` com corpo
+`{ "usuarioId": "..." }` e **sem** header `Location` (ver pendências abaixo).
+Todas as decisões abaixo foram validadas uma a uma com o usuário em
+2026-09-27:
+
+- **Rota:** `/api/auth/cadastro` — exceção deliberada à regra "inglês fora do
+  modelo de dados": `auth` em inglês e a ação em português, por ser o termo
+  literal do RF-01 (sugestão original era `register`). As demais rotas
+  seguirão termos técnicos consagrados: `/api/auth/login`, `/refresh`,
+  `/logout`. Nomes de classes/métodos (`AuthController.Register`) continuam em
+  inglês; só a string da rota é português.
+- **DTOs HTTP próprios** em `Icarus.Api/Contracts/Auth/` (`RegisterRequest`,
+  `RegisterResponse`), desacoplados do `RegisterUserCommand`: o contrato
+  público com o app mobile pode mudar sem quebrar o Application e vice-versa,
+  e nenhum campo interno vaza por acidente. Custo: um mapeamento Request para
+  Command no Controller. JSON em camelCase (padrão do ASP.NET Core).
+- **Validação na borda, com filtro reutilizável:** `Filters/ValidationFilter`
+  (global, `IAsyncActionFilter`) procura um `IValidator<T>` para cada
+  argumento da action e, se falhar, responde `400` com
+  `ValidationProblemDetails` sem executar a action — chaves dos erros em
+  camelCase, iguais aos campos do JSON. Como o filtro enxerga os argumentos da
+  action (o `RegisterRequest`), o validador foi **movido do Application para a
+  API** (`RegisterRequestValidator`, ao lado do Request); o
+  `RegisterUserValidator` antigo foi removido e o pacote `FluentValidation`
+  passou do `Icarus.Application` para o `Icarus.Api`. Consequência aceita: o
+  `RegisterUserUseCase` confia que o chamador validou — qualquer futuro
+  chamador que não seja a API HTTP (ex.: um consumidor de mensagens) precisa
+  validar por conta própria. Novos validadores exigem uma linha de registro
+  em `AddApi()`; quando houver vários, vale trocar por varredura de assembly
+  (pacote `FluentValidation.DependencyInjectionExtensions`).
+- **Mensagens de validação em português:** cultura `pt-BR` global do
+  FluentValidation (traduções já embutidas), com `WithName(...)` para nomes
+  amigáveis ("E-mail", "Data de nascimento"). Para o "campo ausente" cair no
+  FluentValidation (e não no `required` implícito do MVC, que responderia
+  antes, em inglês), `SuppressImplicitRequiredAttributeForNonNullableReferenceTypes`
+  está ligado. Erros de *formato* do JSON (JSON malformado, data que não é
+  data) continuam sendo respondidos pelo próprio ASP.NET Core, em inglês
+  técnico, mas ainda como `ProblemDetails` 400.
+- **Erros HTTP:** `ExceptionHandling/GlobalExceptionHandler`
+  (`IExceptionHandler` + `AddProblemDetails()`, padrão do .NET 8+) mapeia
+  `EmailJaCadastradoException` para `409 ProblemDetails`; qualquer outra
+  exceção devolve `false` e cai no `500` genérico padrão, sem detalhe interno
+  (seção 10.1 da arquitetura). `UseStatusCodePages()` deixa 404/405 etc. também
+  em `ProblemDetails`. Controllers ficam sem `try/catch`.
+- **Terceiro `DependencyInjection`:** `Icarus.Api/DependencyInjection.cs`
+  (`AddApi()`) concentra controllers (com o filtro), OpenAPI, `ProblemDetails`,
+  exception handler e validadores; o `Program.cs` só encadeia
+  `AddApi`/`AddApplication`/`AddInfrastructure` e monta o pipeline.
+- **Sem versionamento de API por ora** (um único cliente, MVP local); rotas
+  seguem `/api/...`. Adicionar `Asp.Versioning` depois é viável.
+- **Testes:** `RegisterRequestValidatorTests` (regras do RF-01.2, inclusive
+  "sem regra de composição"). Testes de integração do endpoint ficam para um
+  passo dedicado com `WebApplicationFactory` + Testcontainers (PostgreSQL
+  real, exigido pelo RNF-04) — por ora, verificação manual.
+
+**Trade-off de segurança aceito (enumeração de contas):** o `409` revela que
+um e-mail já está cadastrado. É o que o RF-01.1 pede ("e-mail duplicado é
+rejeitado"), mas a OWASP recomenda respostas genéricas nesse cenário; uma
+resposta genérica exigiria verificação de e-mail, fora do MVP. O limite de
+tentativas do RF-02 vale para o login, não para o cadastro — considerar rate
+limiting no cadastro no passo 8.
+
+**Pendência registrada (a fazer assim que possível, logo após login/JWT):**
+`GET /api/usuarios/{id}` (perfil), com `[Authorize]` e checagem de que o `id`
+é o do dono do token (RF-02.4: identificador de outro usuário não pode
+consultar nem alterar o recurso; responder 404 para não confirmar a
+existência), e então adicionar o header `Location` (URL do recurso recém-criado,
+convenção REST para `201 Created`) na resposta do cadastro. Não foi feito antes
+porque um GET de perfil sem autenticação exporia nome, e-mail e data de
+nascimento de qualquer usuário por id.
+
+**Ferramenta para testar a API manualmente: arquivo `.http`.** Não há um
+padrão único da comunidade: o `.http` é o padrão de primeira parte (o
+template oficial já gera o `Icarus.Api.http`; roda no Visual Studio, VS Code
+e Rider sem pacote extra) e, para interface visual, o Swagger UI
+(Swashbuckle) foi o padrão por anos mas saiu dos templates no .NET 9 — a
+documentação oficial de OpenAPI cita Swagger UI, Scalar e Redoc, e o Scalar
+é o substituto mais adotado. Seguimos com o `.http` (sem dependência nova,
+versionado no Git como roteiro repetível; o `Icarus.Api.http` foi reescrito
+com os casos do cadastro e cresce com login/refresh/logout). **Scalar
+(`Scalar.AspNetCore`) fica como opção futura**, se quisermos explorar a API
+visualmente: mapear a página só em Development e ligar `launchBrowser` +
+`launchUrl` em `launchSettings.json` (hoje `launchBrowser: false`, padrão do
+template .NET 9+) para o Visual Studio abri-la no F5. Os dois podem coexistir.
+
+**Verificação ponta a ponta (2026-09-27, Postgres real, API em `dotnet run`,
+`curl`):** `201` com `{ "usuarioId": ... }` (linha gravada com nome/e-mail
+normalizados, hash `$argon2id$...` de 100 caracteres, `criado_em`/`atualizado_em`
+preenchidos); e-mail repetido em maiúsculas devolve `409` `ProblemDetails`;
+dados inválidos e corpo vazio devolvem `400` com `errors` por campo em
+camelCase e mensagens em português; JSON malformado e data inválida devolvem
+`400` do próprio ASP.NET Core; rota inexistente devolve `404` `ProblemDetails`;
+nenhum caso inválido criou linha. Usuário de teste removido depois.
+
+**Detalhes conhecidos, a decidir (não bloqueiam):**
+- Os campos `title` do `ProblemDetails` gerados pelo framework continuam em
+  inglês ("One or more validation errors occurred.", "Not Found"); só as
+  mensagens de validação por campo estão em português. Traduzir exige
+  customizar `ProblemDetailsOptions`/`ApiBehaviorOptions`.
+- As mensagens de erro de *binding* (JSON malformado, data inválida) são do
+  ASP.NET Core e incluem caminho/posição do JSON e, no caso da data, o nome
+  completo do tipo interno (`Icarus.Api.Contracts.Auth.RegisterRequest`) —
+  pequeno vazamento de detalhe interno frente à seção 10.1 da arquitetura
+  ("mensagens sem exposição de detalhes internos"). Solução possível:
+  substituir essas mensagens por um texto genérico no
+  `InvalidModelStateResponseFactory`.
+- A tradução pt-BR embutida do FluentValidation usa "deve ser informado"
+  (sem concordância de gênero: "'Senha' deve ser informado").
+
+**Ainda não implementado** (próximos passos do plano em andamento): geração
+de JWT, casos de uso e endpoints de login/refresh/logout, `JwtBearer` +
+rate limiting de login, `GET` de perfil e `Location` (pendência acima),
+testes de integração do endpoint.
+
+## 4.5 Convenção de testes
+
+**Um projeto de teste por projeto de produção**, cada um referenciando só a
+camada que testa (nunca a camada de teste de outra camada, nem uma camada de
+produção que não seja a sua):
+
+```
+tests/
+├── Icarus.Application.UnitTests/     → testa Icarus.Application
+├── Icarus.Infrastructure.UnitTests/  → testa Icarus.Infrastructure
+└── Icarus.Api.UnitTests/             → testa Icarus.Api
+```
+
+Dentro de cada projeto, a estrutura de pastas **espelha o namespace da
+camada correspondente** — ex.: `Icarus.Application.UnitTests/UseCases/RegisterUser/RegisterUserUseCaseTests.cs`
+testa `Icarus.Application/UseCases/RegisterUser/RegisterUserUseCase.cs`. O
+namespace de cada arquivo de teste segue a mesma pasta (`Icarus.Application.UnitTests.UseCases.RegisterUser`).
+
+**Um projeto por camada só nasce quando a camada tem algo a testar** — por
+isso não existe `Icarus.Domain.UnitTests` hoje (ver subseção própria abaixo).
+Quando existir mais de um projeto para a mesma camada de produção, o motivo
+para cada um é diferente:
+- `Icarus.Application.UnitTests`: testes unitários puros, rápidos, sem nada
+  externo (nem banco, nem HTTP).
+- `Icarus.Infrastructure.UnitTests`: hoje só unitário (`PasswordHasher`);
+  quando houver teste do `UsuarioRepository` contra Postgres de verdade, via
+  Testcontainers, provavelmente vira `Icarus.Infrastructure.IntegrationTests`
+  (RNF-04 exige Postgres real nesses testes, não só um banco em memória).
+- `Icarus.Api.UnitTests`: hoje só o `RegisterRequestValidator` (validação da
+  borda HTTP, sem subir a API); quando houver teste do `AuthController`
+  ponta a ponta via `WebApplicationFactory`, provavelmente vira
+  `Icarus.Api.IntegrationTests` — separado do unitário, porque integração é
+  bem mais lenta.
+
+Se tudo estivesse num projeto só, ele acumularia as dependências mais
+pesadas (EF Core, Testcontainers, ASP.NET Core Test Host) mesmo para rodar
+um teste rápido de validação, e não daria pra rodar "só os rápidos"
+separado dos "que precisam de Postgres/Docker". É essencialmente o mesmo
+padrão do template de Clean Architecture do Jason Taylor (`Application.UnitTests`,
+`Application.FunctionalTests`, `Infrastructure.IntegrationTests` etc.), só
+com o sufixo de tipo (`UnitTests`) já fixado desde já e `IntegrationTests`
+reservado para quando o primeiro teste de integração de verdade aparecer.
+
+**Cuidado de dependência já aplicado:** `Icarus.Application.UnitTests` usa um
+`PasswordHasherFake` (interno ao projeto de teste) em vez do `PasswordHasher`
+real do `Icarus.Infrastructure` — testar `Icarus.Application` não pode
+depender de `Icarus.Infrastructure` (inverteria a Clean Architecture), e o
+algoritmo Argon2id em si já é testado à parte, em
+`Icarus.Infrastructure.UnitTests/Security/PasswordHasherTests.cs`.
+
+#### Por que não existe `Icarus.Domain.UnitTests`
+
+Decisão tomada com o usuário em 2026-09-27, **revertendo** uma criação feita
+horas antes no mesmo dia (nunca commitada): ao reorganizar os testes,
+criamos `Icarus.Domain.UnitTests` e movemos pra lá o `OcorrenciaTests`
+(criado pelo Fabiam, testando `Icarus.Domain.Entities.Ocorrencia`, que
+antes estava — sem pertencer a nenhuma camada testada ali — dentro de
+`Icarus.Api.Tests`). Ao revisar, ficou claro que esse teste **não tem valor
+real**:
+
+```csharp
+[Fact]
+public void NovaOcorrenciaIniciaComoPendenteESemMovimentacoes()
+{
+    var ocorrencia = new Ocorrencia();
+
+    Assert.Equal(StatusOcorrencia.Pendente, ocorrencia.Status);
+    Assert.Empty(ocorrencia.MovimentacoesPontos);
+}
+```
+Isso só confirma que os inicializadores de propriedade do C# funcionam
+(`= StatusOcorrencia.Pendente`, `= new List<...>()`) — algo que a própria
+linguagem garante. Não existe cenário em que esse teste pegaria um bug real;
+ele só "segue" a entidade se o default mudar, sem verificar nenhuma decisão
+de negócio.
+
+**Por que isso acontece:** as entidades de `Icarus.Domain` são **POCOs
+puros**, sem nenhum método ou invariante própria (decisão registrada na
+seção 4.3) — validação mora no FluentValidation (API), persistência no EF
+Core (Infrastructure). Hoje não existe comportamento de domínio pra testar.
+
+**Sobre o template do Jason Taylor** (citado na seção 4.4 como referência
+várias vezes): ele **tem** um `Domain.UnitTests` — mas porque o domínio dele
+não é anêmico: tem uma classe `Enumeration` customizada (com lógica própria
+de busca/comparação) e entidades que disparam eventos de domínio ao mudar de
+estado. O `Domain.UnitTests` dele testa esse comportamento real. A
+existência do projeto lá não valida ter um projeto vazio aqui — reforça o
+oposto: só vale a pena quando há comportamento de verdade.
+
+**Decisão:** removidos o projeto `Icarus.Domain.UnitTests` e o teste
+`OcorrenciaTests` (mesmo raciocínio já aplicado ao `IUnitOfWork` — seção
+4.4: não criar abstração/estrutura antes de haver necessidade real, YAGNI).
+Quando `Icarus.Domain` ganhar comportamento de verdade (método que aplica
+regra, invariante no construtor, evento de domínio), criar
+`Icarus.Domain.UnitTests` naquele momento, com um teste que verifique esse
+comportamento.
 
 ## 5. CI/CD
 
@@ -520,8 +839,8 @@ comunicarem pelo nome do serviço em vez de porta publicada no host.
 
 ## 7. Lacunas conhecidas / próximos passos naturais
 
-- Modelo de dados criado (seção 4.3), mas nenhum caso de uso/serviço em `Icarus.Application` ainda usa essas entidades.
-- Nenhum Controller em `Icarus.Api` (arquivo `.http` residual referencia endpoint inexistente).
+- Modelo de dados criado (seção 4.3), mas só `Usuario` é usado por um caso de uso (cadastro); as demais entidades ainda não têm nenhum caso de uso em `Icarus.Application`.
+- Só existe um endpoint (`POST /api/auth/cadastro`); login, refresh, logout e o `GET` de perfil (com `Location` no cadastro) ainda não existem — ver seção 4.4. O arquivo `.http` continua residual do template.
 - CI não roda build/test do .NET, apenas validações estruturais (nem `dotnet format`/analisadores, apesar do `.editorconfig` já estar configurado); também não roda `dotnet ef migrations` em pipeline algum.
 - Sem autenticação/autorização configurada (só `UseAuthorization()` chamado, sem esquema definido) — o DER já assume `Usuario.Id` vindo do JWT, mas isso ainda não existe na API.
 - Pendências de produto herdadas do DER (não bloqueiam a estrutura, mas afetam regras futuras): estados finais da missão, escala de prioridade, regra de sobreposição de vigência da rotina, se o diário aceita múltiplas entradas por dia, estrutura definitiva dos dados externos (ATUS/Vigitel).
@@ -533,6 +852,8 @@ comunicarem pelo nome do serviço em vez de porta publicada no host.
   - `minio/minio:RELEASE.2025-09-07T16-13-09Z` (`icarus-infrastructure/compose.yaml`) — tag de release imutável, 100% fixada.
   - `rabbitmq:4.0-management` (`icarus-infrastructure/compose.yaml`) — major.minor fixados, patch "flutua".
   - O trade-off: tag flutuante pega correção de segurança automaticamente mas não é 100% reprodutível entre execuções/máquinas diferentes; tag imutável é reprodutível mas exige atualização manual periódica (e checar CVEs manualmente). Precisamos decidir **uma convenção única** para todos os serviços (provável candidato: tag imutável/digest para todos, seguindo o exemplo do MinIO) e aplicá-la de forma consistente. Não decidido ainda — discutir antes de adicionar novos serviços (ex.: trabalhador Python, Nginx).
+- **Decisão pendente: `IUnitOfWork` deveria ser uma classe própria, em vez de `IcarusDbContext` implementar direto?** Ver seção 4.4 ("Dúvida em aberto") para as três escolas da comunidade .NET e o raciocínio de por que ficamos com a opção mais simples por enquanto. Retomar quando `SalvarAlteracoesAsync` precisar fazer mais do que chamar `SaveChangesAsync` (candidatos: eventos de domínio, padrão outbox do RabbitMQ).
+- **Decisão consciente, a reavaliar: sem MediatR/CQRS, exceção em vez de Result pattern nos casos de uso.** Ver seção 4.4 ("Decisão consciente de simplificação") — divergem do padrão mais replicado hoje (ex.: template do Jason Taylor), escolhido para reduzir conceitos novos enquanto o usuário aprende. Reavaliar se o número de casos de uso ou de regras de negócio "esperadas para falhar" crescer.
 
 ## 8. Histórico de decisões e features (a atualizar conforme avançarmos)
 
@@ -660,3 +981,71 @@ comunicarem pelo nome do serviço em vez de porta publicada no host.
   (3 migrations empilhadas: `CriarModeloInicial`, `AdicionarAutenticacao`,
   `PersistirOcorrencias`) conferidas via `psql`. `dotnet build` (0
   avisos/erros) e `dotnet test` (4 aprovados) validados.
+- 2026-09-14 — Passo 3 do plano de autenticação: caso de uso de Cadastro
+  (RF-01), primeiro código real em `Icarus.Application`. Criados
+  `IUsuarioRepository`/`IUnitOfWork` (contratos de persistência, para a
+  Application não depender do EF Core), `RegisterUserCommand`/`Result`,
+  `RegisterUserValidator` (FluentValidation) e `RegisterUserUseCase`
+  (normaliza e-mail, checa duplicidade, gera hash da senha).
+  `EmailJaCadastradoException` para a regra de e-mail único do RF-01.1.
+  `UsuarioRepository` implementado em `Icarus.Infrastructure` com EF Core;
+  `IcarusDbContext` passou a implementar `IUnitOfWork`. Primeiro
+  `AddApplication` (DI da camada Application), chamado em `Program.cs`.
+  Pacotes adicionados: `FluentValidation`,
+  `Microsoft.Extensions.DependencyInjection.Abstractions`. Testado com
+  repositório falso em memória, sem Postgres real. `dotnet build`
+  (0 avisos/erros) e `dotnet test` (6 aprovados) validados.
+- 2026-09-15 — Ajustes de nomenclatura a pedido do usuário: variáveis
+  `contexto`/`provedor` renomeadas para `context`/`provider` em
+  `UsuarioRepository`/`DependencyInjection.cs` (regra da seção 0 — fora do
+  modelo de dados, inglês é o padrão; esses nomes eram referência técnica ao
+  `DbContext`/`IServiceProvider`, não dado de negócio). Pasta
+  `Icarus.Application/Abstractions/` renomeada para `Interfaces/` — decisão
+  do usuário de padronizar o nome mais literal (usado pelo template do
+  Jason Taylor) em vez do termo que a Microsoft usa em nomes de pacote
+  (`Microsoft.Extensions.*.Abstractions`); ambos têm respaldo, escolhido por
+  preferência. Documentada em detalhe (seção 4.4) a dúvida em aberto sobre
+  `IUnitOfWork` ser ou não uma classe própria, com as três escolas da
+  comunidade .NET e o critério pra retomar a decisão. `dotnet build`
+  (0 avisos/erros) e `dotnet test` (6 aprovados) validados.
+- 2026-09-27 — Endpoint de cadastro (`POST /api/auth/cadastro`), primeiro
+  Controller da solução. Cada decisão de ferramenta/arquitetura foi validada
+  com o usuário antes de codar: rota `/api/auth/cadastro` (exceção
+  deliberada à regra de idioma, contra a recomendação inicial de
+  `register`), DTOs HTTP próprios, `IExceptionHandler` global com
+  `ProblemDetails`, filtro de validação reutilizável, mensagens pt-BR, sem
+  versionamento, testes de integração adiados. A escolha do filtro
+  reutilizável conflitou com o validador do Application (o filtro só
+  enxerga os argumentos da action, isto é, o Request): o validador foi
+  movido para a API (`RegisterRequestValidator`), `RegisterUserValidator` e
+  a referência do `FluentValidation` saíram do Application. Criado o
+  terceiro `DependencyInjection` (`AddApi()`). Adicionados
+  `RegisterRequestValidatorTests` (12 testes no total, todos aprovados).
+  Registradas as pendências: `GET` de perfil autenticado + header `Location`
+  no cadastro (só após login/JWT, para não expor dados pessoais sem
+  autenticação), ferramenta de teste manual (`.http` vs Scalar) e o
+  trade-off de enumeração de contas do `409`. Endpoint verificado
+  manualmente de ponta a ponta contra Postgres real (`curl`): 201, 409, 400
+  (dados inválidos, corpo vazio, JSON malformado, data inválida) e 404
+  respondendo como esperado.
+- 2026-09-27 — Reorganizados os testes a pedido do usuário: de um único
+  projeto (`Icarus.Api.Tests`, misturando testes de três camadas diferentes)
+  para um projeto por camada de produção que tem algo a testar
+  (`Icarus.Application.UnitTests`, `Icarus.Infrastructure.UnitTests`,
+  `Icarus.Api.UnitTests`), com pastas espelhando o namespace dentro de cada
+  um — ver seção 4.5 para a convenção completa e o porquê. Criado
+  `PasswordHasherFake` em `Icarus.Application.UnitTests` para não depender de
+  `Icarus.Infrastructure` num teste de `Icarus.Application`. `Icarus.slnx`
+  atualizado. `dotnet build` (0 avisos/erros) e `dotnet test` (11 aprovados,
+  distribuídos nos 3 projetos) validados.
+  Nesta mesma rodada, criamos e depois removemos um `Icarus.Domain.UnitTests`
+  (nunca commitado): ele receberia o `OcorrenciaTests` do Fabiam (testava
+  `Icarus.Domain.Entities.Ocorrencia`, estava dentro de `Icarus.Api.Tests`
+  sem pertencer a nenhuma camada testada ali), mas esse teste só confirma um
+  inicializador de propriedade do C#, sem verificar nenhum comportamento de
+  domínio — `Icarus.Domain` hoje é só POCOs, sem lógica própria. Decisão:
+  remover projeto e teste (mesmo raciocínio do `IUnitOfWork`, seção 4.4:
+  YAGNI, criar quando a necessidade real aparecer), documentado em detalhe
+  na seção 4.5 ("Por que não existe `Icarus.Domain.UnitTests`"), incluindo
+  o contraste com o `Domain.UnitTests` do template do Jason Taylor (que tem
+  conteúdo real porque o domínio dele não é anêmico).
