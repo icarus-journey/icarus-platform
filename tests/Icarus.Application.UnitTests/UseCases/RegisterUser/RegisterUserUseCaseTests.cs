@@ -2,6 +2,7 @@ using Icarus.Application.Exceptions;
 using Icarus.Application.Interfaces;
 using Icarus.Application.UseCases.RegisterUser;
 using Icarus.Domain.Entities;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Icarus.Application.UnitTests.UseCases.RegisterUser;
 
@@ -46,7 +47,7 @@ public class RegisterUserUseCaseTests
 
     public RegisterUserUseCaseTests()
     {
-        _useCase = new RegisterUserUseCase(_repositorio, _repositorio, new PasswordHasherFake());
+        _useCase = new RegisterUserUseCase(_repositorio, _repositorio, new PasswordHasherFake(), NullLogger<RegisterUserUseCase>.Instance);
     }
 
     [Fact(DisplayName = "Cadastro bem-sucedido normaliza o e-mail e nunca guarda a senha em texto puro")]

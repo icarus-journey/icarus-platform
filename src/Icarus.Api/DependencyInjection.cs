@@ -11,7 +11,7 @@ namespace Icarus.Api;
 /// </summary>
 public static class DependencyInjection
 {
-    public static IServiceCollection AddApi(this IServiceCollection services)
+    public static IServiceCollection AddApi(this IServiceCollection services, IConfiguration configuration)
     {
         // Mensagens de validação em português (o FluentValidation já traz as traduções pt-BR).
         ValidatorOptions.Global.LanguageManager.Culture = new CultureInfo("pt-BR");
@@ -33,6 +33,14 @@ public static class DependencyInjection
 
         // Validadores são stateless, então singleton. Um por Request; o ValidationFilter os encontra sozinho.
         services.AddSingleton<IValidator<RegisterRequest>, RegisterRequestValidator>();
+
+        // "Saúde da API" (seção 11 do icarus-context): /health responde 200 só se também
+        // conseguir falar com o Postgres — não é só "o processo está de pé", é "a API funciona".
+        var connectionString = configuration.GetConnectionString("DefaultConnection")
+            ?? throw new InvalidOperationException("String de conexão 'DefaultConnection' não encontrada.");
+
+        services.AddHealthChecks()
+            .AddNpgSql(connectionString, name: "postgres");
 
         return services;
     }

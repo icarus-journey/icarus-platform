@@ -1,7 +1,7 @@
 # Icarus Platform — Documentação do Projeto
 
 > Documento vivo. Mantido e atualizado à medida que novas decisões e features forem implementadas.
-> Última atualização: 2026-09-27
+> Última atualização: 2026-10-04
 
 ## 0. Regra permanente do projeto
 
@@ -68,6 +68,8 @@ O modelo de dados segue o DER do `icarus-context` na versão **1.2**
 | Banco de dados | PostgreSQL (via `Npgsql.EntityFrameworkCore.PostgreSQL` 10.0.3) |
 | Documentação de API | `Microsoft.AspNetCore.OpenApi` 10.0.11 (endpoint `/openapi`, ativo só em Development) |
 | Testes | xUnit 2.9.3 + `Microsoft.NET.Test.Sdk` 17.14.1 + `coverlet.collector` (cobertura) |
+| Logging | Serilog (`Serilog.AspNetCore` 10.0.0), JSON estruturado no stdout e no Loki (`Serilog.Sinks.Grafana.Loki`) |
+| Traces / Métricas | OpenTelemetry (`OpenTelemetry.Extensions.Hosting` 1.19.1), exportadas via OTLP para Tempo/Prometheus (`icarus-infrastructure`) |
 | CI | GitHub Actions |
 | Banco de dados (ambiente local) | PostgreSQL 16 via container Docker (Docker Desktop), orquestrado com `docker-compose.yml` |
 | IDE | Visual Studio (pasta `.vs/` e `Icarus.slnx` — formato de solução novo do VS) |
@@ -734,6 +736,197 @@ regra, invariante no construtor, evento de domínio), criar
 `Icarus.Domain.UnitTests` naquele momento, com um teste que verifique esse
 comportamento.
 
+## 4.6 Observabilidade (logs, traces, métricas)
+
+Fonte funcional: seção 11 ("Observabilidade, operação e manutenção") e
+seção 10.2 do `01-arquitetura-da-solucao.md`, no `icarus-context`. O
+documento define **o quê** logar (formato, campos, o que é proibido) mas
+não escolhe **nenhuma ferramenta** — a escolha abaixo é nossa, validada com
+o usuário em 2026-09-29.
+
+### O que são as três coisas, e por que existem separadas
+
+- **Logs** — registro de um evento pontual ("aconteceu isso, agora"). Serve
+  pra investigar um caso específico depois do fato.
+- **Traces** — acompanham **uma única requisição** através de várias etapas
+  (Controller → Filter → UseCase → Repository → Postgres), medindo cada
+  uma. Serve pra achar **onde o tempo foi gasto** dentro de uma requisição
+  lenta.
+- **Métricas** — números **agregados ao longo do tempo** (contagem de
+  cadastros, duração média de requisição por rota). Servem pra painel e
+  alerta, não pra investigar um caso específico.
+
+A seção 10.2 do `icarus-context` já pedia um "identificador de correlação
+[...] propagado aos logs" — isso é essencialmente pedir tracing, só que sem
+nomear a tecnologia.
+
+### Decisões validadas com o usuário
+
+- **Logging: Serilog** (`Serilog.AspNetCore`), não o `Microsoft.Extensions.Logging`
+  puro com `AddJsonConsole()` — Serilog é o padrão de fato da comunidade
+  pra logging estruturado, com enrichers automáticos.
+- **Escopo: tudo de uma vez**, incluindo tracing e métricas distribuídos via
+  OpenTelemetry com exportador real — não só logging isolado.
+- **Backend real desde já**: Grafana + Tempo (traces) + Prometheus
+  (métricas) subidos no `icarus-infrastructure` (ver `README.md` de lá),
+  em vez de adiar pra quando o RabbitMQ existir ou usar só um exportador de
+  console.
+- **Onde logar manualmente**: só onde uma decisão de negócio acontece
+  (`RegisterUserUseCase`) ou na última linha de defesa
+  (`GlobalExceptionHandler`, só para exceções **inesperadas** — as
+  conhecidas, tipo `EmailJaCadastradoException`, já são logadas por quem as
+  lança, logar de novo no exception handler seria duplicar a linha).
+  Controller, Filter e Repository **não** ganham log manual — o que
+  aconteceria ali já é coberto automaticamente: o ASP.NET Core já loga uma
+  linha por requisição (`app.UseSerilogRequestLogging()`), o EF Core já loga
+  os comandos SQL executados, e a instrumentação do OpenTelemetry gera
+  *trace* automático de ambos (`AddAspNetCoreInstrumentation()` +
+  `AddSource("Npgsql")`, este último porque o Npgsql já expõe seus próprios
+  spans, bastando registrar a fonte). Log manual em toda camada é
+  considerado ruído no padrão .NET, não boa prática.
+
+### Como funciona
+
+- **`Icarus.Api/Observability/ObservabilityExtensions.cs`**: `ConfigureSerilog`
+  (chamado em `builder.Host` antes de `AddApi`) configura o Serilog —
+  `ReadFrom.Configuration` (nível mínimo em `appsettings.json`, seção
+  `Serilog`), `Enrich.WithSpan()` (`Serilog.Enrichers.Span` — adiciona
+  `TraceId`/`SpanId` do OpenTelemetry a toda linha de log) e dois destinos
+  (`WriteTo`) em paralelo: `Console` com `JsonFormatter` (JSON no stdout,
+  exigência da seção 11) e `GrafanaLoki` (`Serilog.Sinks.Grafana.Loki`,
+  mesmo `JsonFormatter`, endpoint do Loki) — ver subseção própria abaixo.
+  `AddObservability` registra o OpenTelemetry:
+  `WithTracing` (instrumentação do ASP.NET Core + fonte "Npgsql", exportador
+  OTLP apontando pro Tempo) e `WithMetrics` (instrumentação do ASP.NET Core
+  + do runtime do .NET, exportador OTLP apontando pro recebedor OTLP nativo
+  do Prometheus — sem *scrape*, a API empurra as métricas direto).
+- **Nunca logar dado pessoal**: `RegisterUserUseCase` e
+  `GlobalExceptionHandler` nunca recebem o e-mail como argumento de log —
+  só o `UsuarioId` (Guid, não é dado pessoal por si só) e, no erro, o
+  método/rota da requisição. Reforçado (mas não garantido) pelo EF Core, que
+  por padrão mascara valores de parâmetro nos logs de comando SQL
+  (`@email='?'`), a menos que `EnableSensitiveDataLogging()` seja chamado —
+  o que não fizemos.
+- **Métodos de log com `[LoggerMessage]`**: em vez de chamar
+  `logger.LogInformation(...)` direto (o que os analisadores do .NET
+  marcam com `CA1848`/`CA1873` — custo de alocação/avaliação mesmo com o
+  nível de log desabilitado), os logs manuais viram métodos parciais com o
+  atributo `[LoggerMessage]` (`LogCadastroConcluido`, `LogEmailJaCadastrado`,
+  `LogErroNaoTratado`) — código gerado em tempo de compilação, sem alocação
+  extra, o padrão recomendado pelo .NET desde a versão 6.
+
+### `icarus-infrastructure`: Grafana + Tempo + Prometheus + Loki
+
+Quatro serviços (`compose.yaml`), configuração em `observabilidade/`:
+`tempo.yaml` (recebedor OTLP/HTTP, armazenamento local), `prometheus.yml`
+(mínimo, sem *scrape* — só auto-monitoramento; `--web.enable-otlp-receiver`
+habilita o recebimento direto de métricas), `loki-config.yaml` (modo
+*single-binary*, índice TSDB, armazenamento local), `grafana-datasources.yml`
+(Tempo, Prometheus e Loki já pré-configurados como fonte de dados, sem
+passo manual). Tempo publica duas portas: `4318` (recebe OTLP) e `3200`
+(API de consulta — usada pelo Grafana internamente, publicada também no
+host pra depuração via `curl`). Loki publica `3100` (API de *push*).
+
+**Correlação trace ↔ log, sem indexar `TraceId` como label do Loki**: o
+Tempo (`jsonData.tracesToLogsV2`) aponta pro Loki e usa
+`filterByTraceID: true` — ao abrir um trace no Grafana, ele busca o texto
+do `TraceId` dentro do conteúdo das linhas de log (uma busca, não um índice).
+O Loki (`jsonData.derivedFields`), na direção contrária, extrai o `TraceId`
+de dentro do JSON de cada linha via *regex* e vira um link pro trace
+correspondente no Tempo. **Por que não indexar como label**: labels no Loki
+viram um índice; `TraceId` é um valor novo a cada requisição (altíssima
+cardinalidade) — torná-lo label explodiria o número de fluxos indexados e
+degradaria a performance do Loki. A única label usada é `app=Icarus.Api`
+(baixa cardinalidade, um valor fixo).
+
+**Validado em 2026-09-29** (Postgres real, API via `dotnet run`, containers
+de observabilidade via Docker): chamado `POST /api/auth/cadastro`; log de
+sucesso (`Usuario {UsuarioId} cadastrado com sucesso`) encontrado em JSON no
+stdout, com o mesmo `TraceId` das linhas de comando SQL do EF Core e da
+linha de requisição do `Serilog.AspNetCore`; o trace correspondente
+encontrado no Tempo (`GET /api/traces/{traceId}` na porta 3200), incluindo
+o span do Npgsql com o texto da query SQL; métrica
+`http_server_request_duration_seconds_count` encontrada no Prometheus,
+com `http_route="api/Auth/cadastro"` e `http_response_status_code="201"`.
+
+**Validado em 2026-10-04** (adição do Loki, a pedido do usuário): mesmas
+linhas de log encontradas no Loki (`{app="Icarus.Api"} |= "<TraceId>"`),
+idênticas às do stdout; provisionamento das três fontes de dados no Grafana
+confirmado sem erro (`logger=provisioning.datasources ... name=Loki`).
+Também observado, sem ser bug: uma tentativa de cadastro com o Postgres
+fora do ar gerou `500`, e as três camadas de log (erro de conexão do EF
+Core, `GlobalExceptionHandler` e o log padrão do ASP.NET Core) apareceram
+corretamente correlacionadas pelo mesmo `TraceId` — confirma que o caminho
+de erro também fica observável, não só o de sucesso.
+
+### Revisão de completude (2026-10-06): 3 lacunas encontradas e corrigidas
+
+Ao revisar a seção 4.6 contra a seção 11 do `icarus-context` linha por
+linha, a pedido do usuário, três pontos ficaram de fora da primeira
+implementação:
+
+1. **Versão do serviço ausente no log.** A seção 11 pede "serviço, versão"
+   — só tínhamos `Servico`. Corrigido: `ObservabilityExtensions` lê
+   `Assembly.GetExecutingAssembly().GetName().Version` e adiciona como
+   propriedade `Versao` em todo log (`Enrich.WithProperty`) e como
+   `serviceVersion` no recurso do OpenTelemetry (`ConfigureResource`) —
+   assim traces e métricas também carregam a versão, não só os logs. Hoje
+   resolve para `1.0.0.0` (o `.csproj` não fixa `<Version>` explicitamente;
+   ajustar isso se o projeto adotar versionamento semântico no futuro).
+2. **Sem endpoint de saúde.** A seção 11 lista "saúde da API" como
+   verificação mínima. Adicionado `GET /health`
+   (`AspNetCore.HealthChecks.NpgSql`, via `AddHealthChecks().AddNpgSql(...)`
+   em `Icarus.Api/DependencyInjection.cs`, mapeado em `Program.cs`) — responde
+   `200 Healthy` só se também conseguir abrir conexão com o Postgres, não só
+   "o processo está de pé". Para não afogar logs/traces com chamadas
+   frequentes de orquestrador/Prometheus a esse endpoint: o
+   `UseSerilogRequestLogging` rebaixa `/health` para `Debug` (abaixo do
+   `MinimumLevel.Default: Information`, então nunca aparece) e
+   `AddAspNetCoreInstrumentation` tem um `Filter` que exclui `/health` do
+   Tempo.
+3. **Retenção do Loki configurada, mas nunca aplicada.** `retention_period`
+   sozinho em `limits_config` não apaga nada — faltava ligar
+   `compactor.retention_enabled: true` (e, com armazenamento em filesystem,
+   `compactor.delete_request_store: filesystem`, exigido pelas versões
+   recentes do Loki quando a retenção está ligada). Corrigido em
+   `icarus-infrastructure/observabilidade/loki-config.yaml`, e o período
+   aumentado de 24h para **168h (1 semana)**, a pedido do usuário.
+
+Validado: `GET /health` respondendo `200 Healthy`; campo `Versao` presente
+em toda linha de log; chamada a `/health` **não** gerou log em
+`Information` nem trace no Tempo (confirmado via busca no Loki, zero
+resultados para o texto "health"); Loki reiniciado com a config nova sem
+erro de validação. `dotnet build` (0 avisos/erros) e `dotnet test`
+(11 aprovados) revalidados.
+
+#### Correção adicional: botão "Logs for this span" não funcionava
+
+Ao testar manualmente o clique de um trace no Tempo para os logs no Loki
+(fluxo descrito acima, mas nunca antes clicado de fato na UI — só validado
+via API), o Grafana retornava "No logs volume available". Causa: o
+`tracesToLogsV2` do datasource Tempo (`grafana-datasources.yml`) só tinha
+`filterByTraceID: true`, sem dizer qual *label* do Loki usar — e o Loki
+exige pelo menos um seletor de stream (label) em toda consulta, não aceita
+busca de texto "solta". Corrigido adicionando `customQuery: true` e um
+`query` explícito com o label `app="Icarus.Api"`:
+```yaml
+tracesToLogsV2:
+  datasourceUid: loki
+  customQuery: true
+  query: '{app="Icarus.Api"} |= "${__trace.traceId}"'
+```
+Validado consultando o Loki diretamente com essa mesma LogQL e o TraceId de
+uma requisição real — retornou as 3 linhas esperadas (log do EF Core, do
+`GlobalExceptionHandler` e da requisição HTTP). Lição: a verificação anterior
+desta seção testou a correlação via `curl` na API do Loki, mas não o
+*clique* de fato no botão da UI do Grafana — os dois não são a mesma coisa,
+e só o segundo pegou esse bug.
+
+**Ainda não implementado**: nenhum painel/dashboard próprio no Grafana
+(só as fontes de dados); métricas de negócio customizadas (ex.: contador de
+cadastros bem-sucedidos vs. rejeitados, além da métrica HTTP genérica que já
+vem de graça da instrumentação).
+
 ## 5. CI/CD
 
 **Workflow**: `.github/workflows/validacao-inicial.yml` ("Validação inicial")
@@ -840,7 +1033,8 @@ comunicarem pelo nome do serviço em vez de porta publicada no host.
 ## 7. Lacunas conhecidas / próximos passos naturais
 
 - Modelo de dados criado (seção 4.3), mas só `Usuario` é usado por um caso de uso (cadastro); as demais entidades ainda não têm nenhum caso de uso em `Icarus.Application`.
-- Só existe um endpoint (`POST /api/auth/cadastro`); login, refresh, logout e o `GET` de perfil (com `Location` no cadastro) ainda não existem — ver seção 4.4. O arquivo `.http` continua residual do template.
+- Observabilidade (seção 4.6): sem painel/dashboard próprio no Grafana e sem métrica de negócio customizada — só a instrumentação automática do ASP.NET Core/Npgsql por enquanto.
+- Só existe um endpoint de negócio (`POST /api/auth/cadastro`, mais o `GET /health` de observabilidade — seção 4.6); login, refresh, logout e o `GET` de perfil (com `Location` no cadastro) ainda não existem — ver seção 4.4. O arquivo `.http` continua residual do template.
 - CI não roda build/test do .NET, apenas validações estruturais (nem `dotnet format`/analisadores, apesar do `.editorconfig` já estar configurado); também não roda `dotnet ef migrations` em pipeline algum.
 - Sem autenticação/autorização configurada (só `UseAuthorization()` chamado, sem esquema definido) — o DER já assume `Usuario.Id` vindo do JWT, mas isso ainda não existe na API.
 - Pendências de produto herdadas do DER (não bloqueiam a estrutura, mas afetam regras futuras): estados finais da missão, escala de prioridade, regra de sobreposição de vigência da rotina, se o diário aceita múltiplas entradas por dia, estrutura definitiva dos dados externos (ATUS/Vigitel).
@@ -851,6 +1045,7 @@ comunicarem pelo nome do serviço em vez de porta publicada no host.
   - `postgres:16` (`icarus-platform/docker-compose.yml`) — só a versão major fixada; minor/patch "flutuam" a cada `pull` novo.
   - `minio/minio:RELEASE.2025-09-07T16-13-09Z` (`icarus-infrastructure/compose.yaml`) — tag de release imutável, 100% fixada.
   - `rabbitmq:4.0-management` (`icarus-infrastructure/compose.yaml`) — major.minor fixados, patch "flutua".
+  - `grafana/tempo:2.6.1`, `prom/prometheus:v3.0.1`, `grafana/grafana:11.3.0`, `grafana/loki:3.3.0` (`icarus-infrastructure/compose.yaml`) — major.minor.patch fixados, mas sem revisão periódica combinada.
   - O trade-off: tag flutuante pega correção de segurança automaticamente mas não é 100% reprodutível entre execuções/máquinas diferentes; tag imutável é reprodutível mas exige atualização manual periódica (e checar CVEs manualmente). Precisamos decidir **uma convenção única** para todos os serviços (provável candidato: tag imutável/digest para todos, seguindo o exemplo do MinIO) e aplicá-la de forma consistente. Não decidido ainda — discutir antes de adicionar novos serviços (ex.: trabalhador Python, Nginx).
 - **Decisão pendente: `IUnitOfWork` deveria ser uma classe própria, em vez de `IcarusDbContext` implementar direto?** Ver seção 4.4 ("Dúvida em aberto") para as três escolas da comunidade .NET e o raciocínio de por que ficamos com a opção mais simples por enquanto. Retomar quando `SalvarAlteracoesAsync` precisar fazer mais do que chamar `SaveChangesAsync` (candidatos: eventos de domínio, padrão outbox do RabbitMQ).
 - **Decisão consciente, a reavaliar: sem MediatR/CQRS, exceção em vez de Result pattern nos casos de uso.** Ver seção 4.4 ("Decisão consciente de simplificação") — divergem do padrão mais replicado hoje (ex.: template do Jason Taylor), escolhido para reduzir conceitos novos enquanto o usuário aprende. Reavaliar se o número de casos de uso ou de regras de negócio "esperadas para falhar" crescer.
@@ -1049,3 +1244,43 @@ comunicarem pelo nome do serviço em vez de porta publicada no host.
   na seção 4.5 ("Por que não existe `Icarus.Domain.UnitTests`"), incluindo
   o contraste com o `Domain.UnitTests` do template do Jason Taylor (que tem
   conteúdo real porque o domínio dele não é anêmico).
+- 2026-09-29 — Observabilidade (logs, traces, métricas), a pedido do
+  usuário, antes de seguir para o passo 4 do plano de autenticação. Seção
+  11 do `icarus-context` já exigia formato/conteúdo dos logs (JSON no
+  stdout, sem dado pessoal, com ID de correlação), mas não a ferramenta —
+  escolhas validadas uma a uma: Serilog (não `AddJsonConsole` puro) para
+  logging; OpenTelemetry completo (traces + métricas) desde já, não só
+  logging isolado; backend real (Grafana + Tempo + Prometheus, subidos no
+  `icarus-infrastructure`) em vez de exportador de console ou adiar para
+  quando o RabbitMQ existir. Log manual só no `RegisterUserUseCase`
+  (decisão de negócio) e no `GlobalExceptionHandler` (exceção inesperada,
+  sem duplicar o log de exceções já conhecidas); Controller/Filter/Repository
+  não ganham log manual — cobertos pela instrumentação automática do
+  ASP.NET Core e do Npgsql. Logs convertidos para o padrão `[LoggerMessage]`
+  (métodos parciais gerados em tempo de compilação), eliminando os avisos
+  `CA1848`/`CA1873` dos analisadores. `Serilog.Enrichers.Span` adiciona
+  `TraceId`/`SpanId` a toda linha de log, correlacionando log e trace mesmo
+  sem um agregador central de logs (Loki, ainda não adicionado). Validado
+  de ponta a ponta: log de sucesso do cadastro encontrado em JSON com o
+  mesmo `TraceId` das linhas de SQL do EF Core; trace correspondente
+  encontrado no Tempo, com o span do Npgsql mostrando a query executada;
+  métrica de duração HTTP por rota/status encontrada no Prometheus. Nunca
+  logamos e-mail ou outro dado pessoal — só `UsuarioId` (Guid). Ver seção
+  4.6 para o detalhamento completo.
+- 2026-10-04 — Adicionado o Loki (logs centralizados), a pedido do usuário,
+  fechando a lacuna que a própria seção 4.6 já registrava. Novo serviço no
+  `icarus-infrastructure` (`loki-config.yaml`, modo *single-binary*,
+  armazenamento local); `Serilog.Sinks.Grafana.Loki` adicionado como um
+  segundo destino (`WriteTo`) do Serilog, em paralelo ao stdout — nenhum dos
+  dois substitui o outro. Grafana ganhou a terceira fonte de dados, com
+  correlação trace↔log nos dois sentidos (Tempo aponta pro Loki via busca de
+  texto pelo `TraceId`; Loki aponta pro Tempo via *regex* no JSON da linha).
+  Decisão deliberada: `TraceId` nunca vira *label* do Loki (alta
+  cardinalidade, degradaria a performance) — só `app=Icarus.Api`. Validado:
+  logs de uma requisição de cadastro encontrados no Loki via
+  `{app="Icarus.Api"} |= "<TraceId>"`, idênticos aos do stdout;
+  provisionamento das 3 fontes de dados no Grafana sem erro. Também
+  observado (não é bug): uma falha real de conexão com o Postgres gerou um
+  500 com as três camadas de log (EF Core, `GlobalExceptionHandler`, ASP.NET
+  Core) corretamente correlacionadas pelo mesmo `TraceId` — o caminho de
+  erro também é observável, não só o de sucesso.
