@@ -1,7 +1,7 @@
 # Icarus Platform — Documentação do Projeto
 
 > Documento vivo. Mantido e atualizado à medida que novas decisões e features forem implementadas.
-> Última atualização: 2026-10-04
+> Última atualização: 2026-10-11 (RF-01 + RF-02 completos: perfil, Location, DevController; `.http` removido)
 
 ## 0. Regra permanente do projeto
 
@@ -41,8 +41,9 @@ Estado atual: **projeto em estágio inicial**. A estrutura de solução (Clean
 Architecture), a persistência com Entity Framework Core / PostgreSQL e o
 modelo de dados completo do MVP (14 entidades, ver seção 4.3), incluindo
 ocorrências persistidas para missões recorrentes, já foram criados.
-Autenticação (cadastro/login) está em construção — ver seção 4.4. O único
-endpoint exposto hoje é o de cadastro (`POST /api/auth/cadastro`).
+Autenticação (cadastro/login) está em construção — ver seção 4.4. Endpoints
+de negócio expostos hoje: cadastro (`POST /api/auth/cadastro`) e login
+(`POST /api/auth/login`).
 
 O modelo de dados segue o DER do `icarus-context` na versão **1.2**
 (2026-09-08), incluindo ocorrências persistidas para missões recorrentes.
@@ -152,7 +153,7 @@ Icarus.Api.UnitTests            ──> Icarus.Api
 - Pacotes (versão centralizada em `Directory.Packages.props`): `Microsoft.AspNetCore.OpenApi`, `Microsoft.EntityFrameworkCore.Design` (para suportar `dotnet ef migrations`).
 - `Program.cs`: encadeia `AddApi()`, `AddApplication()` e `AddInfrastructure(builder.Configuration)`; pipeline com `UseExceptionHandler`, `UseStatusCodePages`, `/openapi` apenas em Development, `UseHttpsRedirection`, `UseAuthorization`, `MapControllers`.
 - Pastas: `Controllers/` (`AuthController`), `Contracts/Auth/` (Request/Response e validador), `Filters/` (`ValidationFilter`), `ExceptionHandling/` (`GlobalExceptionHandler`). Detalhes na seção 4.4.
-- Único endpoint hoje: `POST /api/auth/cadastro`. O `Icarus.Api.http` continua sendo o template residual (referencia `/weatherforecast/`, que não existe mais) — ver decisão pendente sobre ferramenta de teste na seção 4.4.
+- Endpoints de negócio em `AuthController` (cadastro, login, refresh, `me`) — ver seção 4.4. Teste manual via Swagger UI (seção 4.4); o arquivo `.http` do template foi removido (decisão do usuário, 2026-10-10).
 - Pacotes: `FluentValidation` (validação dos Requests).
 - `appsettings.json`: **não contém mais credenciais**. `ConnectionStrings:DefaultConnection` foi movida para User Secrets (ver seção 6.1).
 - `launchSettings.json`: perfis `http` (porta 5138) e `https` (portas 7220/5138).
@@ -596,19 +597,83 @@ convenção REST para `201 Created`) na resposta do cadastro. Não foi feito ant
 porque um GET de perfil sem autenticação exporia nome, e-mail e data de
 nascimento de qualquer usuário por id.
 
-**Ferramenta para testar a API manualmente: arquivo `.http`.** Não há um
-padrão único da comunidade: o `.http` é o padrão de primeira parte (o
-template oficial já gera o `Icarus.Api.http`; roda no Visual Studio, VS Code
-e Rider sem pacote extra) e, para interface visual, o Swagger UI
-(Swashbuckle) foi o padrão por anos mas saiu dos templates no .NET 9 — a
-documentação oficial de OpenAPI cita Swagger UI, Scalar e Redoc, e o Scalar
-é o substituto mais adotado. Seguimos com o `.http` (sem dependência nova,
-versionado no Git como roteiro repetível; o `Icarus.Api.http` foi reescrito
-com os casos do cadastro e cresce com login/refresh/logout). **Scalar
-(`Scalar.AspNetCore`) fica como opção futura**, se quisermos explorar a API
-visualmente: mapear a página só em Development e ligar `launchBrowser` +
-`launchUrl` em `launchSettings.json` (hoje `launchBrowser: false`, padrão do
-template .NET 9+) para o Visual Studio abri-la no F5. Os dois podem coexistir.
+**Ferramenta para testar a API manualmente: Swagger UI (único jeito, desde
+2026-10-10).** Não há um padrão único da comunidade pra isso. Passamos por
+três fases:
+
+1. **`.http`** (template de primeira parte, roda no Visual Studio/VS Code/
+   Rider sem pacote extra) — reescrito com os casos de cadastro, login,
+   `me` e refresh conforme cada um foi implementado.
+2. **Scalar** (`Scalar.AspNetCore`) — ligado em 2026-10-10 porque o usuário
+   queria algo visual, não só o `.http`.
+3. **Swagger UI** (Swashbuckle) — trocamos o Scalar por ele no mesmo dia, a
+   pedido do usuário (ver abaixo). Depois disso, o usuário pediu pra
+   **remover o `.http` definitivamente** ("também não vamos mais usar o
+   `.http`") — arquivo `src/Icarus.Api/Icarus.Api.http` excluído. Hoje o
+   Swagger UI é a única ferramenta de teste manual do projeto.
+
+Mapeado só em `Development`. `launchSettings.json` tem `launchBrowser: true`
+nos dois perfis (`http`/`https`) — ao rodar `dotnet run` (ou F5 no Visual
+Studio), o navegador já abre direto nele.
+
+Primeiro ligamos o **Scalar** (`Scalar.AspNetCore`,
+`app.MapScalarApiReference()`, rota `/scalar/v1`, `launchUrl: "scalar/v1"`).
+No mesmo dia, a pedido do usuário, **trocamos para o Swagger UI** — pacote e
+código do Scalar removidos. Fica documentado aqui como religar o Scalar se
+quisermos voltar:
+```csharp
+// Program.cs, dentro do if (app.Environment.IsDevelopment())
+app.MapScalarApiReference(); // precisa do pacote Scalar.AspNetCore
+```
+e trocar `launchUrl` de `"swagger"` para `"scalar/v1"` no `launchSettings.json`.
+
+**Swagger UI (Swashbuckle), ligado hoje:** só o pacote
+`Swashbuckle.AspNetCore.SwaggerUI` — **sem** `AddSwaggerGen`/`UseSwagger`, já
+que não precisamos de um segundo gerador de documento OpenAPI; o
+`Microsoft.AspNetCore.OpenApi` (`AddOpenApi()`/`MapOpenApi()`) que já
+existia continua gerando o documento (`/openapi/v1.json`), e o Swagger UI só
+lê esse documento (`options.SwaggerEndpoint("/openapi/v1.json", "Icarus API")`).
+Rota padrão `/swagger` (redireciona para `/swagger/index.html`);
+`launchUrl: "swagger"`. Validado: build limpo, `/swagger/index.html`
+responde `200` com a UI de verdade, listando `/api/Auth/cadastro` e
+`/api/Auth/login` a partir do mesmo `/openapi/v1.json`.
+
+**Botão "Authorize" (2026-10-10), a pedido do usuário.** Sem `AddSwaggerGen`,
+não existe `AddSecurityDefinition`/`AddSecurityRequirement` do Swashbuckle
+disponível — essas APIs só existem quando o Swashbuckle também gera o
+documento. Como o documento é gerado pelo `Microsoft.AspNetCore.OpenApi`, a
+definição do esquema de segurança precisa entrar nele por outro caminho: um
+*document/operation transformer*
+(`Icarus.Api/OpenApi/BearerSecuritySchemeTransformer.cs`), registrado via
+`AddOpenApi(options => { options.AddDocumentTransformer<...>();
+options.AddOperationTransformer<...>(); })`:
+- O lado de **documento** adiciona `components.securitySchemes.Bearer`
+  (tipo `http`, scheme `bearer`, `bearerFormat: JWT`) — só se o esquema
+  `JwtBearer` estiver de fato registrado (`IAuthenticationSchemeProvider`).
+- O lado de **operação** olha se a action tem `[Authorize]`
+  (`IAuthorizeData` nos metadados do endpoint) e só então adiciona o
+  requisito de segurança **naquela** operação — por isso só `GET /api/auth/me`
+  ganha o cadeado no Swagger UI; cadastro e login continuam sem, do jeito
+  que têm que ser.
+- `Microsoft.OpenApi` 2.7.5 (dependência do `Microsoft.AspNetCore.OpenApi`
+  10.0.11) é uma versão nova, com API bem diferente da v1 clássica do
+  Swashbuckle: namespace achatado (sem `Microsoft.OpenApi.Models`),
+  `OpenApiSecuritySchemeReference(nomeDoEsquema, document)` em vez de um
+  `Reference` separado — tive que compilar e ajustar duas vezes até achar
+  os nomes certos, incluindo passar o `context.Document` de verdade pro
+  construtor da referência (passar `null` ali serializava a referência como
+  objeto vazio `{}`, quebrando o requisito de segurança silenciosamente).
+- `options.ConfigObject.PersistAuthorization = true` no `UseSwaggerUI`
+  (`SwaggerUIOptions.PersistAuthorization` não existe direto — fica dentro
+  de `ConfigObject`) — mantém o token colado no botão entre um F5 e outro
+  na página.
+
+Validado: documento OpenAPI com `components.securitySchemes.Bearer`
+presente; `security` só aparece em `GET /api/auth/me` (`[{"Bearer": []}]`),
+ausente em `cadastro`/`login`; fluxo completo cadastro → login → `/eu` com
+o `accessToken` colado no header `Authorization` continua devolvendo o
+`UsuarioId` certo. `dotnet build` (0 avisos/erros) e `dotnet test`
+(17 aprovados) revalidados.
 
 **Verificação ponta a ponta (2026-09-27, Postgres real, API em `dotnet run`,
 `curl`):** `201` com `{ "usuarioId": ... }` (linha gravada com nome/e-mail
@@ -634,10 +699,394 @@ nenhum caso inválido criou linha. Usuário de teste removido depois.
 - A tradução pt-BR embutida do FluentValidation usa "deve ser informado"
   (sem concordância de gênero: "'Senha' deve ser informado").
 
-**Ainda não implementado** (próximos passos do plano em andamento): geração
-de JWT, casos de uso e endpoints de login/refresh/logout, `JwtBearer` +
-rate limiting de login, `GET` de perfil e `Location` (pendência acima),
-testes de integração do endpoint.
+**Ainda não implementado** (na época desta seção; ver "Passo 4" abaixo para o
+que foi feito depois): geração de JWT, casos de uso e endpoints de
+login/refresh/logout, `JwtBearer` + rate limiting de login, `GET` de perfil e
+`Location` (pendência acima), testes de integração do endpoint.
+
+### Passo 4 do plano de autenticação: login + emissão de token (RF-02.1)
+
+Escopo desta etapa, validado com o usuário antes de implementar: só o login
+e a emissão dos tokens. Logout (RF-02.2), limite de tentativas (RF-02.3) e o
+middleware de autorização/ownership (RF-02.4) ficam para os próximos passos —
+mesmo racional de dividir o cadastro em pedaços revisáveis.
+
+**Geração do JWT:** `IJwtTokenGenerator`
+(`Icarus.Application/Interfaces/IJwtTokenGenerator.cs`), implementado por
+`JwtTokenGenerator` em `Icarus.Infrastructure/Security/` usando
+`Microsoft.IdentityModel.JsonWebTokens.JsonWebTokenHandler` — mais rápida que
+o antigo `JwtSecurityTokenHandler` (API mais simples, não usa as classes
+XML-orientadas antigas) e o mesmo handler que o
+`Microsoft.AspNetCore.Authentication.JwtBearer` já usa por padrão para
+*validar* tokens desde o .NET 8; gerar com a mesma classe mantém os dois
+lados consistentes. Claim única no payload: `NameIdentifier` com o
+`UsuarioId` — nenhum outro dado pessoal, já que o JWT é só assinado, não
+criptografado, e qualquer um pode decodificar o payload (não é um cofre).
+
+**Durações** (validadas com o usuário): access token de **15 minutos**,
+refresh token de **7 dias**. Configuração de assinatura (`Jwt:ChaveSecreta`,
+`Jwt:Emissor`, `Jwt:Audiencia`) via `JwtOptions` (`IOptions<T>`), nunca em
+`appsettings.json` — segue a mesma convenção já usada para a connection
+string: `dotnet user-secrets` no desenvolvimento.
+
+**Refresh token:** string aleatória de 32 bytes (`RandomNumberGenerator`),
+devolvida ao cliente em texto puro uma única vez; só o hash é persistido em
+`TokenRenovacao.TokenHash`. O hash usa **SHA-256 simples, não Argon2id** —
+diferente da senha (escolhida por um humano, previsível, precisa de uma
+função de derivação lenta contra força bruta), o refresh token já nasce
+aleatório de alta entropia, então hashear com Argon2id seria custo de CPU
+desperdiçado sem ganho de segurança real (mesmo racional usado para hash de
+API keys/tokens de sessão na prática da comunidade).
+
+**Caso de uso de Login:** `LoginUseCase`
+(`Icarus.Application/UseCases/Login/`) busca o usuário por e-mail
+(`IUsuarioRepository.BuscarPorEmailAsync`, método novo), verifica a senha via
+`IPasswordHasher.Verify` e, se tudo certo, gera os dois tokens e persiste o
+refresh token (`ITokenRenovacaoRepository.AdicionarAsync`, repositório novo).
+**E-mail inexistente e senha incorreta lançam a mesma exceção**
+(`CredenciaisInvalidasException`, mapeada para `401` com a mensagem genérica
+"E-mail ou senha inválidos.") — não diferenciar os dois casos evita revelar
+se um e-mail está cadastrado, mesmo princípio por trás do RF-02.3. O log de
+falha também é genérico, sem e-mail.
+
+**Endpoint:** `POST /api/auth/login` (`AuthController.Login`), seguindo a
+mesma estrutura do cadastro — `LoginRequest`/`LoginResponse` próprios,
+`LoginRequestValidator` (FluentValidation, só confirma formato: não valida o
+tamanho da senha, regra que só se aplica ao cadastro) registrado via
+`ValidationFilter` existente.
+
+Testado em `LoginUseCaseTests.cs` (sucesso gera e persiste os tokens;
+e-mail inexistente e senha incorreta lançam a mesma exceção) e em
+`JwtTokenGeneratorTests.cs` (o JWT gerado valida de verdade com
+`JsonWebTokenHandler.ValidateTokenAsync` e carrega o `UsuarioId` certo; o
+hash do refresh token bate com SHA-256 do valor devolvido; dois refresh
+tokens gerados em sequência são diferentes).
+
+**Verificação ponta a ponta (2026-10-06, Postgres real, API em `dotnet run`,
+`curl`):** cadastro seguido de login devolve `200` com `accessToken` (JWT
+válido) e `refreshToken`; `token_renovacao.token_hash` no banco **difere**
+do `refreshToken` devolvido na resposta (confirma que só o hash foi
+persistido); login com senha errada e login com e-mail inexistente devolvem
+o mesmo `401` com a mesma mensagem; os dois casos de falha geram a mesma
+linha de log genérica ("Tentativa de login rejeitada: credenciais
+inválidas"), sem e-mail. `dotnet build` (0 avisos/erros) e `dotnet test`
+(17 aprovados) revalidados. Usuário de teste removido depois.
+
+**Ainda não implementado (nesta etapa):** logout (RF-02.2), limite de
+tentativas de login (RF-02.3, `Microsoft.AspNetCore.RateLimiting`), `GET`
+de perfil completo e testes de integração. O middleware de autorização
+(`AddJwtBearer` + `[Authorize]`) e o endpoint de refresh (com rotação e
+detecção de reuso) foram implementados depois, no mesmo dia — ver "RF-02.4"
+e "Refresh" abaixo.
+
+### Refresh: rotação de token + detecção de reuso
+
+Implementado em 2026-10-10, a pedido do usuário ("vamos pro refresh token
+agora"). Antes de implementar, uma decisão de segurança real foi validada
+com ele: o que fazer quando um refresh token **já rotacionado antes**
+aparece de novo numa requisição (indício de token roubado, usado em
+paralelo ao dono legítimo)? Duas opções honestas:
+
+1. Rejeitar só aquela tentativa (mais simples, não reage ao indício de roubo).
+2. **Revogar todos os refresh tokens ativos do usuário** (recomendação do
+   OAuth2 Security BCP, prática real do Auth0/Okta) — reage ao pior
+   cenário, ao custo de deslogar sessões legítimas também.
+
+Optamos pela opção 2.
+
+**`POST /api/auth/refresh`** (`AuthController.Refresh`, reaproveita
+`LoginResponse` — mesmo formato de saída, sem motivo de negócio pra serem
+tipos diferentes). `RefreshTokenUseCase`
+(`Icarus.Application/UseCases/RefreshToken/`):
+- Calcula o hash do token recebido (`IJwtTokenGenerator.CalcularHashDoRefreshToken`,
+  novo método — mesma lógica SHA-256 já usada em `GerarRefreshToken`, agora
+  exposta separadamente pra poder recalcular a partir de um token existente)
+  e busca por igualdade direta no banco (`ITokenRenovacaoRepository.BuscarPorTokenHashAsync`
+  — possível porque o hash é determinístico, ao contrário do Argon2id da
+  senha, que exige buscar por outra chave e then verificar).
+- Token não encontrado, expirado ou já revogado → `RefreshTokenInvalidoException`
+  (401 genérico, mesma mensagem pros três casos — não dá pista de qual
+  aconteceu, mesmo racional do login).
+- Token já tem `SubstituidoPorId` preenchido (já foi trocado antes) →
+  **reuso detectado**: chama `ITokenRenovacaoRepository.RevogarTodosDoUsuarioAsync`
+  (marca `RevogadoEm` em todo token ainda ativo daquele usuário) e lança a
+  mesma exceção genérica.
+- Token válido → gera o par novo (`GerarAccessToken` + `GerarRefreshToken`),
+  cria a nova `TokenRenovacao`, e liga `tokenAntigo.SubstituidoPor = tokenNovo`
+  (navegação do EF Core — resolve o `SubstituidoPorId` automaticamente ao
+  salvar, sem precisar de um segundo `SaveChanges` pra obter o Id gerado).
+  **Não** marca `RevogadoEm` nessa rotação normal — `SubstituidoPorId` e
+  `RevogadoEm` são conceitos diferentes (superado por rotação vs. revogado
+  de verdade), só o segundo dispara em logout/roubo.
+
+Testado em `RefreshTokenUseCaseTests` (rotação válida; token inexistente,
+expirado e revogado lançam a exceção; reuso lança a exceção **e** revoga
+outro token ativo do mesmo usuário) e `JwtTokenGeneratorTests`
+(`CalcularHashDoRefreshToken` bate com o hash que `GerarRefreshToken` já
+tinha gerado).
+
+**Verificação ponta a ponta (2026-10-10, Postgres real, API em `dotnet run`,
+`curl`):** cadastro → login → refresh devolveu um par **novo** de tokens
+(`200`); reapresentar o token original (já rotacionado) devolveu `401`;
+o token novo que tinha sido emitido no passo de refresh **também** passou
+a devolver `401` depois disso — confirmando que a reação ao reuso revogou
+mesmo a sessão inteira, não só o token reusado. Consulta direta no banco
+mostrou os 4 tokens do usuário (de dois ciclos de login/refresh diferentes)
+com `revogado_em` preenchido no mesmo instante. `dotnet build`
+(0 avisos/erros) e `dotnet test` (23 aprovados) revalidados.
+
+**Ainda não implementado (na época):** a notificação para o usuário de que
+a sessão foi revogada por suspeita de roubo (hoje ele só recebe `401`
+igual a qualquer token inválido — não há um alerta distinto); endpoint de
+logout, implementado depois, no mesmo dia — ver "Logout" abaixo.
+
+### Logout (RF-02.2)
+
+Implementado em 2026-10-10, a pedido do usuário. Duas decisões validadas
+com ele antes de implementar:
+
+1. **Exige só o refresh token, não o access token** (sem `[Authorize]`) —
+   mesmo racional do refresh: o refresh token em si já é a credencial. Exigir
+   também um access token válido forçaria um refresh só para poder deslogar,
+   se o access token (15 min) já tivesse expirado no momento do logout.
+2. **Resposta sempre `204`, independente do estado do token** — segue a
+   RFC 7009 (revogação de token OAuth2): o servidor responde sucesso mesmo
+   se o token já não existia, já expirou ou já tinha sido revogado antes,
+   para não revelar o estado de um token a quem pede o logout. O resultado
+   desejado ("esse token não funciona mais") já é verdade nos três casos.
+
+**`POST /api/auth/logout`** (`AuthController.Logout`, reusa `RefreshRequest`
+— mesmo formato de entrada do refresh). `LogoutUseCase`
+(`Icarus.Application/UseCases/Logout/`) calcula o hash do token recebido,
+busca por `ITokenRenovacaoRepository.BuscarPorTokenHashAsync` (método já
+existente, criado pro refresh) e, se encontrar um token ainda não revogado,
+marca `RevogadoEm`. Não lança nenhuma exceção em caso algum — não há
+"caminho de erro" nesse caso de uso, por design. Diferente do `ExecuteAsync`
+dos outros casos de uso, não devolve nada (`Task`, não `Task<T>`): não há
+dado útil para devolver depois de um logout.
+
+Testado em `LogoutUseCaseTests` (token válido marca `RevogadoEm` e salva;
+token inexistente e token já revogado não lançam exceção e não salvam de
+novo). **Verificação ponta a ponta** (Postgres real, `curl`): cadastro →
+login → logout devolveu `204`; usar o mesmo refresh token depois num
+refresh devolveu `401` (confirma que a revogação funcionou de verdade);
+logout de novo com o mesmo token (já revogado) devolveu `204` outra vez
+(idempotente); logout com um token que nunca existiu também devolveu
+`204`, sem diferença na resposta. `dotnet build` (0 avisos/erros) e
+`dotnet test` (26 aprovados) revalidados.
+
+### Limite de tentativas de login (RF-02.3)
+
+Implementado em 2026-10-11, a pedido do usuário ("vamos para o limite de
+tentativas"). Antes de implementar, o usuário pediu pra eu esclarecer qual
+é de fato o padrão da comunidade .NET pra esse problema — a resposta tinha
+uma nuance importante:
+
+**`Microsoft.AspNetCore.RateLimiting`** (mencionado como ferramenta
+planejada em versões anteriores desta seção) resolve um problema
+*diferente*: limitar a taxa de requisições por IP/rota, de forma genérica.
+Ele roda antes do corpo da requisição ser lido, então não vê o e-mail
+dentro do JSON, e por padrão contaria *toda* requisição, não só as que
+falharam — não modela "5 falhas por **conta** + origem" sem engenharia
+extra que descaracterizaria a ferramenta.
+
+**O padrão real da comunidade .NET pra esse problema específico** é o
+*lockout* do `ASP.NET Core Identity` (`UserManager.AccessFailedCount` +
+`LockoutEnd`, por conta, persistido na tabela do usuário) — só que sem o
+componente de IP, que o Identity não tem por padrão. Como não adotamos o
+Identity (seção 4.4, decisão já documentada — conflito de nomenclatura de
+tabelas), construímos o equivalente conceitual na mão, com o IP adicionado,
+igual já fizemos pra hash de senha e JWT.
+
+**Implementação:** `ILoginAttemptLimiter`
+(`Icarus.Application/Interfaces/`), com três operações:
+`EstaBloqueado`, `RegistrarFalha`, `RegistrarSucesso` (chave = e-mail
+normalizado + origem). Implementado em `Icarus.Infrastructure/Security/LoginAttemptLimiter.cs`
+usando `IMemoryCache` — **aceito como limitação conhecida do MVP local**:
+o contador se perde se a API reiniciar. Essa não é uma decisão nova: já
+estava documentada no `icarus-context`
+(`01-arquitetura-da-solucao.md`, seção 17 — "Limite de login em memória se
+perder ao reiniciar: Baixo no MVP local; aceitar como limitação
+documentada; persistir ou externalizar se houver publicação"). Janela
+fixa de 15 min a partir da primeira falha (expira sozinha no cache); 5
+falhas bloqueiam; um login certo zera o contador (uma conta não devia
+continuar penalizada por falhas antigas depois de autenticar com sucesso).
+
+`LoginCommand` ganhou o campo `Origem` (o IP do cliente,
+`HttpContext.Connection.RemoteIpAddress`, extraído no `AuthController` —
+`Icarus.Application` não pode depender de `HttpContext`).
+`LoginUseCase.ExecuteAsync` checa `EstaBloqueado` **antes** de buscar o
+usuário ou calcular qualquer hash Argon2id — evita gastar CPU numa
+requisição que já vai ser rejeitada. Nova exceção
+`LimiteDeTentativasExcedidoException`, mapeada para `429 Too Many
+Requests` (RFC 6585) — não `401`, porque `429` é o código HTTP padrão pra
+essa situação e, diferente de inventar uma resposta "disfarçada" de
+credenciais inválidas, não revela nada sobre a conta além de "está sendo
+limitado agora".
+
+Testado em `LoginUseCaseTests` (bloqueia na 6ª tentativa mesmo com a senha
+certa; um sucesso zera o contador) e `LoginAttemptLimiterTests`
+(implementação real com `IMemoryCache`: não bloqueia com menos de 5
+falhas, bloqueia a partir de 5, `RegistrarSucesso` zera, contadores de
+e-mails/origens diferentes não se misturam). **Verificação ponta a ponta**
+(Postgres real, `curl`): 5 tentativas com senha errada devolvem `401`; a
+6ª tentativa, com a senha **certa**, devolve `429` (prova que bloqueou
+antes de checar a senha); outro usuário, do mesmo IP, loga normalmente
+(prova que o bloqueio é por conta+origem, não por IP sozinho). `dotnet
+build` (0 avisos/erros) e `dotnet test` (33 aprovados) validados.
+
+**Ainda não implementado:** liberar o bloqueio manualmente (hoje só expira
+pelo tempo); métrica/alerta de observabilidade quando uma conta é
+bloqueada (hoje só tem o log `Warning`).
+
+### `GET` de perfil (RF-01) + `Location` no cadastro (2026-10-11)
+
+Implementado a pedido do usuário — a última peça deixada pendente desde o
+cadastro, porque expor dados pessoais sem autenticação seria uma falha de
+privacidade. Agora que o `[Authorize]` existe (seção "RF-02.4" acima),
+fica seguro. Duas decisões validadas antes de implementar:
+
+1. **`GET /api/usuarios/{id}`, com checagem de propriedade** (em vez de
+   `GET /api/usuarios/me`, sem id na URL). Essa é a primeira vez que o
+   RF-02.4 ("identificador de outro usuário não permite consultar o
+   recurso") é testado de verdade contra uma rota que recebe um id — o
+   `/api/auth/me` nunca precisa checar propriedade, porque sempre devolve
+   o dono do próprio token. Também resolve a pendência antiga do header
+   `Location` no cadastro, já que agora existe uma URL por usuário pra
+   apontar.
+2. **Só os campos do cadastro**: `Id`, `Nome`, `Email`, `DataNascimento`.
+   Sem `SaldoPontos` — esse campo é conceito de outro RF (RF-05/RF-06,
+   pontuação), que ainda não existe; misturar agora assumiria escopo de
+   uma funcionalidade futura.
+
+**`ObterPerfilUseCase`** (`Icarus.Application/UseCases/ObterPerfil/`):
+recebe `UsuarioIdAutenticado` (da claim do token) e `UsuarioIdSolicitado`
+(da rota). Se forem diferentes, lança `PerfilNaoEncontradoException` —
+**sem nem consultar o banco** — e a mesma exceção é lançada se o id
+simplesmente não existir. As duas situações (perfil de outro usuário vs.
+id inexistente) são deliberadamente indistinguíveis na resposta (`404`
+genérico): não confirma a existência de uma conta que não é a do
+chamador, mesmo racional de não revelar mais do que o necessário já usado
+em login/refresh/logout.
+
+**`UsuariosController`** (novo, separado do `AuthController` — "usuarios"
+é um recurso diferente de "auth"). `IUsuarioRepository` ganhou
+`BuscarPorIdAsync` (método novo, usado também pelo `DevController`).
+
+**`Location` no cadastro**: `AuthController.Register` passou de
+`StatusCode(201, ...)` pra `CreatedAtAction(nameof(UsuariosController.ObterPerfil), "Usuarios", new { id }, ...)`
+— o ASP.NET Core monta a URL via roteamento (não é uma string hardcoded),
+então ela acompanha a rota automaticamente se o caminho mudar no futuro.
+
+**Verificação ponta a ponta** (Postgres real, `curl`): cadastro devolveu
+`Location: http://localhost:5138/api/Usuarios/{id}` correto; `GET` nesse
+id, autenticado, devolveu `200` com os dados certos; sem token, `401`;
+com um id aleatório que não existe, `404`; e o teste mais importante —
+**cadastrei um segundo usuário real** e confirmei que o primeiro,
+autenticado, recebe `404` ao tentar ver o perfil do segundo (não só um id
+inventado — um id de conta de verdade). Testado também em
+`ObterPerfilUseCaseTests` (perfil próprio; id de outro usuário real;
+id inexistente). `dotnet build` (0 avisos/erros) e `dotnet test`
+(36 aprovados) revalidados.
+
+### `DevController`: gerar token de teste sem login (2026-10-11)
+
+A pedido do usuário: um atalho pra testar endpoints protegidos no Swagger
+sem repetir cadastro+login a cada teste. **Não é uma RF do projeto** —
+nenhuma regra de negócio, puramente ferramenta de desenvolvimento.
+
+**Decisão validada antes de implementar:** o token é gerado a partir de um
+`UsuarioId` de um usuário **já cadastrado** (não um GUID arbitrário sem
+checagem) — assim o token corresponde a dados reais, útil quando existirem
+endpoints que consultam informação do usuário (RF-03 em diante).
+
+**`GET /api/dev/token/{usuarioId}`** (`DevController`, novo controller,
+separado do `AuthController` de propósito — deixa óbvio visualmente, no
+Swagger, que esse grupo de rotas não é "de produto"). Busca o usuário
+(`IUsuarioRepository.BuscarPorIdAsync`, método novo) e gera só o access
+token (`IJwtTokenGenerator.GerarAccessToken`) — sem checar senha, sem
+gerar refresh token, sem gravar nada no banco.
+
+**Bloqueio fora de Development é checado em runtime, não só escondido do
+Swagger.** O Swagger UI já só é mapeado em `Development` (`Program.cs`),
+mas a **rota** do `DevController` continua existindo nos outros ambientes
+via `MapControllers()` — por isso a action injeta `IHostEnvironment` e
+confere `ambiente.IsDevelopment()` como primeira linha, devolvendo `404`
+(idêntico a uma rota inexistente) se não for. Esconder do Swagger sozinho
+não bastaria: alguém poderia chamar a rota direto, sem nunca ter visto o
+Swagger.
+
+**Verificação ponta a ponta** (Postgres real, `curl`): cadastro → gerar
+token de dev pra esse `UsuarioId` → usar esse token em `GET /api/auth/me`
+devolveu o mesmo `UsuarioId` (prova que o token é válido de verdade, não
+só "parece" um JWT); `UsuarioId` inexistente devolveu `404`. `dotnet
+build` (0 avisos/erros) e `dotnet test` (33 aprovados) revalidados.
+
+### Experimento revertido: `[FromForm]` no login (2026-10-10)
+
+Por algumas horas, `POST /api/auth/login` usou `[FromForm]`
+(`application/x-www-form-urlencoded`) em vez de `[FromBody]` (JSON) — a
+pedido do usuário, depois de eu explicar por que o Swagger UI mostra um
+textarea de JSON cru pro corpo de POST (é assim que ele renderiza qualquer
+corpo `application/json`; só mostra campo por campo quando o conteúdo é
+`application/x-www-form-urlencoded`/`multipart/form-data`, ou pra
+parâmetros de query/rota). Era deliberadamente só nesse endpoint, como
+comparação visual, nunca a intenção de virar padrão — o `[FromBody]`/JSON
+é a escolha certa pra qualquer endpoint da API (é o que o `icarus-mobile`
+vai consumir; senha fica mais exposta em formulário do que em JSON).
+
+Validado funcionando nos dois formatos enquanto durou (o `ValidationFilter`
+não se importa com a origem do valor, só com o objeto já resolvido pelo
+model binding). Depois do teste, o próprio usuário pediu pra desfazer —
+`AuthController.Login` voltou a usar `[FromBody]` (implícito), igual aos
+outros endpoints. Revertido e revalidado (`dotnet build` 0 avisos/erros,
+`dotnet test` 23 aprovados, login via JSON voltando a responder `200`).
+`dotnet build` (0 avisos/erros) e `dotnet test` (23 aprovados) revalidados.
+
+### RF-02.4: middleware de autenticação/autorização + endpoint de exemplo protegido
+
+Implementado em 2026-10-10, a pedido do usuário — ele perguntou "pra que
+serve ligar o `AddJwtBearer`?" e, depois de eu explicar, pediu pra
+implementar na mesma conversa.
+
+**Lado da validação** (`Icarus.Api/DependencyInjection.cs`,
+`AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(...)`),
+com `TokenValidationParameters` usando o **mesmo** `JwtOptions`
+(emissor/audiência/chave) já configurado para o lado da emissão
+(`Icarus.Infrastructure/Security/JwtTokenGenerator.cs`) — os dois lados
+precisam da mesma chave, senão nenhum token emitido validaria.
+`services.AddAuthorization()` registrado; `app.UseAuthentication()`
+adicionado em `Program.cs`, **antes** de `app.UseAuthorization()` (ordem
+importa: sem isso o `[Authorize]` nunca teria um usuário pra checar).
+
+**Endpoint de exemplo:** `GET /api/auth/me` (`AuthController.Me`, com
+`[Authorize]`) — deliberadamente **não** é o `GET` de perfil completo
+(RF-01, ainda deferido): só lê o `UsuarioId` da claim `NameIdentifier` do
+token (`User.FindFirstValue`) e devolve, provando que a validação está de
+fato exigida e correta, sem se comprometer ainda com o formato final do
+endpoint de perfil (que exige decisões próprias: quais campos expor, se
+tem `Location`, etc.).
+
+**Nome do endpoint — validado com o usuário em 2026-10-10.** A primeira
+versão se chamava `eu` (tradução literal), mas isso não é convenção
+nenhuma, só invenção improvisada. Duas referências reais existiam: `me`
+(convenção ampla de REST/OAuth2 — é literalmente o nome do *UserInfo
+Endpoint* do OIDC, e o que GitHub/Spotify/Auth0 usam para "o recurso é o
+dono do token") vs. `info` (o `MapIdentityApi` do próprio ASP.NET Core,
+desde o .NET 8, expõe `GET /manage/info` com esse exato propósito). Optamos
+por `me`, por ser a convenção mais ampla e por manter o inglês nas partes
+técnicas (seção 0) em vez de uma tradução literal do português.
+
+**Validado (Postgres real, `curl`):** sem header `Authorization`, `401`;
+com o access token devolvido pelo login, `200` com o `UsuarioId` idêntico
+ao do cadastro; com o mesmo token adulterado em 1 caractere (assinatura
+inválida), `401` de novo. `dotnet build` (0 avisos/erros) e `dotnet test`
+(17 aprovados) revalidados — nenhum teste novo adicionado para o
+`AuthController` em si (controllers finos não são testados unitariamente
+neste projeto; ver "testes de integração" como pendência já documentada
+acima). `Icarus.Api.http` ganhou os dois casos (sem token / com token,
+encadeando o `accessToken` da resposta do login via `@name login` +
+`{{login.response.body.$.accessToken}}`, recurso do REST Client).
 
 ## 4.5 Convenção de testes
 
@@ -1034,7 +1483,7 @@ comunicarem pelo nome do serviço em vez de porta publicada no host.
 
 - Modelo de dados criado (seção 4.3), mas só `Usuario` é usado por um caso de uso (cadastro); as demais entidades ainda não têm nenhum caso de uso em `Icarus.Application`.
 - Observabilidade (seção 4.6): sem painel/dashboard próprio no Grafana e sem métrica de negócio customizada — só a instrumentação automática do ASP.NET Core/Npgsql por enquanto.
-- Só existe um endpoint de negócio (`POST /api/auth/cadastro`, mais o `GET /health` de observabilidade — seção 4.6); login, refresh, logout e o `GET` de perfil (com `Location` no cadastro) ainda não existem — ver seção 4.4. O arquivo `.http` continua residual do template.
+- RF-01 e RF-02 (cadastro e autenticação) estão completos: `POST /api/auth/cadastro` (com `Location`), `POST /api/auth/login` (com limite de 5 tentativas/15 min por conta+origem), `POST /api/auth/refresh`, `POST /api/auth/logout`, `GET /api/auth/me`, `GET /api/usuarios/{id}` — todos protegidos por `[Authorize]` onde cabe —, mais o `GET /health` de observabilidade (seção 4.6) e o `GET /api/dev/token/{id}` (ferramenta de desenvolvimento, não é RF). O resto do MVP (RF-03 em diante) ainda não foi iniciado. O arquivo `.http` foi removido (decisão do usuário, 2026-10-10) — o Swagger UI é hoje a única ferramenta de teste manual.
 - CI não roda build/test do .NET, apenas validações estruturais (nem `dotnet format`/analisadores, apesar do `.editorconfig` já estar configurado); também não roda `dotnet ef migrations` em pipeline algum.
 - Sem autenticação/autorização configurada (só `UseAuthorization()` chamado, sem esquema definido) — o DER já assume `Usuario.Id` vindo do JWT, mas isso ainda não existe na API.
 - Pendências de produto herdadas do DER (não bloqueiam a estrutura, mas afetam regras futuras): estados finais da missão, escala de prioridade, regra de sobreposição de vigência da rotina, se o diário aceita múltiplas entradas por dia, estrutura definitiva dos dados externos (ATUS/Vigitel).
@@ -1284,3 +1733,157 @@ comunicarem pelo nome do serviço em vez de porta publicada no host.
   500 com as três camadas de log (EF Core, `GlobalExceptionHandler`, ASP.NET
   Core) corretamente correlacionadas pelo mesmo `TraceId` — o caminho de
   erro também é observável, não só o de sucesso.
+- 2026-10-06 — Revisão de completude da observabilidade (a pedido do
+  usuário) encontrou e corrigiu 3 lacunas frente à seção 11 do
+  `icarus-context`: versão do serviço ausente nos logs/traces/métricas
+  (`Versao` adicionado via `Assembly.GetExecutingAssembly().GetName().Version`);
+  ausência de `GET /health` (adicionado, checando conexão real com o
+  Postgres via `AspNetCore.HealthChecks.NpgSql`, excluído do ruído de
+  logs/traces); retenção do Loki configurada mas nunca aplicada (faltava
+  `compactor.retention_enabled: true`; corrigido e aumentado para 1 semana).
+  Ao testar manualmente o clique "Logs for this span" no Grafana (nunca
+  antes clicado de fato — só validado via `curl` na API do Loki), achamos
+  um quarto bug: `tracesToLogsV2` não tinha `customQuery`/`query`, então o
+  Grafana não sabia qual label do Loki usar e a busca falhava. Corrigido com
+  `query: '{app="Icarus.Api"} |= "${__trace.traceId}"'`. Lição: validar via
+  API não substitui clicar de verdade na UI. Tudo documentado também no
+  `icarus-context` (`01-arquitetura-da-solucao.md`, seção 11 ganhou o estado
+  de implementação atual e o "como acessar"; ADR-014 registrado na seção 16).
+- 2026-10-06 — Passo 4 do plano de autenticação: login e emissão de tokens
+  (RF-02.1). Escopo validado com o usuário antes de implementar (só login +
+  tokens; logout, rate limiting e o middleware de autorização ficam para os
+  próximos passos). `JsonWebTokenHandler` (não o `JwtSecurityTokenHandler`
+  clássico) para gerar o JWT — é o handler que o `JwtBearer` já usa por
+  padrão para validar desde o .NET 8. Access token de 15 min, refresh token
+  de 7 dias (ambos validados com o usuário); refresh token é uma string
+  aleatória opaca, com hash SHA-256 (não Argon2id — já nasce de alta
+  entropia, não precisa de derivação lenta). `LoginUseCase` trata e-mail
+  inexistente e senha incorreta como a mesma `CredenciaisInvalidasException`
+  (401 genérico), para não revelar se um e-mail está cadastrado. Testado em
+  `LoginUseCaseTests` e `JwtTokenGeneratorTests` (o token gerado valida de
+  verdade). Validado de ponta a ponta: `token_renovacao.token_hash` no banco
+  difere do `refreshToken` devolvido ao cliente (confirma que só o hash foi
+  persistido); as duas formas de falha de login geram a mesma resposta e o
+  mesmo log, sem e-mail. `dotnet build` (0 avisos/erros) e `dotnet test`
+  (17 aprovados) validados. Ver seção 4.4 ("Passo 4") para o detalhamento
+  completo.
+- 2026-10-10 — Ligada a interface visual (Scalar, depois trocado por Swagger
+  UI a pedido do usuário no mesmo dia — Scalar documentado na seção 4.4 como
+  religar depois). E, também a pedido do usuário, o middleware de
+  autenticação/autorização (RF-02.4): `AddAuthentication().AddJwtBearer()` +
+  `AddAuthorization()` + `app.UseAuthentication()` (antes do
+  `UseAuthorization()` já existente), usando o mesmo `JwtOptions` do lado de
+  emissão. Endpoint de exemplo `GET /api/auth/me` (`[Authorize]`) criado só
+  para provar a validação — não é o `GET` de perfil completo, ainda
+  deferido. Validado: sem token → `401`; com token válido → `200` com o
+  `UsuarioId` certo; com token adulterado → `401` de novo. Botão "Authorize"
+  ligado no Swagger UI (via *document/operation transformer*, já que não
+  usamos `AddSwaggerGen`) e o endpoint renomeado de `eu` (tradução literal,
+  sem respaldo) para `me` (convenção do UserInfo Endpoint OAuth2/OIDC) a
+  pedido do usuário. Ver seção 4.4 ("RF-02.4") para o detalhamento completo.
+- 2026-10-10 — `POST /api/auth/refresh`, com rotação e detecção de reuso.
+  Decisão validada com o usuário antes de implementar: reuso de um refresh
+  token já rotacionado (indício de token roubado) revoga **todos** os
+  refresh tokens ativos do usuário, não só o reusado — recomendação do
+  OAuth2 Security BCP, prática do Auth0/Okta. `IJwtTokenGenerator` ganhou
+  `CalcularHashDoRefreshToken` (expõe a mesma lógica de hash já usada
+  internamente); `ITokenRenovacaoRepository` ganhou `BuscarPorTokenHashAsync`
+  e `RevogarTodosDoUsuarioAsync`. Rotação normal liga
+  `tokenAntigo.SubstituidoPor = tokenNovo` (navegação do EF Core resolve o
+  Id sozinha, sem segundo `SaveChanges`) sem marcar `RevogadoEm` — esse
+  campo é só pra revogação de verdade (reuso detectado, ou futuro logout),
+  conceito diferente de "foi superado pela rotação normal". Testado em
+  `RefreshTokenUseCaseTests` e validado de ponta a ponta: refresh gera par
+  novo; reapresentar o token original dá `401`; o token novo emitido no
+  refresh **também** passa a dar `401` depois disso, confirmando que a
+  sessão inteira foi revogada, não só o token reusado. `dotnet build`
+  (0 avisos/erros) e `dotnet test` (23 aprovados) validados. Ver seção 4.4
+  ("Refresh") para o detalhamento completo.
+- 2026-10-10 — Exemplo deliberado de `[FromForm]` no `POST /api/auth/login`
+  (só esse endpoint), a pedido do usuário, depois de eu explicar por que o
+  Swagger UI mostra JSON cru pra `[FromBody]` e campo-a-campo só pra
+  `application/x-www-form-urlencoded`. Cadastro, refresh e qualquer
+  endpoint futuro continuam em JSON — isso é uma comparação isolada, não
+  mudança de padrão (senha em formulário fica mais exposta em log de
+  proxy do que num corpo JSON). Validado: `ValidationFilter` continua
+  funcionando sem alteração (valida `ActionArguments` já resolvido, não
+  importa a origem); `curl --data-urlencode` confirma login funcionando
+  igual; documento OpenAPI mostra `Email`/`Senha` como propriedades
+  separadas do schema só nesse endpoint. Ver seção 4.4 para o
+  detalhamento completo.
+- 2026-10-10 — Desfeito o experimento acima e removido o `.http`, a pedido
+  do usuário ("já testei, pode desfazer. também não vamos mais usar o
+  `.http`"). `AuthController.Login` voltou a `[FromBody]` (implícito),
+  igual aos outros endpoints. Arquivo `src/Icarus.Api/Icarus.Api.http`
+  excluído — o Swagger UI passa a ser a única ferramenta de teste manual
+  do projeto. `dotnet build` (0 avisos/erros) e `dotnet test`
+  (23 aprovados) revalidados; login via JSON confirmado funcionando de
+  novo contra Postgres real.
+- 2026-10-10 — `POST /api/auth/logout` (RF-02.2), a pedido do usuário
+  ("vamos pro logout agora"). Duas decisões validadas antes de
+  implementar: exige só o refresh token, sem `[Authorize]` (mesmo
+  racional do refresh — evita forçar um refresh só pra poder deslogar, se
+  o access token já tiver expirado); resposta sempre `204`, mesmo se o
+  token já não existir/estiver expirado/revogado (RFC 7009 — não revela o
+  estado do token). `LogoutUseCase` não lança nenhuma exceção e não
+  devolve nada (`Task`, não `Task<T>` — não há dado útil pra devolver).
+  Testado em `LogoutUseCaseTests` e validado de ponta a ponta: logout
+  devolve `204`; o mesmo refresh token, usado depois num refresh, dá
+  `401` (confirma que revogou de verdade); logout de novo com o mesmo
+  token (idempotente) e com um token que nunca existiu também devolvem
+  `204`, sem diferença. `dotnet build` (0 avisos/erros) e `dotnet test`
+  (26 aprovados) validados. Ver seção 4.4 ("Logout") para o detalhamento
+  completo.
+- 2026-10-11 — Limite de tentativas de login (RF-02.3), a pedido do
+  usuário. Antes de implementar, esclareci por que `Microsoft.AspNetCore.RateLimiting`
+  (ferramenta antes só mencionada como planejada) não é o padrão real
+  pra esse problema — ele limita taxa de requisição por IP/rota, não "5
+  falhas por conta normalizada + origem" (não vê o corpo JSON nesse ponto
+  do pipeline, conta toda requisição, não só falhas). O padrão real da
+  comunidade .NET pra isso é o *lockout* do `ASP.NET Core Identity`
+  (`AccessFailedCount`/`LockoutEnd`, por conta) — como não adotamos o
+  Identity, construímos o equivalente na mão (`ILoginAttemptLimiter`),
+  com o componente de IP adicionado. Implementação em `IMemoryCache`
+  (`Icarus.Infrastructure/Security/LoginAttemptLimiter.cs`) — perda do
+  contador ao reiniciar já era uma limitação aceita e documentada no
+  `icarus-context` (seção 17 do `01-arquitetura-da-solucao.md`), não uma
+  decisão nova. Checa o bloqueio antes de calcular o hash Argon2id;
+  bloqueio responde `429` (RFC 6585), não `401` — não é uma tentativa de
+  disfarce, é o código HTTP padrão pra essa situação. Testado em
+  `LoginUseCaseTests` e `LoginAttemptLimiterTests`, e validado de ponta a
+  ponta: 5 falhas bloqueiam a 6ª tentativa mesmo com a senha certa; outro
+  usuário do mesmo IP continua logando normalmente (confirma que o
+  bloqueio é por conta+origem, não só por IP). `dotnet build`
+  (0 avisos/erros) e `dotnet test` (33 aprovados) validados. Ver seção 4.4
+  ("Limite de tentativas de login") para o detalhamento completo.
+- 2026-10-11 — `GET /api/dev/token/{usuarioId}` (`DevController`, novo), a
+  pedido do usuário — atalho pra testar endpoints protegidos no Swagger
+  sem repetir cadastro+login. Não é RF: gera só o access token (sem
+  checar senha, sem refresh token, sem gravar nada) a partir de um
+  `UsuarioId` já cadastrado (decisão validada: não um GUID arbitrário,
+  pra corresponder a dados reais). Bloqueado fora de `Development` em
+  runtime (`IHostEnvironment.IsDevelopment()`, não só escondido do
+  Swagger — a rota continua existindo via `MapControllers()` nos outros
+  ambientes e precisa recusar sozinha). Validado de ponta a ponta:
+  cadastro → gera token de dev → usa no `/me`, devolve o mesmo
+  `UsuarioId`; `UsuarioId` inexistente dá `404`. `dotnet build`
+  (0 avisos/erros) e `dotnet test` (33 aprovados) revalidados. Ver seção
+  4.4 ("DevController") para o detalhamento completo.
+- 2026-10-11 — `GET /api/usuarios/{id}` (RF-01) + `Location` no cadastro,
+  a pedido do usuário — a última pendência da seção 4.4, resolvida agora
+  que o `[Authorize]` existe. Decisões validadas: rota recebe o id (não
+  `/me` sem id), com checagem de propriedade — primeira vez que o RF-02.4
+  é testado de verdade contra uma rota com id (o `/me` nunca precisa
+  checar, sempre é o próprio token); só os campos do cadastro
+  (`Nome`/`Email`/`DataNascimento`), sem `SaldoPontos` (é RF-05/RF-06,
+  ainda não existe). `ObterPerfilUseCase` lança a mesma
+  `PerfilNaoEncontradoException` (`404` genérico) tanto pra id de outro
+  usuário quanto pra id inexistente — não diferencia, mesmo racional das
+  outras exceções genéricas já usadas. `AuthController.Register` passou a
+  usar `CreatedAtAction` (URL montada via roteamento, não hardcoded).
+  Testado em `ObterPerfilUseCaseTests` e validado de ponta a ponta,
+  inclusive **com um segundo usuário real cadastrado** (não só um id
+  inventado): `Location` correto no cadastro; perfil próprio com `200`;
+  sem token, `401`; id de outro usuário de verdade, `404`. `dotnet build`
+  (0 avisos/erros) e `dotnet test` (36 aprovados) validados. Ver seção 4.4
+  ("GET de perfil") para o detalhamento completo.
