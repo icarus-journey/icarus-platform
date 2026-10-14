@@ -18,6 +18,12 @@ internal sealed class UsuarioRepositoryEmMemoria : IUsuarioRepository, IUnitOfWo
     public Task<bool> ExisteComEmailAsync(string email, CancellationToken cancellationToken)
         => Task.FromResult(Usuarios.Any(u => u.Email == email));
 
+    public Task<Usuario?> BuscarPorEmailAsync(string email, CancellationToken cancellationToken)
+        => Task.FromResult(Usuarios.SingleOrDefault(u => u.Email == email));
+
+    public Task<Usuario?> BuscarPorIdAsync(Guid id, CancellationToken cancellationToken)
+        => Task.FromResult(Usuarios.SingleOrDefault(u => u.Id == id));
+
     public Task AdicionarUsuarioAsync(Usuario usuario, CancellationToken cancellationToken)
     {
         Usuarios.Add(usuario);

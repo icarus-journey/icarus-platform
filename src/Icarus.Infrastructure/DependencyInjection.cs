@@ -27,7 +27,16 @@ public static class DependencyInjection
 
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
 
+        services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SecaoConfiguracao));
+        services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();
+
+        // RF-02.3: contador em memória, por combinação de e-mail + origem. Singleton
+        // porque o estado (as tentativas) precisa persistir entre requisições diferentes.
+        services.AddMemoryCache();
+        services.AddSingleton<ILoginAttemptLimiter, LoginAttemptLimiter>();
+
         services.AddScoped<IUsuarioRepository, UsuarioRepository>();
+        services.AddScoped<ITokenRenovacaoRepository, TokenRenovacaoRepository>();
 
         // Mesma instância de IcarusDbContext do escopo (não uma nova) — repositório e
         // unit of work precisam compartilhar o ChangeTracker para salvar na mesma transação.

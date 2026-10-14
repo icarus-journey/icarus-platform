@@ -14,28 +14,64 @@ public sealed partial class GlobalExceptionHandler(
 {
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
-        if (exception is not EmailJaCadastradoException)
+        var problemDetails = exception switch
         {
-            // Excecao inesperada: nivel Error. As excecoes de negocio conhecidas (ex.:
-            // EmailJaCadastradoException) ja sao logadas por quem as lanca (o caso de uso),
-            // no nivel apropriado — logar de novo aqui so duplicaria a linha.
-            LogErroNaoTratado(httpContext.Request.Method, httpContext.Request.Path, exception);
-            return false;
-        }
-
-        httpContext.Response.StatusCode = StatusCodes.Status409Conflict;
-
-        return await problemDetailsService.TryWriteAsync(new ProblemDetailsContext
-        {
-            HttpContext = httpContext,
-            Exception = exception,
-            ProblemDetails = new ProblemDetails
+            EmailJaCadastradoException => new ProblemDetails
             {
                 Status = StatusCodes.Status409Conflict,
                 Type = "https://tools.ietf.org/html/rfc9110#section-15.5.10",
                 Title = "E-mail já cadastrado",
                 Detail = "Já existe uma conta associada a este e-mail."
-            }
+            },
+            CredenciaisInvalidasException => new ProblemDetails
+            {
+                Status = StatusCodes.Status401Unauthorized,
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.2",
+                Title = "Credenciais inválidas",
+                Detail = "E-mail ou senha inválidos."
+            },
+            RefreshTokenInvalidoException => new ProblemDetails
+            {
+                Status = StatusCodes.Status401Unauthorized,
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.2",
+                Title = "Refresh token inválido",
+                Detail = "Refresh token inválido ou expirado."
+            },
+            LimiteDeTentativasExcedidoException => new ProblemDetails
+            {
+                Status = StatusCodes.Status429TooManyRequests,
+                Type = "https://tools.ietf.org/html/rfc6585#section-4",
+                Title = "Muitas tentativas",
+                Detail = "Muitas tentativas de login. Tente novamente mais tarde."
+            },
+            PerfilNaoEncontradoException => new ProblemDetails
+            {
+                Status = StatusCodes.Status404NotFound,
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.5",
+                Title = "Perfil não encontrado",
+                Detail = "Perfil não encontrado."
+            },
+            _ => null
+        };
+
+        if (problemDetails is null)
+        {
+            // Excecao inesperada: nivel Error. As excecoes de negocio conhecidas (ex.:
+            // EmailJaCadastradoException, CredenciaisInvalidasException,
+            // RefreshTokenInvalidoException, LimiteDeTentativasExcedidoException) ja sao
+            // logadas por quem as lanca (o caso de uso), no nivel apropriado — logar de
+            // novo aqui so duplicaria a linha.
+            LogErroNaoTratado(httpContext.Request.Method, httpContext.Request.Path, exception);
+            return false;
+        }
+
+        httpContext.Response.StatusCode = problemDetails.Status!.Value;
+
+        return await problemDetailsService.TryWriteAsync(new ProblemDetailsContext
+        {
+            HttpContext = httpContext,
+            Exception = exception,
+            ProblemDetails = problemDetails
         });
     }
 

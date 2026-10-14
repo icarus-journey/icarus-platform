@@ -34,10 +34,22 @@ app.UseStatusCodePages();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+
+    // Swagger UI (Swashbuckle) lendo o documento OpenAPI que o MapOpenApi acima já gera —
+    // sem AddSwaggerGen: não precisamos de um segundo gerador de documento, só da UI.
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/openapi/v1.json", "Icarus API");
+
+        // Mantém o token colado no botão "Authorize" entre uma chamada e outra
+        // (sem isso, teria que colar o token de novo a cada F5 na página).
+        options.ConfigObject.PersistAuthorization = true;
+    });
 }
 
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
