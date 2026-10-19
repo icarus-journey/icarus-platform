@@ -28,4 +28,5 @@ public class Usuario : EntidadeBase
     public ICollection<InventarioItem> InventarioItens { get; set; } = new List<InventarioItem>();
     public ICollection<MovimentacaoPontos> MovimentacoesPontos { get; set; } = new List<MovimentacaoPontos>();
     public ICollection<TokenRenovacao> TokensRenovacao { get; set; } = new List<TokenRenovacao>();
+    public ICollection<TrabalhoOnboarding> TrabalhosOnboarding { get; set; } = new List<TrabalhoOnboarding>();
 }

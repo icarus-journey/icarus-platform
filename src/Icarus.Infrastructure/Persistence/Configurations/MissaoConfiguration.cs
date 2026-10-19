@@ -16,6 +16,11 @@ public class MissaoConfiguration : IEntityTypeConfiguration<Missao>
             .IsRequired()
             .HasMaxLength(200);
 
+        builder.Property(m => m.Dificuldade)
+            .IsRequired()
+            .HasConversion<string>()
+            .HasMaxLength(20);
+
         builder.Property(m => m.Status)
             .IsRequired()
             .HasConversion<string>()

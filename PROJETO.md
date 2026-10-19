@@ -1,7 +1,7 @@
 # Icarus Platform — Documentação do Projeto
 
 > Documento vivo. Mantido e atualizado à medida que novas decisões e features forem implementadas.
-> Última atualização: 2026-10-11 (RF-01 + RF-02 completos: perfil, Location, DevController; `.http` removido)
+> Última atualização: 2026-10-17 (onboarding por IA de ponta a ponta: RabbitMQ.Client, `TrabalhoOnboarding`, Épico/Campanha/Missão com dificuldade/pontuação)
 
 ## 0. Regra permanente do projeto
 
@@ -1376,6 +1376,168 @@ e só o segundo pegou esse bug.
 cadastros bem-sucedidos vs. rejeitados, além da métrica HTTP genérica que já
 vem de graça da instrumentação).
 
+## 4.7 Onboarding por IA (RabbitMQ) (2026-10-17)
+
+Primeira integração real do `icarus-platform` com mensageria. O fluxo
+completo: o mobile envia as respostas do questionário de onboarding →
+a API publica um job no RabbitMQ → o worker `icarus-ai` (repositório Python
+separado, branch `feature/ai-onboarding`) gera Épico + Campanha + Missões via
+LLM → publica o resultado de volta → a API consome e persiste. Assíncrono
+dos dois lados: a API nunca espera o worker responder na mesma requisição.
+
+### Decisão de biblioteca: `RabbitMQ.Client` puro, não MassTransit
+
+Validado com o usuário antes de implementar. A topologia (exchanges, filas,
+routing keys, DLQ) já é de propriedade do worker Python (`aio-pika`), com
+payload JSON simples — sem o envelope de mensagem que o MassTransit
+normalmente impõe (headers `$type`, serialização própria). Usar o cliente
+oficial dá controle total do JSON publicado/consumido, batendo exatamente
+com o contrato combinado entre os dois repositórios; MassTransit brilha
+quando ele é quem define a topologia e os dois lados são MassTransit, que
+não é o caso aqui (interoperabilidade com um consumer não-.NET).
+
+### Mudança no modelo de domínio (resolve divergências entre mobile/context/IA)
+
+As entidades `Epico`, `Campanha` e `Missao` já existiam (desde a migration
+inicial) mas nunca tinham sido usadas por nenhum caso de uso. Para fechar o
+onboarding, o usuário revisou o modelo e resolveu três divergências que
+existiam entre o que o mobile já fazia localmente (mock), o DER do
+`icarus-context` e o contrato que o `icarus-ai` já tinha desenhado:
+
+1. **Pontuação deixa de ser arbitrária/vinda da IA.** `Epico`, `Campanha` e
+   `Missao` ganham `Dificuldade` (enum `Trivial`/`Facil`/`Media`/`Dificil`) e
+   `Pontuacao` (int) — mas `Pontuacao` é **sempre calculada pelo backend** a
+   partir da dificuldade (`Icarus.Application.Common.MapeadorPontuacao`:
+   15/30/45/60), nunca aceita vinda do front ou do worker. `Campanha`
+   mantém `ValorMensurado` com semântica separada (soma das missões,
+   calculada ao persistir) — são dois números diferentes, para propósitos
+   diferentes (recompensa fixa por dificuldade vs. progresso mensurável).
+2. **`AreaDaVida` passa a ser enum (era string livre) e `Campanha` também
+   ganha a sua** (copiada do Épico ao persistir — não escolhida
+   independentemente). Catálogo: o das 10 áreas já validadas no RF-03.1
+   (`icarus-context`, `04-requisitos.md`) — `CorpoESaude`,
+   `SonoERecuperacao`, `MenteEEmocoes`, `EstudosEAprendizado`,
+   `TrabalhoECarreira`, `Financas`, `RelacionamentosEComunidade`,
+   `CasaEVidaPratica`, `LazerECriatividade`, `PropositoEEspiritualidade`.
+   Primeira versão desta feature tinha usado um enum de 5 valores
+   inventado ad-hoc (sem checar o RF-03 primeiro); corrigido no mesmo dia,
+   antes de qualquer commit, a pedido do usuário ("usa o catálogo de 10
+   áreas") depois que a revisão do `icarus-context` encontrou a
+   divergência. `Missao` não guarda `AreaDaVida` própria; quem precisar
+   dela lê via `Missao.Campanha.Epico`. RF-03.2 (área do épico imutável)
+   já é respeitada por omissão — não existe nenhum caso de uso de edição
+   de épico.
+3. **`Priorizacao` e `Cor` saem do banco inteiramente** em `Epico` e
+   `Campanha` — passam a ser responsabilidade só do front (ex.: cor
+   calculada no cliente a partir da área da vida). `Campanha.EpicoId`
+   continua obrigatório e `Missao.CampanhaId` continua nulável (missão
+   avulsa) — nenhuma mudança aí, já era a regra certa.
+
+Migration `AjustarEpicoCampanhaMissaoEOnboarding`: o EF Core detectou as
+colunas removidas+adicionadas como **rename** (`priorizacao`→`pontuacao`,
+`cor`→`dificuldade`), não drop+add — tipo-compatível (int→int, string→string)
+mas semanticamente é uma coluna nova. Como as tabelas `epico`/`campanha`
+ainda estavam vazias em todos os ambientes (nenhum caso de uso as usava até
+agora), isso não causou perda de dado real — só vale a pena saber que a
+migration *parece* um rename se alguém for lê-la depois.
+
+### `TrabalhoOnboarding`: rastreio do job assíncrono
+
+Nova entidade, tabela `trabalho_onboarding`. O `Id` (Guid) é o próprio
+`job_id` publicado na fila — serve de correlação com o resultado assíncrono
+e de chave de idempotência (um resultado duplicado, por reentrega da fila,
+é ignorado se o trabalho já estiver `Concluido`). Campos: `UsuarioId`,
+`Status` (`Pendente`/`Concluido`/`Falhou`), `EpicoId` (nulável, preenchido
+na conclusão), `ErroMensagem` (nulável, preenchido na falha). Isso também é
+a resposta prática pro "trabalhos, inbox/outbox" que a seção 18 de
+`01-arquitetura-da-solucao.md` (`icarus-context`) já atribuía ao
+`icarus-platform` como responsabilidade, sem nenhuma implementação até
+agora (ver seção 6.3).
+
+### Endpoints
+
+- `POST /api/usuarios/{id}/onboarding` — `[Authorize]`, RF-02.4 (id de outro
+  usuário = `404` genérico, mesmo padrão de `ObterPerfil`/`AtualizarRotina`).
+  Cria o `TrabalhoOnboarding` (`Pendente`), publica o job e devolve
+  **`202 Accepted`** — primeiro endpoint assíncrono do projeto; todo o resto
+  até aqui era `200`/`201`/`204`. `Location` aponta pro endpoint de status.
+- `GET /api/usuarios/{id}/onboarding/{jobId}` — mesmo padrão de posse.
+  Devolve o status e, quando `Concluido`, o Épico com Campanha e Missões
+  aninhados (evita precisar criar endpoints de leitura de Épico/Campanha/
+  Missão isolados nesta rodada — eles não existem ainda, e não eram o
+  pedido). Primeiro endpoint da API a serializar um enum via HTTP — por
+  isso `Icarus.Api/DependencyInjection.cs` ganhou
+  `JsonStringEnumConverter(JsonNamingPolicy.CamelCase)` global (ex.:
+  `"concluido"`, `"facil"`, `"emAndamento"`), consistente com o camelCase
+  já usado em todo o resto do JSON da API.
+
+### Mensageria (`Icarus.Infrastructure/Messaging/`)
+
+- `RabbitMqConnectionProvider`: uma conexão compartilhada (`AutomaticRecoveryEnabled`),
+  publisher e consumer abrem canais próprios a partir dela — padrão
+  recomendado pelo RabbitMQ (1 conexão, N canais).
+- `RabbitMqOptions`: **`Usuario`/`Senha` são campos discretos, não uma
+  connection string única** — descoberto na validação: a senha padrão do
+  `icarus-infrastructure` contém um `@` literal (`urubu@100` /
+  `icarus-desenvolvimento`, dependendo do `.env` local), que quebra o
+  parsing de `Uri` quando embutida numa string `amqp://usuario:senha@host`
+  (dois `@` na mesma string). Nomes de exchange/fila (não secretos) ficam
+  em `appsettings.json`; `Usuario`/`Senha` vão em User Secrets, mesma regra
+  já usada para `DefaultConnection`/`Jwt`.
+- `OnboardingJobPublisher`: publica em `icarus.input` (routing key
+  `onboarding`), JSON persistente (`DeliveryModes.Persistent`).
+- `OnboardingResultConsumer` (`BackgroundService`): consome
+  `icarus.output.onboarding`. Erro de desserialização (mensagem envenenada)
+  ou tentativas esgotadas vão pra uma DLQ própria
+  (`icarus.output.onboarding.dlq`) — o worker **não** configura DLQ nas
+  filas de saída dele, então essa malha de segurança existe só do lado
+  .NET. Retry com backoff exponencial via header `x-tentativas`
+  (republish manual, mesmo mecanismo que o `icarus-ai` já usa do lado dele),
+  até 3 tentativas (`RabbitMqOptions.MaxTentativas`); esgotadas, marca o
+  `TrabalhoOnboarding` como `Falhou` (`MarcarOnboardingComoFalhoUseCase`)
+  antes de mandar pra DLQ — sem isso, o status ficaria `Pendente` pra
+  sempre e o mobile faria polling eternamente.
+- Contrato JSON mapeado explicitamente (`Icarus.Infrastructure/Messaging/Contratos/`,
+  `OnboardingWireMapeamento`) — sem conversor de enum automático, porque o
+  formato do fio (`"FACIL"`, `"DESENVOLVIMENTO_PESSOAL"`) é combinado entre
+  os dois repositórios, não uma convenção genérica do .NET.
+
+### Validação de ponta a ponta
+
+Com o RabbitMQ real do `icarus-infrastructure` (container já rodando) e a
+API local: `POST .../onboarding` devolveu `202` com `jobId`, publicou de
+verdade no `icarus.input` (confirmado sem fila de entrada vinculada ainda,
+já que o worker Python não estava rodando nesta rodada — mensagem
+corretamente não roteada, sem erro). Para validar o outro lado sem
+depender do worker estar de pé, uma mensagem de resultado foi publicada
+manualmente (API de management do RabbitMQ) em `icarus.output.onboarding`
+no formato combinado — o consumer .NET processou, persistiu Épico
+(`Pontuacao=30` pra `Facil`) + Campanha (`Pontuacao=45` pra `Media`,
+`AreaDaVida` copiada do Épico, `ValorMensurado=30` = soma das missões) +
+Missão (`Pontuacao=30`, `Horario` combinando a data corrente com o
+`"07:00"` sugerido), e o `GET` de status devolveu tudo aninhado
+corretamente. Fila e DLQ vazias depois (confirma `ack`, sem mensagem
+perdida nem duplicada). Dados de teste limpos do Postgres depois da
+validação. `dotnet build` (0 avisos) e `dotnet test` (55 aprovados,
+incluindo os novos testes de `IniciarOnboardingUseCase`,
+`ObterStatusOnboardingUseCase`, `PersistirResultadoOnboardingUseCase` e
+`MapeadorPontuacao`) revalidados.
+
+### Pendências desta feature
+
+- Contrato combinado com o `icarus-ai` e documentação do `icarus-context`
+  atualizados na mesma rodada (fora deste repositório — ver os próprios
+  repositórios para o detalhamento).
+- Integração do mobile (chamar o endpoint de verdade em vez do gerador
+  local `onboardingToPlanning.js`) feita na mesma rodada, incluindo
+  reconstruir a autenticação real (login/cadastro), que até então era só
+  mock local no app.
+- Endpoints de criação manual de Épico/Campanha/Missão (fora do onboarding)
+  continuam não existindo — não eram o pedido desta vez; o modelo de dados
+  já está pronto para quando isso for feito.
+- Validação de ponta a ponta com o worker `icarus-ai` real rodando (em vez
+  de uma mensagem injetada manualmente) ainda não foi feita nesta sessão.
+
 ## 5. CI/CD
 
 **Workflow**: `.github/workflows/validacao-inicial.yml` ("Validação inicial")
@@ -1474,22 +1636,30 @@ Hoje a API roda fora de container (`dotnet run`, seção 6.2), então ela se
 conecta ao RabbitMQ do mesmo jeito que se conecta ao Postgres: via
 `localhost:5672` (porta publicada no host), sem precisar de rede Docker
 compartilhada entre os repositórios. Isso só passa a ser necessário quando a
-API (ou o trabalhador Python do `icarus-data`) for containerizada — nesse
+API (ou o trabalhador Python do `icarus-ai`) for containerizada — nesse
 momento os dois `compose` (`icarus-platform` e `icarus-infrastructure`)
 precisarão declarar uma rede Docker externa compartilhada para se
 comunicarem pelo nome do serviço em vez de porta publicada no host.
+
+**Atualização 2026-10-17**: essa conexão deixou de ser hipotética — a API
+publica e consome mensagens de verdade (seção 4.7, onboarding por IA).
+Credenciais (`Usuario`/`Senha`) em User Secrets locais, lidas do mesmo
+`.env` que o `icarus-infrastructure` já usa pra subir o container (o valor
+real difere do default documentado no `compose.yaml` se alguém tiver
+customizado o `.env` local — checar `docker exec <container> env | grep
+RABBITMQ_DEFAULT` se a autenticação falhar).
 
 ## 7. Lacunas conhecidas / próximos passos naturais
 
 - Modelo de dados criado (seção 4.3), mas só `Usuario` é usado por um caso de uso (cadastro); as demais entidades ainda não têm nenhum caso de uso em `Icarus.Application`.
 - Observabilidade (seção 4.6): sem painel/dashboard próprio no Grafana e sem métrica de negócio customizada — só a instrumentação automática do ASP.NET Core/Npgsql por enquanto.
-- RF-01 e RF-02 (cadastro e autenticação) estão completos: `POST /api/auth/cadastro` (com `Location`), `POST /api/auth/login` (com limite de 5 tentativas/15 min por conta+origem), `POST /api/auth/refresh`, `POST /api/auth/logout`, `GET /api/auth/me`, `GET /api/usuarios/{id}` — todos protegidos por `[Authorize]` onde cabe —, mais o `GET /health` de observabilidade (seção 4.6) e o `GET /api/dev/token/{id}` (ferramenta de desenvolvimento, não é RF). O resto do MVP (RF-03 em diante) ainda não foi iniciado. O arquivo `.http` foi removido (decisão do usuário, 2026-10-10) — o Swagger UI é hoje a única ferramenta de teste manual.
+- RF-01 e RF-02 (cadastro e autenticação) estão completos: `POST /api/auth/cadastro` (com `Location`), `POST /api/auth/login` (com limite de 5 tentativas/15 min por conta+origem), `POST /api/auth/refresh`, `POST /api/auth/logout`, `GET /api/auth/me`, `GET /api/usuarios/{id}` — todos protegidos por `[Authorize]` onde cabe —, mais o `GET /health` de observabilidade (seção 4.6), o `GET /api/dev/token/{id}` (ferramenta de desenvolvimento, não é RF) e, desde 2026-10-17, `POST /api/usuarios/{id}/onboarding` + `GET /api/usuarios/{id}/onboarding/{jobId}` (onboarding por IA, seção 4.7). O resto do MVP ainda não foi iniciado. O arquivo `.http` foi removido (decisão do usuário, 2026-10-10) — o Swagger UI é hoje a única ferramenta de teste manual.
 - CI não roda build/test do .NET, apenas validações estruturais (nem `dotnet format`/analisadores, apesar do `.editorconfig` já estar configurado); também não roda `dotnet ef migrations` em pipeline algum.
 - Sem autenticação/autorização configurada (só `UseAuthorization()` chamado, sem esquema definido) — o DER já assume `Usuario.Id` vindo do JWT, mas isso ainda não existe na API.
 - Pendências de produto herdadas do DER (não bloqueiam a estrutura, mas afetam regras futuras): estados finais da missão, escala de prioridade, regra de sobreposição de vigência da rotina, se o diário aceita múltiplas entradas por dia, estrutura definitiva dos dados externos (ATUS/Vigitel).
 - A rotina diária de geração e os casos de uso para concluir, editar e inativar ocorrências ainda precisam ser implementados; o modelo persistido já suporta a regra validada na seção 4.3.
 - Nulidade de vários campos novos do DER v1.1 (`Epico.AreaDaVida`, `Campanha.ValorMensurado/Unidade/ValorAtual`, `Missao.DataLimite`) foi uma interpretação da equipe, não algo explícito no documento — ver seção 4.3.
-- API ainda não é containerizada nem usa RabbitMQ (broker existe no `icarus-infrastructure`, mas nenhum outbox/inbox foi implementado aqui ainda — ver seção 6.3). Quando a API for containerizada, será preciso criar a rede Docker compartilhada entre `icarus-platform` e `icarus-infrastructure`.
+- API ainda não é containerizada. Desde 2026-10-17 ela já usa RabbitMQ de verdade (seção 4.7: publica jobs de onboarding e consome resultados do `icarus-ai`), conectando via `localhost:5672` (porta publicada pelo `icarus-infrastructure`) — ver seção 6.3. Quando a API for containerizada, será preciso criar a rede Docker compartilhada entre `icarus-platform` e `icarus-infrastructure` pra falar com o broker pelo nome do serviço.
 - **Decisão pendente: estratégia de versionamento das imagens Docker.** Hoje cada serviço usa uma convenção diferente, sem termos parado para decidir isso de propósito:
   - `postgres:16` (`icarus-platform/docker-compose.yml`) — só a versão major fixada; minor/patch "flutuam" a cada `pull` novo.
   - `minio/minio:RELEASE.2025-09-07T16-13-09Z` (`icarus-infrastructure/compose.yaml`) — tag de release imutável, 100% fixada.
@@ -1887,3 +2057,41 @@ comunicarem pelo nome do serviço em vez de porta publicada no host.
   sem token, `401`; id de outro usuário de verdade, `404`. `dotnet build`
   (0 avisos/erros) e `dotnet test` (36 aprovados) validados. Ver seção 4.4
   ("GET de perfil") para o detalhamento completo.
+- 2026-10-17 — Onboarding por IA de ponta a ponta (RabbitMQ), a pedido do
+  usuário ("vamos fazer TUDO o que falta fechar do fluxo"). Validado antes
+  de implementar: `RabbitMQ.Client` puro, não MassTransit (topologia já é
+  do worker Python, payload JSON simples). O usuário também resolveu três
+  divergências de modelagem entre o mobile, o `icarus-context` e o
+  `icarus-ai`: pontuação de Épico/Campanha/Missão passa a ser sempre
+  calculada pelo backend a partir da dificuldade (15/30/45/60), nunca
+  vinda do front/IA; `AreaDaVida` virou enum (catálogo das 10 áreas já
+  validadas no RF-03.1 do `icarus-context` — a primeira versão tinha
+  usado 5 valores inventados sem checar o RF-03 primeiro; corrigido no
+  mesmo dia, a pedido do usuário, antes de qualquer commit) e `Campanha`
+  também ganhou a sua (copiada do Épico); `Priorizacao`/`Cor` saíram do
+  banco (ficam só no front). Nova entidade `TrabalhoOnboarding` rastreia o
+  job assíncrono (id = job_id, serve de idempotência). Dois endpoints
+  novos: `POST /api/usuarios/{id}/onboarding` (primeiro `202 Accepted` do
+  projeto) e `GET .../onboarding/{jobId}`. Migration
+  `AjustarEpicoCampanhaMissaoEOnboarding` aplicada (EF Core tratou as
+  colunas removidas+adicionadas como rename — tabelas estavam vazias,
+  sem perda de dado real). Bug real encontrado e corrigido durante a
+  validação: a senha padrão do RabbitMQ no `icarus-infrastructure` contém
+  um `@` literal, que quebra o parsing de `Uri` numa connection string
+  única — `RabbitMqOptions` passou a ter campos discretos
+  (`Host`/`Porta`/`Usuario`/`Senha`) em vez de uma string só. Validado de
+  ponta a ponta contra o RabbitMQ real do `icarus-infrastructure`: job
+  publicado (sem fila de entrada vinculada, pois o worker não estava
+  rodando — comportamento esperado); resultado injetado manualmente via
+  API de management do RabbitMQ no formato combinado, consumido e
+  persistido corretamente (Épico/Campanha/Missão com pontuação calculada,
+  `AreaDaVida` copiada do Épico pra Campanha, `Horario` combinando data
+  corrente com o horário sugerido); fila e DLQ vazias depois (confirma
+  `ack` sem perda/duplicação). Dados de teste limpos do Postgres.
+  `dotnet build` (0 avisos) e `dotnet test` (55 aprovados) validados. Na
+  mesma rodada, atualizados em paralelo: contrato do `icarus-ai` (fecha a
+  pendência nº1 que aquele repositório já sinalizava), DER e arquitetura
+  no `icarus-context`, e a integração real do mobile (reconstrução da
+  autenticação + chamada real ao onboarding, substituindo o gerador local
+  `onboardingToPlanning.js`) — ver os próprios repositórios. Ver seção 4.7
+  para o detalhamento completo.

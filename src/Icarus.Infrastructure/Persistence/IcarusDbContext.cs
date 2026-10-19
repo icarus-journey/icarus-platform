@@ -28,6 +28,7 @@ public class IcarusDbContext : DbContext, IUnitOfWork
     public DbSet<InventarioItem> InventarioItens => Set<InventarioItem>();
     public DbSet<MovimentacaoPontos> MovimentacoesPontos => Set<MovimentacaoPontos>();
     public DbSet<TokenRenovacao> TokensRenovacao => Set<TokenRenovacao>();
+    public DbSet<TrabalhoOnboarding> TrabalhosOnboarding => Set<TrabalhoOnboarding>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

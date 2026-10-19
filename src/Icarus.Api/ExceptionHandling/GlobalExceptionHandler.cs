@@ -51,6 +51,13 @@ public sealed partial class GlobalExceptionHandler(
                 Title = "Perfil não encontrado",
                 Detail = "Perfil não encontrado."
             },
+            TrabalhoOnboardingNaoEncontradoException => new ProblemDetails
+            {
+                Status = StatusCodes.Status404NotFound,
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.5",
+                Title = "Trabalho de onboarding não encontrado",
+                Detail = "Trabalho de onboarding não encontrado."
+            },
             _ => null
         };
 

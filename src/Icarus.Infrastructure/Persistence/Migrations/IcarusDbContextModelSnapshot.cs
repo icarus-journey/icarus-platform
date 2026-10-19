@@ -31,15 +31,15 @@ namespace Icarus.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<string>("AreaDaVida")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("area_da_vida");
+
                     b.Property<DateTimeOffset>("AtualizadoEm")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("atualizado_em");
-
-                    b.Property<string>("Cor")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("cor");
 
                     b.Property<DateTimeOffset>("CriadoEm")
                         .HasColumnType("timestamp with time zone")
@@ -48,6 +48,12 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                     b.Property<string>("Descricao")
                         .HasColumnType("text")
                         .HasColumnName("descricao");
+
+                    b.Property<string>("Dificuldade")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("dificuldade");
 
                     b.Property<long>("EpicoId")
                         .HasColumnType("bigint")
@@ -59,6 +65,10 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("estado");
 
+                    b.Property<int>("Pontuacao")
+                        .HasColumnType("integer")
+                        .HasColumnName("pontuacao");
+
                     b.Property<DateOnly>("PrazoFim")
                         .HasColumnType("date")
                         .HasColumnName("prazo_fim");
@@ -66,10 +76,6 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                     b.Property<DateOnly>("PrazoInicio")
                         .HasColumnType("date")
                         .HasColumnName("prazo_inicio");
-
-                    b.Property<int>("Priorizacao")
-                        .HasColumnType("integer")
-                        .HasColumnName("priorizacao");
 
                     b.Property<string>("Titulo")
                         .IsRequired()
@@ -96,7 +102,10 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                     b.HasIndex("EpicoId")
                         .HasDatabaseName("ix_campanha_epico_id");
 
-                    b.ToTable("campanha", (string)null);
+                    b.ToTable("campanha", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_campanha_pontuacao_nao_negativa", "pontuacao >= 0");
+                        });
                 });
 
             modelBuilder.Entity("Icarus.Domain.Entities.Diario", b =>
@@ -149,19 +158,13 @@ namespace Icarus.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("AreaDaVida")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
                         .HasColumnName("area_da_vida");
 
                     b.Property<DateTimeOffset>("AtualizadoEm")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("atualizado_em");
-
-                    b.Property<string>("Cor")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("cor");
 
                     b.Property<DateTimeOffset>("CriadoEm")
                         .HasColumnType("timestamp with time zone")
@@ -171,11 +174,21 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("descricao");
 
+                    b.Property<string>("Dificuldade")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("dificuldade");
+
                     b.Property<string>("Estado")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("estado");
+
+                    b.Property<int>("Pontuacao")
+                        .HasColumnType("integer")
+                        .HasColumnName("pontuacao");
 
                     b.Property<DateOnly>("PrazoFim")
                         .HasColumnType("date")
@@ -184,10 +197,6 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                     b.Property<DateOnly>("PrazoInicio")
                         .HasColumnType("date")
                         .HasColumnName("prazo_inicio");
-
-                    b.Property<int>("Priorizacao")
-                        .HasColumnType("integer")
-                        .HasColumnName("priorizacao");
 
                     b.Property<string>("Titulo")
                         .IsRequired()
@@ -208,7 +217,10 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                     b.HasIndex("UsuarioId", "PrazoFim")
                         .HasDatabaseName("ix_epico_usuario_id_prazo_fim");
 
-                    b.ToTable("epico", (string)null);
+                    b.ToTable("epico", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_epico_pontuacao_nao_negativa", "pontuacao >= 0");
+                        });
                 });
 
             modelBuilder.Entity("Icarus.Domain.Entities.InventarioItem", b =>
@@ -345,6 +357,12 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                     b.Property<string>("Descricao")
                         .HasColumnType("text")
                         .HasColumnName("descricao");
+
+                    b.Property<string>("Dificuldade")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("dificuldade");
 
                     b.Property<DateTimeOffset>("Horario")
                         .HasColumnType("timestamp with time zone")
@@ -808,6 +826,52 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                     b.ToTable("token_renovacao", (string)null);
                 });
 
+            modelBuilder.Entity("Icarus.Domain.Entities.TrabalhoOnboarding", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AtualizadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("atualizado_em");
+
+                    b.Property<DateTimeOffset>("CriadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("criado_em");
+
+                    b.Property<long?>("EpicoId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("epico_id");
+
+                    b.Property<string>("ErroMensagem")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("erro_mensagem");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("UsuarioId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("usuario_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_trabalho_onboarding");
+
+                    b.HasIndex("EpicoId")
+                        .HasDatabaseName("ix_trabalho_onboarding_epico_id");
+
+                    b.HasIndex("UsuarioId")
+                        .HasDatabaseName("ix_trabalho_onboarding_usuario_id");
+
+                    b.ToTable("trabalho_onboarding", (string)null);
+                });
+
             modelBuilder.Entity("Icarus.Domain.Entities.Usuario", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1077,6 +1141,26 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                     b.Navigation("Usuario");
                 });
 
+            modelBuilder.Entity("Icarus.Domain.Entities.TrabalhoOnboarding", b =>
+                {
+                    b.HasOne("Icarus.Domain.Entities.Epico", "Epico")
+                        .WithMany()
+                        .HasForeignKey("EpicoId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_trabalho_onboarding_epico_epico_id");
+
+                    b.HasOne("Icarus.Domain.Entities.Usuario", "Usuario")
+                        .WithMany("TrabalhosOnboarding")
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_trabalho_onboarding_usuarios_usuario_id");
+
+                    b.Navigation("Epico");
+
+                    b.Navigation("Usuario");
+                });
+
             modelBuilder.Entity("Icarus.Domain.Entities.Campanha", b =>
                 {
                     b.Navigation("Missoes");
@@ -1131,6 +1215,8 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                     b.Navigation("Rotinas");
 
                     b.Navigation("TokensRenovacao");
+
+                    b.Navigation("TrabalhosOnboarding");
                 });
 #pragma warning restore 612, 618
         }
