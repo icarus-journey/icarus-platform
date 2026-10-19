@@ -4,6 +4,9 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using FluentValidation;
 using Icarus.Api.Contracts.Auth;
+using Icarus.Api.Contracts.Campanhas;
+using Icarus.Api.Contracts.Epicos;
+using Icarus.Api.Contracts.Missoes;
 using Icarus.Api.Contracts.Usuarios;
 using Icarus.Api.ExceptionHandling;
 using Icarus.Api.Filters;
@@ -53,6 +56,12 @@ public static class DependencyInjection
         services.AddSingleton<IValidator<LoginRequest>, LoginRequestValidator>();
         services.AddSingleton<IValidator<RefreshRequest>, RefreshRequestValidator>();
         services.AddSingleton<IValidator<IniciarOnboardingRequest>, IniciarOnboardingRequestValidator>();
+        services.AddSingleton<IValidator<CriarEpicoRequest>, CriarEpicoRequestValidator>();
+        services.AddSingleton<IValidator<AtualizarEpicoRequest>, AtualizarEpicoRequestValidator>();
+        services.AddSingleton<IValidator<CriarCampanhaRequest>, CriarCampanhaRequestValidator>();
+        services.AddSingleton<IValidator<AtualizarCampanhaRequest>, AtualizarCampanhaRequestValidator>();
+        services.AddSingleton<IValidator<CriarMissaoRequest>, CriarMissaoRequestValidator>();
+        services.AddSingleton<IValidator<AtualizarMissaoRequest>, AtualizarMissaoRequestValidator>();
 
         // "Saúde da API" (seção 11 do icarus-context): /health responde 200 só se também
         // conseguir falar com o Postgres — não é só "o processo está de pé", é "a API funciona".

@@ -52,6 +52,12 @@ internal sealed class EpicoRepositorioEmMemoriaParaPersistir : IEpicoRepository
 
     public Task<Epico?> BuscarComCampanhaEMissoesAsync(long epicoId, Guid usuarioId, CancellationToken cancellationToken)
         => Task.FromResult(Epicos.SingleOrDefault(e => e.Id == epicoId && e.UsuarioId == usuarioId));
+
+    public Task<Epico?> BuscarPorIdAsync(long epicoId, Guid usuarioId, CancellationToken cancellationToken)
+        => Task.FromResult(Epicos.SingleOrDefault(e => e.Id == epicoId && e.UsuarioId == usuarioId));
+
+    public Task<List<Epico>> ListarComCampanhasEMissoesAsync(Guid usuarioId, CancellationToken cancellationToken)
+        => Task.FromResult(Epicos.Where(e => e.UsuarioId == usuarioId).ToList());
 }
 
 public class PersistirResultadoOnboardingUseCaseTests

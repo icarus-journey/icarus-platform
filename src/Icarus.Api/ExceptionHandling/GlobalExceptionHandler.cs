@@ -58,6 +58,27 @@ public sealed partial class GlobalExceptionHandler(
                 Title = "Trabalho de onboarding não encontrado",
                 Detail = "Trabalho de onboarding não encontrado."
             },
+            EpicoNaoEncontradoException => new ProblemDetails
+            {
+                Status = StatusCodes.Status404NotFound,
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.5",
+                Title = "Épico não encontrado",
+                Detail = "Épico não encontrado."
+            },
+            CampanhaNaoEncontradaException => new ProblemDetails
+            {
+                Status = StatusCodes.Status404NotFound,
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.5",
+                Title = "Campanha não encontrada",
+                Detail = "Campanha não encontrada."
+            },
+            MissaoNaoEncontradaException => new ProblemDetails
+            {
+                Status = StatusCodes.Status404NotFound,
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.5",
+                Title = "Missão não encontrada",
+                Detail = "Missão não encontrada."
+            },
             _ => null
         };
 
