@@ -12,4 +12,5 @@ public sealed record AtualizarMissaoResult(
     int Pontuacao,
     DateOnly? DataLimite,
     DateTimeOffset Horario,
-    StatusMissao Status);
+    StatusMissao Status,
+    DateTimeOffset? ConcluidaEm);

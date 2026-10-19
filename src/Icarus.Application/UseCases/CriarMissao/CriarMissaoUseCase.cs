@@ -49,7 +49,7 @@ public sealed partial class CriarMissaoUseCase(
 
         return new CriarMissaoResult(
             missao.Id, missao.CampanhaId, missao.Titulo, missao.Descricao, missao.Beneficio,
-            missao.Dificuldade, missao.Pontuacao, missao.DataLimite, missao.Horario, missao.Status);
+            missao.Dificuldade, missao.Pontuacao, missao.DataLimite, missao.Horario, missao.Status, missao.ConcluidaEm);
     }
 
     private static DateTimeOffset ParaHorario(DateOnly data, string? horario)

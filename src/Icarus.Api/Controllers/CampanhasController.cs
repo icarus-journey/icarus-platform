@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Icarus.Api.Contracts.Campanhas;
 using Icarus.Application.UseCases.AtualizarCampanha;
+using Icarus.Application.UseCases.ConcluirCampanha;
 using Icarus.Application.UseCases.CriarCampanha;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -12,7 +13,8 @@ namespace Icarus.Api.Controllers;
 [Route("api/usuarios/{usuarioId:guid}/campanhas")]
 public class CampanhasController(
     CriarCampanhaUseCase criarCampanha,
-    AtualizarCampanhaUseCase atualizarCampanha) : ControllerBase
+    AtualizarCampanhaUseCase atualizarCampanha,
+    ConcluirCampanhaUseCase concluirCampanha) : ControllerBase
 {
     /// <summary>Cria uma campanha manualmente (RF-01), sempre atrelada a um épico do usuário.</summary>
     [Authorize]
@@ -51,6 +53,25 @@ public class CampanhasController(
         var resultado = await atualizarCampanha.ExecuteAsync(command, cancellationToken);
 
         return Ok(ParaResponse(resultado));
+    }
+
+    /// <summary>
+    /// Conclui uma campanha manualmente (RF-03.7) — confirmação explícita; atingir o valor
+    /// mensurado não conclui por si só. Idempotente: concluir de novo é um no-op.
+    /// </summary>
+    [Authorize]
+    [HttpPost("{campanhaId:long}/concluir")]
+    [ProducesResponseType<ConcluirCampanhaResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Concluir(Guid usuarioId, long campanhaId, CancellationToken cancellationToken)
+    {
+        var usuarioIdAutenticado = ObterUsuarioIdAutenticado();
+        var command = new ConcluirCampanhaCommand(usuarioIdAutenticado, usuarioId, campanhaId);
+
+        var resultado = await concluirCampanha.ExecuteAsync(command, cancellationToken);
+
+        return Ok(new ConcluirCampanhaResponse(resultado.Id, resultado.Estado));
     }
 
     private Guid ObterUsuarioIdAutenticado() => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);

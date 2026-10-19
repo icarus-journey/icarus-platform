@@ -40,4 +40,5 @@ public sealed record MissaoResumoResponse(
     int Pontuacao,
     DateOnly? DataLimite,
     DateTimeOffset Horario,
-    StatusMissao Status);
+    StatusMissao Status,
+    DateTimeOffset? ConcluidaEm);

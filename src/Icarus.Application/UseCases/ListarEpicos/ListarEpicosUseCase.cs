@@ -26,7 +26,7 @@ public sealed partial class ListarEpicosUseCase(IEpicoRepository epicoRepository
                 campanha.Unidade, campanha.ValorAtual, campanha.Estado,
                 campanha.Missoes.Select(missao => new MissaoListadaResult(
                     missao.Id, missao.Titulo, missao.Descricao, missao.Beneficio, missao.Dificuldade,
-                    missao.Pontuacao, missao.DataLimite, missao.Horario, missao.Status))
+                    missao.Pontuacao, missao.DataLimite, missao.Horario, missao.Status, missao.ConcluidaEm))
                     .ToList()))
                 .ToList()))
             .ToList();

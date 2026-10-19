@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Icarus.Api.Contracts.Epicos;
 using Icarus.Application.UseCases.AtualizarEpico;
+using Icarus.Application.UseCases.ConcluirEpico;
 using Icarus.Application.UseCases.CriarEpico;
 using Icarus.Application.UseCases.ListarEpicos;
 using Microsoft.AspNetCore.Authorization;
@@ -14,7 +15,8 @@ namespace Icarus.Api.Controllers;
 public class EpicosController(
     CriarEpicoUseCase criarEpico,
     AtualizarEpicoUseCase atualizarEpico,
-    ListarEpicosUseCase listarEpicos) : ControllerBase
+    ListarEpicosUseCase listarEpicos,
+    ConcluirEpicoUseCase concluirEpico) : ControllerBase
 {
     /// <summary>Lista os épicos do usuário, com campanhas e missões aninhadas (RF-01.5).</summary>
     [Authorize]
@@ -76,6 +78,25 @@ public class EpicosController(
             resultado.Dificuldade, resultado.Pontuacao, resultado.PrazoInicio, resultado.PrazoFim, resultado.Estado));
     }
 
+    /// <summary>
+    /// Conclui um épico manualmente (RF-03.8) — irreversível e não altera o estado das
+    /// campanhas. Idempotente: concluir de novo um épico já concluído é um no-op.
+    /// </summary>
+    [Authorize]
+    [HttpPost("{epicoId:long}/concluir")]
+    [ProducesResponseType<EpicoResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Concluir(Guid usuarioId, long epicoId, CancellationToken cancellationToken)
+    {
+        var usuarioIdAutenticado = ObterUsuarioIdAutenticado();
+        var command = new ConcluirEpicoCommand(usuarioIdAutenticado, usuarioId, epicoId);
+
+        var resultado = await concluirEpico.ExecuteAsync(command, cancellationToken);
+
+        return Ok(new ConcluirEpicoResponse(resultado.Id, resultado.Estado));
+    }
+
     private Guid ObterUsuarioIdAutenticado() => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
     private static EpicoComCampanhasResponse ParaResponse(EpicoListadoResult epico) => new(
@@ -87,7 +108,7 @@ public class EpicosController(
             campanha.Unidade, campanha.ValorAtual, campanha.Estado,
             campanha.Missoes.Select(missao => new MissaoResumoResponse(
                 missao.Id, missao.Titulo, missao.Descricao, missao.Beneficio, missao.Dificuldade,
-                missao.Pontuacao, missao.DataLimite, missao.Horario, missao.Status))
+                missao.Pontuacao, missao.DataLimite, missao.Horario, missao.Status, missao.ConcluidaEm))
                 .ToList()))
             .ToList());
 }

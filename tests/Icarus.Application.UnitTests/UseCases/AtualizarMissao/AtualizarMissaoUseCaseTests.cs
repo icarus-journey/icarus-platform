@@ -52,6 +52,23 @@ public class AtualizarMissaoUseCaseTests
         Assert.Equal(new TimeOnly(20, 0), TimeOnly.FromDateTime(resultado.Horario.DateTime));
     }
 
+    [Fact(DisplayName = "Missão já concluída é imutável — edição lança MissaoConcluidaException (RF-04.3)")]
+    public async Task ExecuteAsync_DeveLancarExcecaoQuandoMissaoJaConcluida()
+    {
+        var missao = new Missao
+        {
+            Id = 1, UsuarioId = Guid.NewGuid(), Titulo = "Concluída", Dificuldade = Dificuldade.Facil,
+            Pontuacao = 30, ConcluidaEm = DateTimeOffset.UtcNow
+        };
+        _repositorio.Missoes.Add(missao);
+
+        var command = new AtualizarMissaoCommand(
+            missao.UsuarioId, missao.UsuarioId, missao.Id, "Novo título", null, null, Dificuldade.Media, null, null);
+
+        await Assert.ThrowsAsync<MissaoConcluidaException>(() => _useCase.ExecuteAsync(command, CancellationToken.None));
+        Assert.Equal("Concluída", missao.Titulo); // não foi alterada
+    }
+
     [Fact(DisplayName = "Missão inexistente (ou de outro usuário) lança MissaoNaoEncontradaException")]
     public async Task ExecuteAsync_DeveLancarExcecaoQuandoMissaoNaoExiste()
     {

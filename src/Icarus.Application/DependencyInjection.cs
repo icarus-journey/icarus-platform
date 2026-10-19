@@ -1,6 +1,9 @@
 using Icarus.Application.UseCases.AtualizarCampanha;
 using Icarus.Application.UseCases.AtualizarEpico;
 using Icarus.Application.UseCases.AtualizarMissao;
+using Icarus.Application.UseCases.ConcluirCampanha;
+using Icarus.Application.UseCases.ConcluirEpico;
+using Icarus.Application.UseCases.ConcluirMissao;
 using Icarus.Application.UseCases.CriarCampanha;
 using Icarus.Application.UseCases.CriarEpico;
 using Icarus.Application.UseCases.CriarMissao;
@@ -43,6 +46,9 @@ public static class DependencyInjection
         services.AddScoped<CriarMissaoUseCase>();
         services.AddScoped<AtualizarMissaoUseCase>();
         services.AddScoped<ListarMissoesAvulsasUseCase>();
+        services.AddScoped<ConcluirMissaoUseCase>();
+        services.AddScoped<ConcluirCampanhaUseCase>();
+        services.AddScoped<ConcluirEpicoUseCase>();
 
         return services;
     }

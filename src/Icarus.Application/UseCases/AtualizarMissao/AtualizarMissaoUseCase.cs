@@ -22,6 +22,12 @@ public sealed partial class AtualizarMissaoUseCase(
         var missao = await missaoRepository.BuscarPorIdAsync(command.MissaoId, command.UsuarioIdSolicitado, cancellationToken)
             ?? throw new MissaoNaoEncontradaException();
 
+        if (missao.ConcluidaEm is not null)
+        {
+            LogEdicaoRejeitada(missao.Id);
+            throw new MissaoConcluidaException();
+        }
+
         var dataReferencia = command.DataLimite ?? DateOnly.FromDateTime(DateTime.UtcNow);
 
         missao.Titulo = command.Titulo;
@@ -38,7 +44,7 @@ public sealed partial class AtualizarMissaoUseCase(
 
         return new AtualizarMissaoResult(
             missao.Id, missao.CampanhaId, missao.Titulo, missao.Descricao, missao.Beneficio,
-            missao.Dificuldade, missao.Pontuacao, missao.DataLimite, missao.Horario, missao.Status);
+            missao.Dificuldade, missao.Pontuacao, missao.DataLimite, missao.Horario, missao.Status, missao.ConcluidaEm);
     }
 
     private static DateTimeOffset ParaHorario(DateOnly data, string? horario)
@@ -52,4 +58,7 @@ public sealed partial class AtualizarMissaoUseCase(
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Missão {MissaoId} atualizada")]
     private partial void LogMissaoAtualizada(long missaoId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Tentativa de editar missão {MissaoId} já concluída rejeitada")]
+    private partial void LogEdicaoRejeitada(long missaoId);
 }

@@ -79,6 +79,13 @@ public sealed partial class GlobalExceptionHandler(
                 Title = "Missão não encontrada",
                 Detail = "Missão não encontrada."
             },
+            MissaoConcluidaException => new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.10",
+                Title = "Missão concluída",
+                Detail = "Missão concluída não pode ser editada."
+            },
             _ => null
         };
 
