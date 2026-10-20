@@ -150,12 +150,12 @@ public class ConcluirMissaoUseCaseTests
         Assert.Equal(StatusOcorrencia.ConcluidaComAtraso, ocorrencia.Status);
     }
 
-    [Fact(DisplayName = "Missão vinculada a campanha mensurável soma os pontos ao valor atual")]
+    [Fact(DisplayName = "Campanha em pontos mantém o contador de gamificação")]
     public async Task ExecuteAsync_DeveSomarPontosAoValorAtualDaCampanhaMensuravel()
     {
         var usuarioId = Guid.NewGuid();
         AdicionarUsuario(usuarioId);
-        var campanha = new Campanha { Id = 10, EpicoId = 1, Titulo = "Campanha", ValorMensurado = 100m, ValorAtual = 40m };
+        var campanha = new Campanha { Id = 10, EpicoId = 1, Titulo = "Campanha", ValorMensurado = 100m, ValorAtual = 40m, Unidade = "pontos" };
         _campanhaRepositorio.Campanhas.Add(campanha);
         var missao = new Missao { Id = 1, UsuarioId = usuarioId, CampanhaId = campanha.Id, Titulo = "M", Dificuldade = Dificuldade.Media, Pontuacao = 45 };
         _missaoRepositorio.Missoes.Add(missao);
@@ -163,6 +163,23 @@ public class ConcluirMissaoUseCaseTests
         await _useCase.ExecuteAsync(new ConcluirMissaoCommand(usuarioId, usuarioId, missao.Id), CancellationToken.None);
 
         Assert.Equal(85m, campanha.ValorAtual);
+    }
+
+    [Theory]
+    [InlineData("módulos")]
+    [InlineData("reais")]
+    [InlineData(null)]
+    public async Task ConclusaoNaoDeveSomarPontosAoResultadoMensurado(string? unidade)
+    {
+        var usuarioId = Guid.NewGuid();
+        AdicionarUsuario(usuarioId);
+        var campanha = new Campanha { Id = 10, EpicoId = 1, Titulo = "Campanha", ValorMensurado = 10m, ValorAtual = 4m, Unidade = unidade };
+        _campanhaRepositorio.Campanhas.Add(campanha);
+        _missaoRepositorio.Missoes.Add(new Missao { Id = 1, UsuarioId = usuarioId, CampanhaId = campanha.Id, Titulo = "M", Dificuldade = Dificuldade.Media, Pontuacao = 45 });
+
+        await _useCase.ExecuteAsync(new ConcluirMissaoCommand(usuarioId, usuarioId, 1), CancellationToken.None);
+
+        Assert.Equal(4m, campanha.ValorAtual);
     }
 
     [Fact(DisplayName = "Concluir de novo uma missão já concluída é idempotente e não credita pontos outra vez")]
