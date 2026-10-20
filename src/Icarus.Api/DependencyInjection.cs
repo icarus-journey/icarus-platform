@@ -1,3 +1,4 @@
+using Icarus.Api.Contracts.Analise;
 using Icarus.Api.Contracts.Loja;
 using System.Globalization;
 using System.Text;
@@ -53,6 +54,8 @@ public static class DependencyInjection
         services.AddExceptionHandler<GlobalExceptionHandler>();
 
         // Validadores são stateless, então singleton. Um por Request; o ValidationFilter os encontra sozinho.
+        services.AddSingleton<IValidator<ConsultarReferenciasPublicasRequest>, ConsultarReferenciasPublicasRequestValidator>();
+        services.AddSingleton<IValidator<ConsultarProgressoRequest>, ConsultarProgressoRequestValidator>();
         services.AddSingleton<IValidator<RegisterRequest>, RegisterRequestValidator>();
         services.AddSingleton<IValidator<RecompensaRequest>, RecompensaRequestValidator>();
         services.AddSingleton<IValidator<ResgateRequest>, ResgateRequestValidator>();

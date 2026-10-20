@@ -38,6 +38,9 @@ public static class DependencyInjection
         services.AddSingleton<ILoginAttemptLimiter, LoginAttemptLimiter>();
 
         services.AddScoped<IUsuarioRepository, UsuarioRepository>();
+        services.AddScoped<IReferenciasPublicasRepository, ReferenciasPublicasRepository>();
+        services.AddScoped<IIndicadoresPessoaisRepository, IndicadoresPessoaisRepository>();
+        services.AddScoped<IRelatorioSemanalRepository, RelatorioSemanalRepository>();
         services.AddScoped<ILojaRepository, LojaRepository>();
         var loja = configuration.GetSection("Loja").Get<LojaOptions>() ?? new();
         if (loja.CustoProtecao is < 1 or > 1_000_000)
@@ -62,6 +65,8 @@ public static class DependencyInjection
         services.AddSingleton<RabbitMqConnectionProvider>();
         services.AddScoped<IOnboardingJobPublisher, OnboardingJobPublisher>();
         services.AddHostedService<OnboardingResultConsumer>();
+        services.AddHostedService<PublicadorOutboxRelatorio>();
+        services.AddHostedService<ConsumidorResultadoRelatorio>();
 
         return services;
     }

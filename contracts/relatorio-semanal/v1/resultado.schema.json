@@ -1,0 +1,195 @@
+{
+  "$defs": {
+    "ConfiguracaoGeracao": {
+      "additionalProperties": false,
+      "properties": {
+        "provedor": {
+          "enum": [
+            "openai",
+            "ollama"
+          ],
+          "title": "Provedor",
+          "type": "string"
+        },
+        "modelo": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Modelo",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provedor",
+        "modelo"
+      ],
+      "title": "ConfiguracaoGeracao",
+      "type": "object"
+    },
+    "PeriodoSemanal": {
+      "additionalProperties": false,
+      "properties": {
+        "inicio": {
+          "format": "date",
+          "title": "Inicio",
+          "type": "string"
+        },
+        "fim": {
+          "format": "date",
+          "title": "Fim",
+          "type": "string"
+        },
+        "fusoHorario": {
+          "maxLength": 100,
+          "minLength": 1,
+          "title": "Fusohorario",
+          "type": "string"
+        }
+      },
+      "required": [
+        "inicio",
+        "fim",
+        "fusoHorario"
+      ],
+      "title": "PeriodoSemanal",
+      "type": "object"
+    },
+    "TextoRelatorioSemanal": {
+      "additionalProperties": false,
+      "properties": {
+        "titulo": {
+          "maxLength": 100,
+          "minLength": 1,
+          "title": "Titulo",
+          "type": "string"
+        },
+        "resumo": {
+          "maxLength": 800,
+          "minLength": 1,
+          "title": "Resumo",
+          "type": "string"
+        },
+        "proximoAjuste": {
+          "maxLength": 600,
+          "minLength": 1,
+          "title": "Proximoajuste",
+          "type": "string"
+        },
+        "reflexao": {
+          "maxLength": 400,
+          "minLength": 1,
+          "title": "Reflexao",
+          "type": "string"
+        }
+      },
+      "required": [
+        "titulo",
+        "resumo",
+        "proximoAjuste",
+        "reflexao"
+      ],
+      "title": "TextoRelatorioSemanal",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "idMensagem": {
+      "format": "uuid",
+      "title": "Idmensagem",
+      "type": "string"
+    },
+    "correlacaoId": {
+      "format": "uuid",
+      "title": "Correlacaoid",
+      "type": "string"
+    },
+    "causalidadeId": {
+      "format": "uuid",
+      "title": "Causalidadeid",
+      "type": "string"
+    },
+    "tipo": {
+      "const": "relatorio.semanal.resultado",
+      "default": "relatorio.semanal.resultado",
+      "title": "Tipo",
+      "type": "string"
+    },
+    "versaoContrato": {
+      "const": "1.0.0",
+      "default": "1.0.0",
+      "title": "Versaocontrato",
+      "type": "string"
+    },
+    "criadaEm": {
+      "format": "date-time",
+      "title": "Criadaem",
+      "type": "string"
+    },
+    "expiraEm": {
+      "format": "date-time",
+      "title": "Expiraem",
+      "type": "string"
+    },
+    "chaveIdempotencia": {
+      "title": "Chaveidempotencia",
+      "type": "string"
+    },
+    "periodo": {
+      "$ref": "#/$defs/PeriodoSemanal"
+    },
+    "estado": {
+      "enum": [
+        "concluido",
+        "falha"
+      ],
+      "title": "Estado",
+      "type": "string"
+    },
+    "conteudo": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TextoRelatorioSemanal"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "falhaCodigo": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Falhacodigo"
+    },
+    "geracao": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ConfiguracaoGeracao"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "idMensagem",
+    "correlacaoId",
+    "causalidadeId",
+    "criadaEm",
+    "expiraEm",
+    "chaveIdempotencia",
+    "periodo",
+    "estado",
+    "conteudo",
+    "falhaCodigo",
+    "geracao"
+  ],
+  "title": "ResultadoRelatorioSemanal",
+  "type": "object"
+}

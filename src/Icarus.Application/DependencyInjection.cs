@@ -1,3 +1,7 @@
+using Icarus.Application.UseCases.ConsultarRelatorioSemanal;
+using Icarus.Application.UseCases.SolicitarRelatorioSemanal;
+using Icarus.Application.UseCases.PersistirRelatorioSemanal;
+using Icarus.Application.UseCases.ConsultarProgresso;
 using Icarus.Application.UseCases.UtilizarRecompensa;
 using Icarus.Application.UseCases.ResgatarRecompensa;
 using Icarus.Application.UseCases.ExcluirRecompensa;
@@ -5,6 +9,7 @@ using Icarus.Application.UseCases.DesfazerResgate;
 using Icarus.Application.UseCases.CriarRecompensa;
 using Icarus.Application.UseCases.ConsultarLoja;
 using Icarus.Application.UseCases.AtualizarRecompensa;
+using Icarus.Application.UseCases.ConsultarReferenciasPublicas;
 using Icarus.Application.UseCases.AtualizarCampanha;
 using Icarus.Application.UseCases.AtualizarEpico;
 using Icarus.Application.UseCases.AtualizarMissao;
@@ -38,6 +43,12 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
+        services.AddSingleton(TimeProvider.System);
+        services.AddScoped<ConsultarReferenciasPublicasUseCase>();
+        services.AddScoped<ConsultarProgressoUseCase>();
+        services.AddScoped<ConsultarRelatorioSemanalUseCase>();
+        services.AddScoped<SolicitarRelatorioSemanalUseCase>();
+        services.AddScoped<PersistirRelatorioSemanalUseCase>();
         services.AddScoped<RegisterUserUseCase>();
         services.AddScoped<ConsultarLojaUseCase>();
         services.AddScoped<CriarRecompensaUseCase>();
