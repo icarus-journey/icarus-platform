@@ -4,6 +4,8 @@ using Icarus.Application.Common;
 using Icarus.Application.UseCases.IniciarOnboarding;
 using Icarus.Application.UseCases.ObterPerfil;
 using Icarus.Application.UseCases.ObterStatusOnboarding;
+using Icarus.Application.UseCases.AtualizarPerfil;
+using Icarus.Application.UseCases.AtualizarFuso;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,7 +17,9 @@ namespace Icarus.Api.Controllers;
 public class UsuariosController(
     ObterPerfilUseCase obterPerfil,
     IniciarOnboardingUseCase iniciarOnboarding,
-    ObterStatusOnboardingUseCase obterStatusOnboarding) : ControllerBase
+    ObterStatusOnboardingUseCase obterStatusOnboarding,
+    AtualizarPerfilUseCase atualizarPerfil,
+    AtualizarFusoUseCase atualizarFuso) : ControllerBase
 {
     /// <summary>
     /// Perfil do usuário (RF-01). Exige <c>[Authorize]</c> e o id da rota tem que ser o
@@ -34,7 +38,41 @@ public class UsuariosController(
 
         var result = await obterPerfil.ExecuteAsync(command, cancellationToken);
 
-        return Ok(new UsuarioResponse(result.Id, result.Nome, result.Email, result.DataNascimento));
+        return Ok(new UsuarioResponse(result.Id, result.Nome, result.Email, result.DataNascimento,
+            result.Estuda, result.CargaHorariaEstudoSemanal, result.Trabalha,
+            result.CargaHorariaTrabalhoSemanal, result.FusoHorario));
+    }
+
+    [Authorize]
+    [HttpPut("{id:guid}/perfil")]
+    [ProducesResponseType<UsuarioResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> AtualizarPerfil(Guid id, AtualizarPerfilRequest request, CancellationToken cancellationToken)
+    {
+        var autenticado = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var command = new AtualizarPerfilCommand(autenticado, id, request.Estuda,
+            request.CargaHorariaEstudoSemanal, request.Trabalha, request.CargaHorariaTrabalhoSemanal);
+        var result = await atualizarPerfil.ExecuteAsync(command, cancellationToken);
+        return Ok(new UsuarioResponse(result.Id, result.Nome, result.Email, result.DataNascimento,
+            result.Estuda, result.CargaHorariaEstudoSemanal, result.Trabalha,
+            result.CargaHorariaTrabalhoSemanal, result.FusoHorario));
+    }
+
+    [Authorize]
+    [HttpPut("{id:guid}/fuso")]
+    [ProducesResponseType<AtualizarFusoResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> AtualizarFuso(Guid id, AtualizarFusoRequest request, CancellationToken cancellationToken)
+    {
+        var autenticado = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var result = await atualizarFuso.ExecuteAsync(new AtualizarFusoCommand(autenticado, id, request.FusoHorario), cancellationToken);
+        return Ok(new AtualizarFusoResponse(result.Id, result.FusoHorario));
     }
 
     /// <summary>

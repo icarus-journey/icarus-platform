@@ -16,6 +16,20 @@ public sealed partial class GlobalExceptionHandler(
     {
         var problemDetails = exception switch
         {
+            OperacaoLojaException loja => new ProblemDetails
+            {
+                Status = loja.NaoEncontrado ? StatusCodes.Status404NotFound : StatusCodes.Status409Conflict,
+                Title = "Não foi possível realizar a operação da loja",
+                Detail = loja.Message,
+                Extensions = { ["codigo"] = loja.Codigo }
+            },
+            DadosAtualizadosException => new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Title = "Dados atualizados por outra operação",
+                Detail = "Seus dados mudaram. Atualize a tela e tente novamente.",
+                Extensions = { ["codigo"] = "dados_atualizados" }
+            },
             EmailJaCadastradoException => new ProblemDetails
             {
                 Status = StatusCodes.Status409Conflict,

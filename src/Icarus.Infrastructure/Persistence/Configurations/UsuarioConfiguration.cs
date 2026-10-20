@@ -8,7 +8,14 @@ public class UsuarioConfiguration : IEntityTypeConfiguration<Usuario>
 {
     public void Configure(EntityTypeBuilder<Usuario> builder)
     {
-        builder.ToTable("usuario", t => t.HasCheckConstraint("ck_usuario_saldo_pontos_nao_negativo", "saldo_pontos >= 0"));
+        builder.ToTable("usuario", t =>
+        {
+            t.HasCheckConstraint("ck_usuario_saldo_pontos_nao_negativo", "saldo_pontos >= 0");
+            t.HasCheckConstraint("ck_usuario_carga_estudo",
+                "carga_horaria_estudo_semanal IS NULL OR (estuda IS TRUE AND carga_horaria_estudo_semanal BETWEEN 0 AND 168)");
+            t.HasCheckConstraint("ck_usuario_carga_trabalho",
+                "carga_horaria_trabalho_semanal IS NULL OR (trabalha IS TRUE AND carga_horaria_trabalho_semanal BETWEEN 0 AND 168)");
+        });
 
         builder.HasKey(u => u.Id);
 
@@ -29,6 +36,11 @@ public class UsuarioConfiguration : IEntityTypeConfiguration<Usuario>
 
         builder.Property(u => u.SaldoPontos)
             .IsRequired()
+            .IsConcurrencyToken()
             .HasDefaultValue(0);
+
+        builder.Property(u => u.CargaHorariaEstudoSemanal).HasPrecision(5, 2);
+        builder.Property(u => u.CargaHorariaTrabalhoSemanal).HasPrecision(5, 2);
+        builder.Property(u => u.FusoHorario).HasMaxLength(100);
     }
 }

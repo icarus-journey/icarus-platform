@@ -1,3 +1,4 @@
+using Icarus.Application.UseCases.ConsultarLoja;
 using Icarus.Application.Interfaces;
 using Icarus.Infrastructure.Messaging;
 using Icarus.Infrastructure.Persistence;
@@ -37,6 +38,11 @@ public static class DependencyInjection
         services.AddSingleton<ILoginAttemptLimiter, LoginAttemptLimiter>();
 
         services.AddScoped<IUsuarioRepository, UsuarioRepository>();
+        services.AddScoped<ILojaRepository, LojaRepository>();
+        var loja = configuration.GetSection("Loja").Get<LojaOptions>() ?? new();
+        if (loja.CustoProtecao is < 1 or > 1_000_000)
+            throw new InvalidOperationException("Loja:CustoProtecao deve estar entre 1 e 1.000.000.");
+        services.AddSingleton(loja);
         services.AddScoped<ITokenRenovacaoRepository, TokenRenovacaoRepository>();
         services.AddScoped<IEpicoRepository, EpicoRepository>();
         services.AddScoped<ICampanhaRepository, CampanhaRepository>();

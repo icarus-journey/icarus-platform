@@ -13,6 +13,12 @@ public class Usuario : EntidadeBase
 
     public DateOnly DataNascimento { get; set; }
 
+    public bool? Estuda { get; set; }
+    public decimal? CargaHorariaEstudoSemanal { get; set; }
+    public bool? Trabalha { get; set; }
+    public decimal? CargaHorariaTrabalhoSemanal { get; set; }
+    public string? FusoHorario { get; set; }
+
     /// <summary>
     /// Saldo atual, mantido em sincronia com <see cref="MovimentacaoPontos"/> na mesma transação.
     /// </summary>
