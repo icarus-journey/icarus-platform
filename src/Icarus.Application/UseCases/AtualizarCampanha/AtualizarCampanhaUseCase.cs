@@ -1,6 +1,7 @@
 using Icarus.Application.Common;
 using Icarus.Application.Exceptions;
 using Icarus.Application.Interfaces;
+using Icarus.Domain.Enums;
 using Microsoft.Extensions.Logging;
 
 namespace Icarus.Application.UseCases.AtualizarCampanha;
@@ -21,6 +22,12 @@ public sealed partial class AtualizarCampanhaUseCase(
 
         var campanha = await campanhaRepository.BuscarPorIdAsync(command.CampanhaId, command.UsuarioIdSolicitado, cancellationToken)
             ?? throw new CampanhaNaoEncontradaException();
+
+        if (campanha.Estado == EstadoCampanha.Concluida)
+        {
+            LogEdicaoRejeitada(campanha.Id);
+            throw new CampanhaConcluidaException();
+        }
 
         campanha.Titulo = command.Titulo;
         campanha.Descricao = command.Descricao;
@@ -55,4 +62,7 @@ public sealed partial class AtualizarCampanhaUseCase(
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Campanha {CampanhaId} atualizada")]
     private partial void LogCampanhaAtualizada(long campanhaId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Tentativa de editar campanha {CampanhaId} já concluída rejeitada")]
+    private partial void LogEdicaoRejeitada(long campanhaId);
 }

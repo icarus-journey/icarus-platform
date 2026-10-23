@@ -108,7 +108,8 @@ public class EpicosController(
             campanha.Unidade, campanha.ValorAtual, campanha.Estado,
             campanha.Missoes.Select(missao => new MissaoResumoResponse(
                 missao.Id, missao.Titulo, missao.Descricao, missao.Beneficio, missao.Dificuldade,
-                missao.Pontuacao, missao.DataLimite, missao.Horario, missao.Status, missao.ConcluidaEm))
+                missao.Pontuacao, missao.DataLimite, missao.Horario, missao.Status, missao.ConcluidaEm,
+                missao.Recorrente))
                 .ToList()))
             .ToList());
 }

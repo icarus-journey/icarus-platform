@@ -86,6 +86,55 @@ public sealed partial class GlobalExceptionHandler(
                 Title = "Missão concluída",
                 Detail = "Missão concluída não pode ser editada."
             },
+            MissaoInativaException => new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.10",
+                Title = "Missão inativa",
+                Detail = "Missão inativa não pode ser concluída."
+            },
+            MissaoRecorrenteImutavelException => new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.10",
+                Title = "Missão recorrente imutável",
+                Detail = "Missão recorrente não pode ser editada. Pare esta missão e crie uma nova para alterar algo."
+            },
+            FotoPerfilInvalidaException fotoInvalida => new ProblemDetails
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+                Title = "Foto de perfil inválida",
+                Detail = fotoInvalida.Message
+            },
+            FotoPerfilNaoEncontradaException => new ProblemDetails
+            {
+                Status = StatusCodes.Status404NotFound,
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.5",
+                Title = "Foto de perfil não encontrada",
+                Detail = "Usuário não tem foto de perfil."
+            },
+            MissaoNaoRecorrenteException => new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.10",
+                Title = "Missão não recorrente",
+                Detail = "Somente missão recorrente pode ser inativada."
+            },
+            CampanhaConcluidaException => new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.10",
+                Title = "Campanha concluída",
+                Detail = "Campanha concluída não pode ser alterada."
+            },
+            EpicoConcluidoException => new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.10",
+                Title = "Épico concluído",
+                Detail = "Épico concluído não pode ser alterado."
+            },
             _ => null
         };
 

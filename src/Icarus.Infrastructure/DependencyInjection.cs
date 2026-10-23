@@ -1,8 +1,10 @@
 using Icarus.Application.Interfaces;
+using Icarus.Infrastructure.Jobs;
 using Icarus.Infrastructure.Messaging;
 using Icarus.Infrastructure.Persistence;
 using Icarus.Infrastructure.Persistence.Repositories;
 using Icarus.Infrastructure.Security;
+using Icarus.Infrastructure.Storage;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -42,6 +44,7 @@ public static class DependencyInjection
         services.AddScoped<ICampanhaRepository, CampanhaRepository>();
         services.AddScoped<IMissaoRepository, MissaoRepository>();
         services.AddScoped<IOcorrenciaRepository, OcorrenciaRepository>();
+        services.AddScoped<IRecorrenciaRepository, RecorrenciaRepository>();
         services.AddScoped<IMovimentacaoPontosRepository, MovimentacaoPontosRepository>();
         services.AddScoped<ITrabalhoOnboardingRepository, TrabalhoOnboardingRepository>();
 
@@ -56,6 +59,13 @@ public static class DependencyInjection
         services.AddSingleton<RabbitMqConnectionProvider>();
         services.AddScoped<IOnboardingJobPublisher, OnboardingJobPublisher>();
         services.AddHostedService<OnboardingResultConsumer>();
+
+        // RF-04.5: mantém a janela de ocorrências das missões recorrentes ativas.
+        services.AddHostedService<RecorrenciaMaintenanceService>();
+
+        // Foto de perfil: objeto guardado no MinIO, não no Postgres.
+        services.Configure<MinioOptions>(configuration.GetSection(MinioOptions.SecaoConfiguracao));
+        services.AddSingleton<IArmazenamentoDeFotoPerfil, MinioArmazenamentoFotoPerfil>();
 
         return services;
     }

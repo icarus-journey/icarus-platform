@@ -23,6 +23,9 @@ internal sealed class MissaoRepositorioEmMemoriaParaAtualizar : IMissaoRepositor
     public Task<List<Missao>> ListarAvulsasAsync(Guid usuarioId, CancellationToken cancellationToken)
         => Task.FromResult(Missoes.Where(m => m.UsuarioId == usuarioId && m.CampanhaId == null).ToList());
 
+    public Task<List<Missao>> ListarRecorrentesAtivasAsync(CancellationToken cancellationToken)
+        => Task.FromResult(Missoes.Where(m => m.Status == StatusMissao.Ativa && m.Recorrencia is not null).ToList());
+
     public Task SalvarAlteracoesAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
@@ -67,6 +70,23 @@ public class AtualizarMissaoUseCaseTests
 
         await Assert.ThrowsAsync<MissaoConcluidaException>(() => _useCase.ExecuteAsync(command, CancellationToken.None));
         Assert.Equal("Concluída", missao.Titulo); // não foi alterada
+    }
+
+    [Fact(DisplayName = "Missão recorrente nunca é editável, concluída ou não — edição lança MissaoRecorrenteImutavelException")]
+    public async Task ExecuteAsync_DeveLancarExcecaoQuandoMissaoRecorrente()
+    {
+        var missao = new Missao
+        {
+            Id = 1, UsuarioId = Guid.NewGuid(), Titulo = "Beber água", Dificuldade = Dificuldade.Trivial, Pontuacao = 15,
+            Recorrencia = new Recorrencia { MissaoId = 1, Tipo = "DIARIA", DataInicio = DateOnly.FromDateTime(DateTime.UtcNow) }
+        };
+        _repositorio.Missoes.Add(missao);
+
+        var command = new AtualizarMissaoCommand(
+            missao.UsuarioId, missao.UsuarioId, missao.Id, "Novo título", null, null, Dificuldade.Media, null, null);
+
+        await Assert.ThrowsAsync<MissaoRecorrenteImutavelException>(() => _useCase.ExecuteAsync(command, CancellationToken.None));
+        Assert.Equal("Beber água", missao.Titulo); // não foi alterada
     }
 
     [Fact(DisplayName = "Missão inexistente (ou de outro usuário) lança MissaoNaoEncontradaException")]

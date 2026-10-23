@@ -1,6 +1,7 @@
 using Icarus.Application.Common;
 using Icarus.Application.Exceptions;
 using Icarus.Application.Interfaces;
+using Icarus.Domain.Enums;
 using Microsoft.Extensions.Logging;
 
 namespace Icarus.Application.UseCases.AtualizarEpico;
@@ -21,6 +22,12 @@ public sealed partial class AtualizarEpicoUseCase(
 
         var epico = await epicoRepository.BuscarPorIdAsync(command.EpicoId, command.UsuarioIdSolicitado, cancellationToken)
             ?? throw new EpicoNaoEncontradoException();
+
+        if (epico.Estado == EstadoEpico.Concluido)
+        {
+            LogEdicaoRejeitada(epico.Id);
+            throw new EpicoConcluidoException();
+        }
 
         epico.Titulo = command.Titulo;
         epico.Descricao = command.Descricao;
@@ -43,4 +50,7 @@ public sealed partial class AtualizarEpicoUseCase(
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Épico {EpicoId} atualizado")]
     private partial void LogEpicoAtualizado(long epicoId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Tentativa de editar épico {EpicoId} já concluído rejeitada")]
+    private partial void LogEdicaoRejeitada(long epicoId);
 }

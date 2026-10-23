@@ -5,7 +5,11 @@ using Microsoft.Extensions.Logging;
 
 namespace Icarus.Application.UseCases.AtualizarMissao;
 
-/// <summary>Caso de uso de edição de missão (RF-01) — não altera a campanha dona nem o status.</summary>
+/// <summary>
+/// Caso de uso de edição de missão (RF-01) — não altera a campanha dona nem o status. Missão
+/// recorrente nunca é editável (diferente da não recorrente, que só fica imutável depois de
+/// concluída) — pra mudar algo nela, o usuário para e cria uma nova (RF-04.6).
+/// </summary>
 public sealed partial class AtualizarMissaoUseCase(
     IMissaoRepository missaoRepository,
     IUnitOfWork unitOfWork,
@@ -21,6 +25,12 @@ public sealed partial class AtualizarMissaoUseCase(
 
         var missao = await missaoRepository.BuscarPorIdAsync(command.MissaoId, command.UsuarioIdSolicitado, cancellationToken)
             ?? throw new MissaoNaoEncontradaException();
+
+        if (missao.Recorrencia is not null)
+        {
+            LogEdicaoRecusadaRecorrente(missao.Id);
+            throw new MissaoRecorrenteImutavelException();
+        }
 
         if (missao.ConcluidaEm is not null)
         {
@@ -44,7 +54,8 @@ public sealed partial class AtualizarMissaoUseCase(
 
         return new AtualizarMissaoResult(
             missao.Id, missao.CampanhaId, missao.Titulo, missao.Descricao, missao.Beneficio,
-            missao.Dificuldade, missao.Pontuacao, missao.DataLimite, missao.Horario, missao.Status, missao.ConcluidaEm);
+            missao.Dificuldade, missao.Pontuacao, missao.DataLimite, missao.Horario, missao.Status,
+            missao.ConcluidaEm, missao.Recorrencia is not null);
     }
 
     private static DateTimeOffset ParaHorario(DateOnly data, string? horario)
@@ -61,4 +72,7 @@ public sealed partial class AtualizarMissaoUseCase(
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Tentativa de editar missão {MissaoId} já concluída rejeitada")]
     private partial void LogEdicaoRejeitada(long missaoId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Tentativa de editar missão {MissaoId} recorrente rejeitada")]
+    private partial void LogEdicaoRecusadaRecorrente(long missaoId);
 }

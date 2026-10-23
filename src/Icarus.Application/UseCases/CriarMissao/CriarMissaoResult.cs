@@ -13,4 +13,5 @@ public sealed record CriarMissaoResult(
     DateOnly? DataLimite,
     DateTimeOffset Horario,
     StatusMissao Status,
-    DateTimeOffset? ConcluidaEm);
+    DateTimeOffset? ConcluidaEm,
+    bool Recorrente);

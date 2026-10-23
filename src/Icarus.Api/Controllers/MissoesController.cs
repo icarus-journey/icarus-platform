@@ -3,6 +3,7 @@ using Icarus.Api.Contracts.Missoes;
 using Icarus.Application.UseCases.AtualizarMissao;
 using Icarus.Application.UseCases.ConcluirMissao;
 using Icarus.Application.UseCases.CriarMissao;
+using Icarus.Application.UseCases.InativarMissao;
 using Icarus.Application.UseCases.ListarMissoesAvulsas;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -16,7 +17,8 @@ public class MissoesController(
     CriarMissaoUseCase criarMissao,
     AtualizarMissaoUseCase atualizarMissao,
     ListarMissoesAvulsasUseCase listarMissoesAvulsas,
-    ConcluirMissaoUseCase concluirMissao) : ControllerBase
+    ConcluirMissaoUseCase concluirMissao,
+    InativarMissaoUseCase inativarMissao) : ControllerBase
 {
     /// <summary>
     /// Lista as missões avulsas do usuário (sem campanha, RF-03). Missões atreladas a uma
@@ -35,7 +37,7 @@ public class MissoesController(
         var resultado = await listarMissoesAvulsas.ExecuteAsync(command, cancellationToken);
 
         return Ok(resultado.Select(r => new MissaoResponse(
-            r.Id, null, r.Titulo, r.Descricao, r.Beneficio, r.Dificuldade, r.Pontuacao, r.DataLimite, r.Horario, r.Status, r.ConcluidaEm))
+            r.Id, null, r.Titulo, r.Descricao, r.Beneficio, r.Dificuldade, r.Pontuacao, r.DataLimite, r.Horario, r.Status, r.ConcluidaEm, r.Recorrente))
             .ToList());
     }
 
@@ -49,9 +51,12 @@ public class MissoesController(
     public async Task<IActionResult> Criar(Guid usuarioId, CriarMissaoRequest request, CancellationToken cancellationToken)
     {
         var usuarioIdAutenticado = ObterUsuarioIdAutenticado();
+        var recorrencia = request.Recorrencia is { } tipo
+            ? new RecorrenciaCommandInfo(tipo, request.DiasSemana, request.DataFimRecorrencia)
+            : null;
         var command = new CriarMissaoCommand(
             usuarioIdAutenticado, usuarioId, request.CampanhaId, request.Titulo, request.Descricao,
-            request.Beneficio, request.Dificuldade, request.DataLimite, request.Horario);
+            request.Beneficio, request.Dificuldade, request.DataLimite, request.Horario, recorrencia);
 
         var resultado = await criarMissao.ExecuteAsync(command, cancellationToken);
         var response = ParaResponse(resultado);
@@ -99,11 +104,32 @@ public class MissoesController(
             resultado.Id, resultado.ConcluidaEm, resultado.ConcluidaComAtraso, resultado.PontuacaoCreditada, resultado.SaldoPontosAtual));
     }
 
+    /// <summary>
+    /// Para uma missão recorrente (RF-04.6) — ela deixa de gerar novas ocorrências. Cancela as
+    /// ocorrências pendentes ainda não vencidas; preserva as já vencidas como histórico, sem
+    /// permitir concluí-las depois. Só missão recorrente pode ser inativada. Idempotente.
+    /// </summary>
+    [Authorize]
+    [HttpPost("{missaoId:long}/inativar")]
+    [ProducesResponseType<InativarMissaoResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Inativar(Guid usuarioId, long missaoId, CancellationToken cancellationToken)
+    {
+        var usuarioIdAutenticado = ObterUsuarioIdAutenticado();
+        var command = new InativarMissaoCommand(usuarioIdAutenticado, usuarioId, missaoId);
+
+        var resultado = await inativarMissao.ExecuteAsync(command, cancellationToken);
+
+        return Ok(new InativarMissaoResponse(resultado.Id, resultado.Status, resultado.OcorrenciasCanceladas));
+    }
+
     private Guid ObterUsuarioIdAutenticado() => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
     private static MissaoResponse ParaResponse(CriarMissaoResult r) => new(
-        r.Id, r.CampanhaId, r.Titulo, r.Descricao, r.Beneficio, r.Dificuldade, r.Pontuacao, r.DataLimite, r.Horario, r.Status, r.ConcluidaEm);
+        r.Id, r.CampanhaId, r.Titulo, r.Descricao, r.Beneficio, r.Dificuldade, r.Pontuacao, r.DataLimite, r.Horario, r.Status, r.ConcluidaEm, r.Recorrente);
 
     private static MissaoResponse ParaResponse(AtualizarMissaoResult r) => new(
-        r.Id, r.CampanhaId, r.Titulo, r.Descricao, r.Beneficio, r.Dificuldade, r.Pontuacao, r.DataLimite, r.Horario, r.Status, r.ConcluidaEm);
+        r.Id, r.CampanhaId, r.Titulo, r.Descricao, r.Beneficio, r.Dificuldade, r.Pontuacao, r.DataLimite, r.Horario, r.Status, r.ConcluidaEm, r.Recorrente);
 }

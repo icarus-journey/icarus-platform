@@ -22,6 +22,9 @@ internal sealed class MissaoRepositorioEmMemoriaParaListarAvulsas : IMissaoRepos
 
     public Task<List<Missao>> ListarAvulsasAsync(Guid usuarioId, CancellationToken cancellationToken)
         => Task.FromResult(Missoes.Where(m => m.UsuarioId == usuarioId && m.CampanhaId == null).ToList());
+
+    public Task<List<Missao>> ListarRecorrentesAtivasAsync(CancellationToken cancellationToken)
+        => Task.FromResult(Missoes.Where(m => m.Status == StatusMissao.Ativa && m.Recorrencia is not null).ToList());
 }
 
 public class ListarMissoesAvulsasUseCaseTests

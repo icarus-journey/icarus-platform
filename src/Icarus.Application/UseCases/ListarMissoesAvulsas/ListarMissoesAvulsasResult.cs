@@ -12,4 +12,5 @@ public sealed record MissaoAvulsaListadaResult(
     DateOnly? DataLimite,
     DateTimeOffset Horario,
     StatusMissao Status,
-    DateTimeOffset? ConcluidaEm);
+    DateTimeOffset? ConcluidaEm,
+    bool Recorrente);

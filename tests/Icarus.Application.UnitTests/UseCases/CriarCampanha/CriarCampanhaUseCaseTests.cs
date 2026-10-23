@@ -84,6 +84,19 @@ public class CriarCampanhaUseCaseTests
         Assert.Null(resultado.ValorAtual);
     }
 
+    [Fact(DisplayName = "Épico já concluído não pode receber campanha nova — lança EpicoConcluidoException")]
+    public async Task ExecuteAsync_DeveLancarExcecaoQuandoEpicoJaConcluido()
+    {
+        var usuarioId = Guid.NewGuid();
+        var epico = AdicionarEpico(usuarioId, new DateOnly(2026, 12, 31));
+        epico.Estado = EstadoEpico.Concluido;
+
+        var command = new CriarCampanhaCommand(
+            usuarioId, usuarioId, epico.Id, "Campanha", null, Dificuldade.Facil, null, null, null, null);
+
+        await Assert.ThrowsAsync<EpicoConcluidoException>(() => _useCase.ExecuteAsync(command, CancellationToken.None));
+    }
+
     [Fact(DisplayName = "Épico inexistente (ou de outro usuário) lança EpicoNaoEncontradoException")]
     public async Task ExecuteAsync_DeveLancarExcecaoQuandoEpicoNaoExiste()
     {

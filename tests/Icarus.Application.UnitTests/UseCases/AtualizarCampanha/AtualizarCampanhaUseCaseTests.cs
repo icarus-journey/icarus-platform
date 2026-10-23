@@ -65,6 +65,23 @@ public class AtualizarCampanhaUseCaseTests
         await Assert.ThrowsAsync<CampanhaNaoEncontradaException>(() => _useCase.ExecuteAsync(command, CancellationToken.None));
     }
 
+    [Fact(DisplayName = "Campanha já concluída é imutável — edição lança CampanhaConcluidaException")]
+    public async Task ExecuteAsync_DeveLancarExcecaoQuandoCampanhaJaConcluida()
+    {
+        var campanha = new Campanha
+        {
+            Id = 1, EpicoId = 1, Titulo = "Concluída", AreaDaVida = AreaDaVida.LazerECriatividade, Dificuldade = Dificuldade.Facil,
+            Pontuacao = 30, PrazoInicio = new DateOnly(2026, 1, 1), PrazoFim = new DateOnly(2026, 6, 1), Estado = EstadoCampanha.Concluida
+        };
+        _repositorio.Campanhas.Add(campanha);
+
+        var command = new AtualizarCampanhaCommand(
+            Guid.Empty, Guid.Empty, campanha.Id, "Novo título", null, Dificuldade.Media, new DateOnly(2026, 1, 1), new DateOnly(2026, 6, 1), null, null);
+
+        await Assert.ThrowsAsync<CampanhaConcluidaException>(() => _useCase.ExecuteAsync(command, CancellationToken.None));
+        Assert.Equal("Concluída", campanha.Titulo); // não foi alterada
+    }
+
     [Fact(DisplayName = "Usuário autenticado tentando editar campanha de outro usuário lança PerfilNaoEncontradoException")]
     public async Task ExecuteAsync_DeveLancarExcecaoQuandoIdsDivergem()
     {

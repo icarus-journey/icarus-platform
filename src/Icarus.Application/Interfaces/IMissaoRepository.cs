@@ -10,8 +10,11 @@ public interface IMissaoRepository
 {
     Task AdicionarAsync(Missao missao, CancellationToken cancellationToken);
 
-    /// <summary>Carrega a missão restrita ao usuário dono (RF-02.4).</summary>
+    /// <summary>Carrega a missão (com a recorrência, se houver) restrita ao usuário dono (RF-02.4).</summary>
     Task<Missao?> BuscarPorIdAsync(long missaoId, Guid usuarioId, CancellationToken cancellationToken);
+
+    /// <summary>Missões ativas com recorrência configurada — usado pela manutenção diária da janela (RF-04.5).</summary>
+    Task<List<Missao>> ListarRecorrentesAtivasAsync(CancellationToken cancellationToken);
 
     /// <summary>
     /// Lista as missões avulsas do usuário (CampanhaId nulo, RF-03). Missões atreladas a uma

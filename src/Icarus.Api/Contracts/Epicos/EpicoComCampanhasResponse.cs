@@ -41,4 +41,5 @@ public sealed record MissaoResumoResponse(
     DateOnly? DataLimite,
     DateTimeOffset Horario,
     StatusMissao Status,
-    DateTimeOffset? ConcluidaEm);
+    DateTimeOffset? ConcluidaEm,
+    bool Recorrente);

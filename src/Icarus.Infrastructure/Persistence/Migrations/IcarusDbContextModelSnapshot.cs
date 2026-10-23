@@ -897,6 +897,11 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(320)")
                         .HasColumnName("email");
 
+                    b.Property<string>("FotoChave")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("foto_chave");
+
                     b.Property<string>("Nome")
                         .IsRequired()
                         .HasMaxLength(200)

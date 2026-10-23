@@ -2,6 +2,7 @@ using Icarus.Application.Common;
 using Icarus.Application.Exceptions;
 using Icarus.Application.Interfaces;
 using Icarus.Domain.Entities;
+using Icarus.Domain.Enums;
 using Microsoft.Extensions.Logging;
 
 namespace Icarus.Application.UseCases.CriarCampanha;
@@ -23,6 +24,12 @@ public sealed partial class CriarCampanhaUseCase(
 
         var epico = await epicoRepository.BuscarPorIdAsync(command.EpicoId, command.UsuarioIdSolicitado, cancellationToken)
             ?? throw new EpicoNaoEncontradoException();
+
+        if (epico.Estado == EstadoEpico.Concluido)
+        {
+            LogAtribuicaoRecusadaEpicoConcluido(epico.Id);
+            throw new EpicoConcluidoException();
+        }
 
         var prazoInicio = command.PrazoInicio ?? DateOnly.FromDateTime(DateTime.UtcNow);
         var prazoFim = command.PrazoFim ?? epico.PrazoFim;
@@ -55,6 +62,9 @@ public sealed partial class CriarCampanhaUseCase(
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Tentativa de criar campanha para outro usuário rejeitada")]
     private partial void LogAcessoNegado();
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Tentativa de atribuir campanha ao épico {EpicoId} já concluído rejeitada")]
+    private partial void LogAtribuicaoRecusadaEpicoConcluido(long epicoId);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Campanha {CampanhaId} criada para o épico {EpicoId}")]
     private partial void LogCampanhaCriada(long campanhaId, long epicoId);

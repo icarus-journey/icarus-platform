@@ -1,5 +1,6 @@
 using Icarus.Application.UseCases.AtualizarCampanha;
 using Icarus.Application.UseCases.AtualizarEpico;
+using Icarus.Application.UseCases.AtualizarFotoPerfil;
 using Icarus.Application.UseCases.AtualizarMissao;
 using Icarus.Application.UseCases.ConcluirCampanha;
 using Icarus.Application.UseCases.ConcluirEpico;
@@ -7,12 +8,15 @@ using Icarus.Application.UseCases.ConcluirMissao;
 using Icarus.Application.UseCases.CriarCampanha;
 using Icarus.Application.UseCases.CriarEpico;
 using Icarus.Application.UseCases.CriarMissao;
+using Icarus.Application.UseCases.EstenderJanelaDeOcorrencias;
+using Icarus.Application.UseCases.InativarMissao;
 using Icarus.Application.UseCases.IniciarOnboarding;
 using Icarus.Application.UseCases.ListarEpicos;
 using Icarus.Application.UseCases.ListarMissoesAvulsas;
 using Icarus.Application.UseCases.Login;
 using Icarus.Application.UseCases.Logout;
 using Icarus.Application.UseCases.MarcarOnboardingComoFalho;
+using Icarus.Application.UseCases.ObterFotoPerfil;
 using Icarus.Application.UseCases.ObterPerfil;
 using Icarus.Application.UseCases.ObterStatusOnboarding;
 using Icarus.Application.UseCases.PersistirResultadoOnboarding;
@@ -34,6 +38,8 @@ public static class DependencyInjection
         services.AddScoped<RefreshTokenUseCase>();
         services.AddScoped<LogoutUseCase>();
         services.AddScoped<ObterPerfilUseCase>();
+        services.AddScoped<AtualizarFotoPerfilUseCase>();
+        services.AddScoped<ObterFotoPerfilUseCase>();
         services.AddScoped<IniciarOnboardingUseCase>();
         services.AddScoped<ObterStatusOnboardingUseCase>();
         services.AddScoped<PersistirResultadoOnboardingUseCase>();
@@ -47,8 +53,10 @@ public static class DependencyInjection
         services.AddScoped<AtualizarMissaoUseCase>();
         services.AddScoped<ListarMissoesAvulsasUseCase>();
         services.AddScoped<ConcluirMissaoUseCase>();
+        services.AddScoped<InativarMissaoUseCase>();
         services.AddScoped<ConcluirCampanhaUseCase>();
         services.AddScoped<ConcluirEpicoUseCase>();
+        services.AddScoped<EstenderJanelaDeOcorrenciasUseCase>();
 
         return services;
     }

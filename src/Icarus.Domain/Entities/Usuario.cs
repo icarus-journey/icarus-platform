@@ -13,6 +13,9 @@ public class Usuario : EntidadeBase
 
     public DateOnly DataNascimento { get; set; }
 
+    /// <summary>Chave do objeto no MinIO (bucket de fotos de perfil); nula quando o usuário não tem foto.</summary>
+    public string? FotoChave { get; set; }
+
     /// <summary>
     /// Saldo atual, mantido em sincronia com <see cref="MovimentacaoPontos"/> na mesma transação.
     /// </summary>

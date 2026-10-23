@@ -30,5 +30,8 @@ public class UsuarioConfiguration : IEntityTypeConfiguration<Usuario>
         builder.Property(u => u.SaldoPontos)
             .IsRequired()
             .HasDefaultValue(0);
+
+        builder.Property(u => u.FotoChave)
+            .HasMaxLength(100);
     }
 }

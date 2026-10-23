@@ -7,15 +7,20 @@ using Microsoft.Extensions.Logging;
 namespace Icarus.Application.UseCases.ConcluirMissao;
 
 /// <summary>
-/// Caso de uso de conclusão de missão (RF-04.6). Cobre hoje só a missão não recorrente — a
-/// única linha de <see cref="Ocorrencia"/> dela é criada aqui mesmo, na primeira conclusão
-/// (DER seção 12: "a não recorrente terá uma única linha"). Geração de janela de ocorrências
-/// para missão recorrente (RF-04.5) é outra funcionalidade, ainda não implementada.
+/// Caso de uso de conclusão de missão (RF-04.6), para missão recorrente ou não. A ocorrência a
+/// concluir é resolvida por <see cref="IOcorrenciaRepository.BuscarParaConcluirAsync"/>: a de
+/// hoje, senão a pendente/atrasada mais antiga (recupera um dia perdido). Normalmente ela já
+/// existe — gerada na criação da missão ou pela manutenção diária da janela
+/// (<c>EstenderJanelaDeOcorrenciasUseCase</c>); se não existir (caso defensivo, ex.: missão
+/// criada antes desta funcionalidade), cria uma pontualmente para hoje.
 ///
-/// Idempotente: concluir de novo uma missão já concluída não credita pontos nem gera uma
-/// segunda movimentação — apenas devolve o resultado já registrado (reentrega de rede, duplo
-/// toque). Editar uma missão concluída, por outro lado, é rejeitado (RF-04.3) em
-/// AtualizarMissaoUseCase, não aqui.
+/// <see cref="Missao.ConcluidaEm"/> só é espelhado para missão **não recorrente** (DER seção
+/// 9) — para recorrente, a missão continua ativa entre uma conclusão e outra; é imutável
+/// (RF-04.3) só quando preenchido, então <c>AtualizarMissaoUseCase</c> nunca bloqueia edição de
+/// missão recorrente por esta via.
+///
+/// Idempotente: concluir de novo a ocorrência de hoje (ou a única, pra não recorrente) não
+/// credita pontos nem gera uma segunda movimentação — apenas devolve o resultado já registrado.
 /// </summary>
 public sealed partial class ConcluirMissaoUseCase(
     IMissaoRepository missaoRepository,
@@ -37,35 +42,46 @@ public sealed partial class ConcluirMissaoUseCase(
         var missao = await missaoRepository.BuscarPorIdAsync(command.MissaoId, command.UsuarioIdSolicitado, cancellationToken)
             ?? throw new MissaoNaoEncontradaException();
 
-        if (missao.ConcluidaEm is not null)
+        if (missao.Status == StatusMissao.Inativa)
         {
-            LogConclusaoDuplicada(missao.Id);
+            LogConclusaoRecusadaInativa(missao.Id);
+            throw new MissaoInativaException();
+        }
+
+        var hoje = DateOnly.FromDateTime(DateTime.UtcNow);
+        var ehRecorrente = missao.Recorrencia is not null;
+
+        var ocorrencia = await ocorrenciaRepository.BuscarParaConcluirAsync(missao.Id, hoje, cancellationToken);
+
+        if (ocorrencia is not null && ocorrencia.Status is StatusOcorrencia.Concluida or StatusOcorrencia.ConcluidaComAtraso)
+        {
+            LogConclusaoDuplicada(missao.Id, ocorrencia.Id);
             var usuarioAtual = await usuarioRepository.BuscarPorIdAsync(command.UsuarioIdSolicitado, cancellationToken);
-            var ocorrenciaAtual = await ocorrenciaRepository.BuscarPorMissaoEDataAsync(
-                missao.Id, missao.DataLimite ?? DateOnly.FromDateTime(missao.ConcluidaEm.Value.UtcDateTime), cancellationToken);
             return new ConcluirMissaoResult(
-                missao.Id, missao.ConcluidaEm.Value, ocorrenciaAtual?.Status == StatusOcorrencia.ConcluidaComAtraso,
+                missao.Id, ocorrencia.ConcluidaEm!.Value, ocorrencia.Status == StatusOcorrencia.ConcluidaComAtraso,
                 missao.Pontuacao, usuarioAtual?.SaldoPontos ?? 0);
         }
 
         var agora = DateTimeOffset.UtcNow;
-        var hoje = DateOnly.FromDateTime(agora.UtcDateTime);
-        var dataPrevista = missao.DataLimite ?? hoje;
-        var concluidaComAtraso = missao.DataLimite is not null && missao.DataLimite < hoje;
-        var statusOcorrencia = concluidaComAtraso ? StatusOcorrencia.ConcluidaComAtraso : StatusOcorrencia.Concluida;
 
-        var ocorrencia = await ocorrenciaRepository.BuscarPorMissaoEDataAsync(missao.Id, dataPrevista, cancellationToken);
         if (ocorrencia is null)
         {
-            ocorrencia = new Ocorrencia { MissaoId = missao.Id, DataPrevista = dataPrevista };
+            // Defensivo: não deveria faltar (gerada na criação ou pela manutenção diária), mas
+            // cobre missão criada antes desta funcionalidade existir. Usa a data limite da
+            // missão (quando houver) para que o atraso seja calculado corretamente.
+            ocorrencia = new Ocorrencia { MissaoId = missao.Id, DataPrevista = missao.DataLimite ?? hoje };
             await ocorrenciaRepository.AdicionarAsync(ocorrencia, cancellationToken);
         }
 
-        ocorrencia.Status = statusOcorrencia;
+        var concluidaComAtraso = ocorrencia.DataPrevista < hoje;
+        ocorrencia.Status = concluidaComAtraso ? StatusOcorrencia.ConcluidaComAtraso : StatusOcorrencia.Concluida;
         ocorrencia.RealizadaEm = agora;
         ocorrencia.ConcluidaEm = agora;
 
-        missao.ConcluidaEm = agora;
+        if (!ehRecorrente)
+        {
+            missao.ConcluidaEm = agora;
+        }
 
         await movimentacaoRepository.AdicionarAsync(new MovimentacaoPontos
         {
@@ -92,7 +108,7 @@ public sealed partial class ConcluirMissaoUseCase(
 
         await unitOfWork.SalvarAlteracoesAsync(cancellationToken);
 
-        LogMissaoConcluida(missao.Id, missao.Pontuacao);
+        LogMissaoConcluida(missao.Id, ocorrencia.Id, missao.Pontuacao);
 
         return new ConcluirMissaoResult(missao.Id, agora, concluidaComAtraso, missao.Pontuacao, usuario.SaldoPontos);
     }
@@ -100,9 +116,12 @@ public sealed partial class ConcluirMissaoUseCase(
     [LoggerMessage(Level = LogLevel.Warning, Message = "Tentativa de concluir missão de outro usuário rejeitada")]
     private partial void LogAcessoNegado();
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Missão {MissaoId} já estava concluída — pedido ignorado (idempotência)")]
-    private partial void LogConclusaoDuplicada(long missaoId);
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Tentativa de concluir missão {MissaoId} inativa rejeitada")]
+    private partial void LogConclusaoRecusadaInativa(long missaoId);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Missão {MissaoId} concluída, {Pontuacao} pontos creditados")]
-    private partial void LogMissaoConcluida(long missaoId, int pontuacao);
+    [LoggerMessage(Level = LogLevel.Information, Message = "Ocorrência {OcorrenciaId} da missão {MissaoId} já estava concluída — pedido ignorado (idempotência)")]
+    private partial void LogConclusaoDuplicada(long missaoId, long ocorrenciaId);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Ocorrência {OcorrenciaId} da missão {MissaoId} concluída, {Pontuacao} pontos creditados")]
+    private partial void LogMissaoConcluida(long missaoId, long ocorrenciaId, int pontuacao);
 }

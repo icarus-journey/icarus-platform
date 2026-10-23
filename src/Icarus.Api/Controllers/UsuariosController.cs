@@ -1,7 +1,9 @@
 using System.Security.Claims;
 using Icarus.Api.Contracts.Usuarios;
 using Icarus.Application.Common;
+using Icarus.Application.UseCases.AtualizarFotoPerfil;
 using Icarus.Application.UseCases.IniciarOnboarding;
+using Icarus.Application.UseCases.ObterFotoPerfil;
 using Icarus.Application.UseCases.ObterPerfil;
 using Icarus.Application.UseCases.ObterStatusOnboarding;
 using Microsoft.AspNetCore.Authorization;
@@ -14,6 +16,8 @@ namespace Icarus.Api.Controllers;
 [Route("api/[controller]")]
 public class UsuariosController(
     ObterPerfilUseCase obterPerfil,
+    AtualizarFotoPerfilUseCase atualizarFotoPerfil,
+    ObterFotoPerfilUseCase obterFotoPerfil,
     IniciarOnboardingUseCase iniciarOnboarding,
     ObterStatusOnboardingUseCase obterStatusOnboarding) : ControllerBase
 {
@@ -34,7 +38,46 @@ public class UsuariosController(
 
         var result = await obterPerfil.ExecuteAsync(command, cancellationToken);
 
-        return Ok(new UsuarioResponse(result.Id, result.Nome, result.Email, result.DataNascimento));
+        return Ok(new UsuarioResponse(result.Id, result.Nome, result.Email, result.DataNascimento, result.TemFoto));
+    }
+
+    /// <summary>
+    /// Troca a foto de perfil do usuário (JPEG ou PNG, até 5 MB). Sempre sobrescreve a
+    /// anterior, se houver.
+    /// </summary>
+    [Authorize]
+    [HttpPut("{id:guid}/foto")]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(5_500_000)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> AtualizarFoto(Guid id, IFormFile arquivo, CancellationToken cancellationToken)
+    {
+        var usuarioIdAutenticado = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        await using var conteudo = arquivo.OpenReadStream();
+        var command = new AtualizarFotoPerfilCommand(usuarioIdAutenticado, id, conteudo, arquivo.ContentType, arquivo.Length);
+        await atualizarFotoPerfil.ExecuteAsync(command, cancellationToken);
+
+        return NoContent();
+    }
+
+    /// <summary>Busca a foto de perfil do usuário. <c>404</c> se ele ainda não tiver uma.</summary>
+    [Authorize]
+    [HttpGet("{id:guid}/foto")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ObterFoto(Guid id, CancellationToken cancellationToken)
+    {
+        var usuarioIdAutenticado = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var command = new ObterFotoPerfilCommand(usuarioIdAutenticado, id);
+
+        var result = await obterFotoPerfil.ExecuteAsync(command, cancellationToken);
+
+        return File(result.Conteudo, result.ContentType);
     }
 
     /// <summary>

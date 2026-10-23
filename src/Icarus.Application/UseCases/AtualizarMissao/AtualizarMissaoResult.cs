@@ -13,4 +13,5 @@ public sealed record AtualizarMissaoResult(
     DateOnly? DataLimite,
     DateTimeOffset Horario,
     StatusMissao Status,
-    DateTimeOffset? ConcluidaEm);
+    DateTimeOffset? ConcluidaEm,
+    bool Recorrente);

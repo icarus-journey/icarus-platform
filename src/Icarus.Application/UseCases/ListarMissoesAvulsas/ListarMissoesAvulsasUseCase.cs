@@ -24,7 +24,8 @@ public sealed partial class ListarMissoesAvulsasUseCase(IMissaoRepository missao
         return missoes
             .Select(missao => new MissaoAvulsaListadaResult(
                 missao.Id, missao.Titulo, missao.Descricao, missao.Beneficio, missao.Dificuldade,
-                missao.Pontuacao, missao.DataLimite, missao.Horario, missao.Status, missao.ConcluidaEm))
+                missao.Pontuacao, missao.DataLimite, missao.Horario, missao.Status, missao.ConcluidaEm,
+                missao.Recorrencia is not null))
             .ToList();
     }
 

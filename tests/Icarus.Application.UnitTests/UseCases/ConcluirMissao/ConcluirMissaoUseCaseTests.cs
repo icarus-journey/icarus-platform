@@ -22,6 +22,9 @@ internal sealed class MissaoRepositorioEmMemoriaParaConcluir : IMissaoRepository
 
     public Task<List<Missao>> ListarAvulsasAsync(Guid usuarioId, CancellationToken cancellationToken)
         => Task.FromResult(Missoes.Where(m => m.UsuarioId == usuarioId && m.CampanhaId == null).ToList());
+
+    public Task<List<Missao>> ListarRecorrentesAtivasAsync(CancellationToken cancellationToken)
+        => Task.FromResult(Missoes.Where(m => m.Status == StatusMissao.Ativa && m.Recorrencia is not null).ToList());
 }
 
 internal sealed class OcorrenciaRepositorioEmMemoriaParaConcluir : IOcorrenciaRepository
@@ -38,6 +41,37 @@ internal sealed class OcorrenciaRepositorioEmMemoriaParaConcluir : IOcorrenciaRe
 
     public Task<Ocorrencia?> BuscarPorMissaoEDataAsync(long missaoId, DateOnly dataPrevista, CancellationToken cancellationToken)
         => Task.FromResult(Ocorrencias.SingleOrDefault(o => o.MissaoId == missaoId && o.DataPrevista == dataPrevista));
+
+    public Task<Ocorrencia?> BuscarParaConcluirAsync(long missaoId, DateOnly hoje, CancellationToken cancellationToken)
+    {
+        var deHoje = Ocorrencias.SingleOrDefault(o => o.MissaoId == missaoId && o.DataPrevista == hoje);
+        if (deHoje is not null)
+        {
+            return Task.FromResult<Ocorrencia?>(deHoje);
+        }
+
+        var pendente = Ocorrencias
+            .Where(o => o.MissaoId == missaoId && (o.Status == StatusOcorrencia.Pendente || o.Status == StatusOcorrencia.Atrasada))
+            .OrderBy(o => o.DataPrevista)
+            .FirstOrDefault();
+        if (pendente is not null)
+        {
+            return Task.FromResult<Ocorrencia?>(pendente);
+        }
+
+        var concluida = Ocorrencias
+            .Where(o => o.MissaoId == missaoId && (o.Status == StatusOcorrencia.Concluida || o.Status == StatusOcorrencia.ConcluidaComAtraso))
+            .OrderByDescending(o => o.DataPrevista)
+            .FirstOrDefault();
+        return Task.FromResult(concluida);
+    }
+
+    public Task<List<DateOnly>> ListarDatasExistentesAsync(long missaoId, DateOnly de, DateOnly ate, CancellationToken cancellationToken)
+        => Task.FromResult(Ocorrencias.Where(o => o.MissaoId == missaoId && o.DataPrevista >= de && o.DataPrevista <= ate)
+            .Select(o => o.DataPrevista).ToList());
+
+    public Task<List<Ocorrencia>> ListarPendentesNaoVencidasAsync(long missaoId, DateOnly hoje, CancellationToken cancellationToken)
+        => Task.FromResult(Ocorrencias.Where(o => o.MissaoId == missaoId && o.Status == StatusOcorrencia.Pendente && o.DataPrevista >= hoje).ToList());
 }
 
 internal sealed class MovimentacaoPontosRepositorioEmMemoriaParaConcluir : IMovimentacaoPontosRepository
@@ -197,5 +231,80 @@ public class ConcluirMissaoUseCaseTests
 
         await Assert.ThrowsAsync<MissaoNaoEncontradaException>(
             () => _useCase.ExecuteAsync(new ConcluirMissaoCommand(usuarioId, usuarioId, 999), CancellationToken.None));
+    }
+
+    [Fact(DisplayName = "Missão inativa não pode ser concluída, mesmo preservando ocorrência atrasada como histórico (RF-04.6)")]
+    public async Task ExecuteAsync_DeveLancarExcecaoQuandoMissaoInativa()
+    {
+        var usuarioId = Guid.NewGuid();
+        AdicionarUsuario(usuarioId);
+        var missao = new Missao { Id = 1, UsuarioId = usuarioId, Titulo = "Parada", Dificuldade = Dificuldade.Facil, Pontuacao = 30, Status = StatusMissao.Inativa };
+        _missaoRepositorio.Missoes.Add(missao);
+
+        await Assert.ThrowsAsync<MissaoInativaException>(
+            () => _useCase.ExecuteAsync(new ConcluirMissaoCommand(usuarioId, usuarioId, missao.Id), CancellationToken.None));
+    }
+
+    [Fact(DisplayName = "Missão recorrente concluída hoje não marca Missao.ConcluidaEm — ela continua ativa para os próximos dias (DER seção 9)")]
+    public async Task ExecuteAsync_NaoDeveMarcarMissaoConcluidaParaRecorrente()
+    {
+        var usuarioId = Guid.NewGuid();
+        AdicionarUsuario(usuarioId, saldoInicial: 0);
+        var hoje = DateOnly.FromDateTime(DateTime.UtcNow);
+        var missao = new Missao
+        {
+            Id = 1, UsuarioId = usuarioId, Titulo = "Beber água", Dificuldade = Dificuldade.Trivial, Pontuacao = 15,
+            Recorrencia = new Recorrencia { MissaoId = 1, Tipo = "DIARIA", DataInicio = hoje }
+        };
+        _missaoRepositorio.Missoes.Add(missao);
+        _ocorrenciaRepositorio.Ocorrencias.Add(new Ocorrencia { Id = 1, MissaoId = missao.Id, DataPrevista = hoje });
+
+        var resultado = await _useCase.ExecuteAsync(new ConcluirMissaoCommand(usuarioId, usuarioId, missao.Id), CancellationToken.None);
+
+        Assert.Equal(15, resultado.PontuacaoCreditada);
+        Assert.Null(missao.ConcluidaEm);
+        Assert.Equal(StatusOcorrencia.Concluida, _ocorrenciaRepositorio.Ocorrencias.Single().Status);
+    }
+
+    [Fact(DisplayName = "Concluir de novo a ocorrência de hoje de uma missão recorrente é idempotente")]
+    public async Task ExecuteAsync_DeveSerIdempotenteParaOcorrenciaDeHojeDeMissaoRecorrente()
+    {
+        var usuarioId = Guid.NewGuid();
+        AdicionarUsuario(usuarioId, saldoInicial: 0);
+        var hoje = DateOnly.FromDateTime(DateTime.UtcNow);
+        var missao = new Missao
+        {
+            Id = 1, UsuarioId = usuarioId, Titulo = "Beber água", Dificuldade = Dificuldade.Trivial, Pontuacao = 15,
+            Recorrencia = new Recorrencia { MissaoId = 1, Tipo = "DIARIA", DataInicio = hoje }
+        };
+        _missaoRepositorio.Missoes.Add(missao);
+        _ocorrenciaRepositorio.Ocorrencias.Add(new Ocorrencia { Id = 1, MissaoId = missao.Id, DataPrevista = hoje });
+
+        await _useCase.ExecuteAsync(new ConcluirMissaoCommand(usuarioId, usuarioId, missao.Id), CancellationToken.None);
+        var resultado = await _useCase.ExecuteAsync(new ConcluirMissaoCommand(usuarioId, usuarioId, missao.Id), CancellationToken.None);
+
+        Assert.Equal(15, resultado.SaldoPontosAtual); // não dobrou
+        Assert.Single(_movimentacaoRepositorio.Movimentacoes);
+    }
+
+    [Fact(DisplayName = "Missão recorrente sem ocorrência de hoje, mas com uma pendente de ontem, recupera o dia perdido")]
+    public async Task ExecuteAsync_DeveRecuperarOcorrenciaPendenteDeOntemQuandoNaoHaDeHoje()
+    {
+        var usuarioId = Guid.NewGuid();
+        AdicionarUsuario(usuarioId, saldoInicial: 0);
+        var hoje = DateOnly.FromDateTime(DateTime.UtcNow);
+        var ontem = hoje.AddDays(-1);
+        var missao = new Missao
+        {
+            Id = 1, UsuarioId = usuarioId, Titulo = "Beber água", Dificuldade = Dificuldade.Trivial, Pontuacao = 15,
+            Recorrencia = new Recorrencia { MissaoId = 1, Tipo = "DIARIA", DataInicio = ontem }
+        };
+        _missaoRepositorio.Missoes.Add(missao);
+        _ocorrenciaRepositorio.Ocorrencias.Add(new Ocorrencia { Id = 1, MissaoId = missao.Id, DataPrevista = ontem, Status = StatusOcorrencia.Atrasada });
+
+        var resultado = await _useCase.ExecuteAsync(new ConcluirMissaoCommand(usuarioId, usuarioId, missao.Id), CancellationToken.None);
+
+        Assert.True(resultado.ConcluidaComAtraso);
+        Assert.Equal(StatusOcorrencia.ConcluidaComAtraso, _ocorrenciaRepositorio.Ocorrencias.Single().Status);
     }
 }

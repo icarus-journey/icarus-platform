@@ -68,6 +68,24 @@ public class AtualizarEpicoUseCaseTests
         Assert.Equal(new DateOnly(2027, 2, 1), resultado.PrazoFim);
     }
 
+    [Fact(DisplayName = "Épico já concluído é imutável — edição lança EpicoConcluidoException")]
+    public async Task ExecuteAsync_DeveLancarExcecaoQuandoEpicoJaConcluido()
+    {
+        var usuarioId = Guid.NewGuid();
+        var epico = new Epico
+        {
+            Id = 1, UsuarioId = usuarioId, Titulo = "Concluído", AreaDaVida = AreaDaVida.CorpoESaude, Dificuldade = Dificuldade.Facil,
+            Pontuacao = 30, PrazoInicio = new DateOnly(2026, 1, 1), PrazoFim = new DateOnly(2026, 12, 31), Estado = EstadoEpico.Concluido
+        };
+        _repositorio.Epicos.Add(epico);
+
+        var command = new AtualizarEpicoCommand(
+            usuarioId, usuarioId, epico.Id, "Novo título", null, Dificuldade.Media, new DateOnly(2026, 1, 1), new DateOnly(2026, 12, 31));
+
+        await Assert.ThrowsAsync<EpicoConcluidoException>(() => _useCase.ExecuteAsync(command, CancellationToken.None));
+        Assert.Equal("Concluído", epico.Titulo); // não foi alterado
+    }
+
     [Fact(DisplayName = "Usuário autenticado tentando editar épico de outro usuário lança PerfilNaoEncontradoException")]
     public async Task ExecuteAsync_DeveLancarExcecaoQuandoIdsDivergem()
     {

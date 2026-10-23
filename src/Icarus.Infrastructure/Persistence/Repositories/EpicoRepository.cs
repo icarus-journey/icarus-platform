@@ -13,6 +13,7 @@ public class EpicoRepository(IcarusDbContext context) : IEpicoRepository
         => context.Epicos
             .Include(e => e.Campanhas)
             .ThenInclude(c => c.Missoes)
+            .ThenInclude(m => m.Recorrencia)
             .SingleOrDefaultAsync(e => e.Id == epicoId && e.UsuarioId == usuarioId, cancellationToken);
 
     public Task<Epico?> BuscarPorIdAsync(long epicoId, Guid usuarioId, CancellationToken cancellationToken)
@@ -23,6 +24,7 @@ public class EpicoRepository(IcarusDbContext context) : IEpicoRepository
             .Where(e => e.UsuarioId == usuarioId)
             .Include(e => e.Campanhas)
             .ThenInclude(c => c.Missoes)
+            .ThenInclude(m => m.Recorrencia)
             .OrderBy(e => e.Id)
             .ToListAsync(cancellationToken);
 }

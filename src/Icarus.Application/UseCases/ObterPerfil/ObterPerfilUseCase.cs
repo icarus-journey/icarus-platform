@@ -26,7 +26,7 @@ public sealed partial class ObterPerfilUseCase(IUsuarioRepository usuarioReposit
             throw new PerfilNaoEncontradoException();
         }
 
-        return new ObterPerfilResult(usuario.Id, usuario.Nome, usuario.Email, usuario.DataNascimento);
+        return new ObterPerfilResult(usuario.Id, usuario.Nome, usuario.Email, usuario.DataNascimento, usuario.FotoChave is not null);
     }
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Tentativa de acessar perfil de outro usuário rejeitada")]
