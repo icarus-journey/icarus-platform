@@ -8,6 +8,9 @@ namespace Icarus.Infrastructure.Persistence.Repositories;
 public sealed class IndicadoresPessoaisRepository(IcarusDbContext contexto) : IIndicadoresPessoaisRepository
 {
     public async Task<IndicadoresPessoais> CalcularAsync(Guid usuarioId, PeriodoAnalitico periodo, CancellationToken ct)
+        => (await CalcularProgressoAsync(usuarioId, periodo, ct)).Indicadores;
+
+    public async Task<ProgressoCalculado> CalcularProgressoAsync(Guid usuarioId, PeriodoAnalitico periodo, CancellationToken ct)
     {
         var inicio = periodo.InicioUtc; var fim = periodo.FimExclusivoUtc;
         var conclusoes = await contexto.Ocorrencias.AsNoTracking()
@@ -33,17 +36,19 @@ public sealed class IndicadoresPessoaisRepository(IcarusDbContext contexto) : II
         var usos = resgates.Count(r => r.UtilizadoEm >= inicio && r.UtilizadoEm < fim);
         var maiorAtividade = conclusoes.Where(o => o.CampanhaId is not null).GroupBy(o => o.CampanhaId)
             .Select(g => (int?)g.Count()).OrderDescending().FirstOrDefault();
-        return new(null, conclusoes.Count == 0 ? null : conclusoes.Count, null, null, null,
+        var datas = conclusoes.Select(o => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(o.RealizadaEm!.Value, fuso).DateTime)).ToArray();
+        var indicadores = new IndicadoresPessoais(null, conclusoes.Count == 0 ? null : conclusoes.Count, null, null, null,
             conclusoes.Count == 0 ? null : conclusoes.Count(o => o.Status == StatusOcorrencia.ConcluidaComAtraso), null,
             ganhos.Length == 0 ? null : ganhos.Sum(m => m.Quantidade), gastos.Length == 0 ? null : -gastos.Sum(m => m.Quantidade),
             compras == 0 ? null : compras, usos == 0 ? null : usos, areas,
             conclusoes.Count == 0 ? null : conclusoes.Count(o => o.Area is null), maiorAtividade, null,
-            conclusoes.Select(o => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(o.RealizadaEm!.Value, fuso).DateTime)).Distinct().Count(),
+            datas.Distinct().Count(),
             conclusoes.Count + movimentos.Count + resgates.Count, true,
             ["A ausência de registro não significa ausência da atividade.",
              "Conclusões usam a data de realização registrada no aplicativo e o fuso do período.",
              "Previstas, pendentes, atrasadas e taxa ainda dependem do histórico completo das ocorrências planejadas; não são estimadas pelas conclusões.",
              "Sequência e histórico manual de resultados ainda não estão disponíveis para esta análise.",
              "Histórico insuficiente para comparação conjunta de previstas, concluídas e taxa."]);
+        return new(indicadores, SerieConclusoes.DasDatas(periodo, datas));
     }
 }

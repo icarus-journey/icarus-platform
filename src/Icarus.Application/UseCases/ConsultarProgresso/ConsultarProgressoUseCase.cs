@@ -13,10 +13,12 @@ public sealed class ConsultarProgressoUseCase(IUsuarioRepository usuarios, IIndi
         if (!Icarus.Application.Common.FusoHorario.EhValido(usuario.FusoHorario))
             return new("fuso_nao_informado", null, null, "historico_mensurado_indisponivel", "Abra novamente o aplicativo para sincronizar o fuso deste dispositivo e consultar seu período.");
         var periodo = PeriodoAnalitico.Encerrado(command.Periodo, usuario.FusoHorario!, relogio.GetUtcNow());
-        var dados = await indicadores.CalcularAsync(usuario.Id, periodo, ct);
+        var calculado = await indicadores.CalcularProgressoAsync(usuario.Id, periodo, ct);
+        var dados = calculado.Indicadores;
         return new(dados.QuantidadeRegistros == 0 ? "sem_registros" : "disponivel", periodo, dados,
             "historico_mensurado_indisponivel", dados.QuantidadeRegistros == 0
                 ? "Ainda não há registros neste período. Isso não significa que você não realizou atividades."
-                : "Estes indicadores resumem apenas os registros do aplicativo, não sua rotina inteira.");
+                : "Estes indicadores resumem apenas os registros do aplicativo, não sua rotina inteira.",
+            Evolucao: calculado.Evolucao);
     }
 }

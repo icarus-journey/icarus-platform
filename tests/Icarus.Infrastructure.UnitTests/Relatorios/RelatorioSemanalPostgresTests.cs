@@ -89,6 +89,7 @@ public sealed class RelatorioSemanalPostgresTests(BancoLoja banco) : IClassFixtu
         Assert.DoesNotContain(id.ToString(), carga);
         Assert.DoesNotContain("email", carga);
         Assert.DoesNotContain("senha", carga);
+        Assert.DoesNotContain("evolucao", carga);
         Assert.Equal(1, await leitura.Set<OutboxRelatorio>().CountAsync(o => o.TrabalhoId == mensagem.CorrelacaoId));
     }
 
