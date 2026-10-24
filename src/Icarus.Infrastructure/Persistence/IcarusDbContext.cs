@@ -1,3 +1,4 @@
+using Icarus.Application.Exceptions;
 using Icarus.Application.Interfaces;
 using Icarus.Domain.Common;
 using Icarus.Domain.Entities;
@@ -49,7 +50,16 @@ public class IcarusDbContext : DbContext, IUnitOfWork
     }
 
     async Task IUnitOfWork.SalvarAlteracoesAsync(CancellationToken cancellationToken)
-        => await SaveChangesAsync(cancellationToken);
+    {
+        try
+        {
+            await SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException erro)
+        {
+            throw new DadosAtualizadosException(erro);
+        }
+    }
 
     private void AtualizarTimestamps()
     {

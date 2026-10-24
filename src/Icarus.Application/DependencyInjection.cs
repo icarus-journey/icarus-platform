@@ -1,3 +1,15 @@
+using Icarus.Application.UseCases.ConsultarRelatorioSemanal;
+using Icarus.Application.UseCases.SolicitarRelatorioSemanal;
+using Icarus.Application.UseCases.PersistirRelatorioSemanal;
+using Icarus.Application.UseCases.ConsultarProgresso;
+using Icarus.Application.UseCases.UtilizarRecompensa;
+using Icarus.Application.UseCases.ResgatarRecompensa;
+using Icarus.Application.UseCases.ExcluirRecompensa;
+using Icarus.Application.UseCases.DesfazerResgate;
+using Icarus.Application.UseCases.CriarRecompensa;
+using Icarus.Application.UseCases.ConsultarLoja;
+using Icarus.Application.UseCases.AtualizarRecompensa;
+using Icarus.Application.UseCases.ConsultarReferenciasPublicas;
 using Icarus.Application.UseCases.AtualizarCampanha;
 using Icarus.Application.UseCases.AtualizarEpico;
 using Icarus.Application.UseCases.AtualizarFotoPerfil;
@@ -18,6 +30,8 @@ using Icarus.Application.UseCases.Logout;
 using Icarus.Application.UseCases.MarcarOnboardingComoFalho;
 using Icarus.Application.UseCases.ObterFotoPerfil;
 using Icarus.Application.UseCases.ObterPerfil;
+using Icarus.Application.UseCases.AtualizarPerfil;
+using Icarus.Application.UseCases.AtualizarFuso;
 using Icarus.Application.UseCases.ObterStatusOnboarding;
 using Icarus.Application.UseCases.PersistirResultadoOnboarding;
 using Icarus.Application.UseCases.RefreshToken;
@@ -33,11 +47,26 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
+        services.AddSingleton(TimeProvider.System);
+        services.AddScoped<ConsultarReferenciasPublicasUseCase>();
+        services.AddScoped<ConsultarProgressoUseCase>();
+        services.AddScoped<ConsultarRelatorioSemanalUseCase>();
+        services.AddScoped<SolicitarRelatorioSemanalUseCase>();
+        services.AddScoped<PersistirRelatorioSemanalUseCase>();
         services.AddScoped<RegisterUserUseCase>();
+        services.AddScoped<ConsultarLojaUseCase>();
+        services.AddScoped<CriarRecompensaUseCase>();
+        services.AddScoped<AtualizarRecompensaUseCase>();
+        services.AddScoped<ExcluirRecompensaUseCase>();
+        services.AddScoped<ResgatarRecompensaUseCase>();
+        services.AddScoped<DesfazerResgateUseCase>();
+        services.AddScoped<UtilizarRecompensaUseCase>();
         services.AddScoped<LoginUseCase>();
         services.AddScoped<RefreshTokenUseCase>();
         services.AddScoped<LogoutUseCase>();
         services.AddScoped<ObterPerfilUseCase>();
+        services.AddScoped<AtualizarPerfilUseCase>();
+        services.AddScoped<AtualizarFusoUseCase>();
         services.AddScoped<AtualizarFotoPerfilUseCase>();
         services.AddScoped<ObterFotoPerfilUseCase>();
         services.AddScoped<IniciarOnboardingUseCase>();

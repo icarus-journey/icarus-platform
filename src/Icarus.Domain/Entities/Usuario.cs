@@ -13,6 +13,12 @@ public class Usuario : EntidadeBase
 
     public DateOnly DataNascimento { get; set; }
 
+    public bool? Estuda { get; set; }
+    public decimal? CargaHorariaEstudoSemanal { get; set; }
+    public bool? Trabalha { get; set; }
+    public decimal? CargaHorariaTrabalhoSemanal { get; set; }
+    public string? FusoHorario { get; set; }
+
     /// <summary>Chave do objeto no MinIO (bucket de fotos de perfil); nula quando o usuário não tem foto.</summary>
     public string? FotoChave { get; set; }
 

@@ -1,3 +1,5 @@
+using Icarus.Api.Contracts.Analise;
+using Icarus.Api.Contracts.Loja;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -52,10 +54,16 @@ public static class DependencyInjection
         services.AddExceptionHandler<GlobalExceptionHandler>();
 
         // Validadores são stateless, então singleton. Um por Request; o ValidationFilter os encontra sozinho.
+        services.AddSingleton<IValidator<ConsultarReferenciasPublicasRequest>, ConsultarReferenciasPublicasRequestValidator>();
+        services.AddSingleton<IValidator<ConsultarProgressoRequest>, ConsultarProgressoRequestValidator>();
         services.AddSingleton<IValidator<RegisterRequest>, RegisterRequestValidator>();
+        services.AddSingleton<IValidator<RecompensaRequest>, RecompensaRequestValidator>();
+        services.AddSingleton<IValidator<ResgateRequest>, ResgateRequestValidator>();
         services.AddSingleton<IValidator<LoginRequest>, LoginRequestValidator>();
         services.AddSingleton<IValidator<RefreshRequest>, RefreshRequestValidator>();
         services.AddSingleton<IValidator<IniciarOnboardingRequest>, IniciarOnboardingRequestValidator>();
+        services.AddSingleton<IValidator<AtualizarPerfilRequest>, AtualizarPerfilRequestValidator>();
+        services.AddSingleton<IValidator<AtualizarFusoRequest>, AtualizarFusoRequestValidator>();
         services.AddSingleton<IValidator<CriarEpicoRequest>, CriarEpicoRequestValidator>();
         services.AddSingleton<IValidator<AtualizarEpicoRequest>, AtualizarEpicoRequestValidator>();
         services.AddSingleton<IValidator<CriarCampanhaRequest>, CriarCampanhaRequestValidator>();

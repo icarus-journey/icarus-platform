@@ -100,7 +100,9 @@ public sealed partial class ConcluirMissaoUseCase(
         if (missao.CampanhaId is { } campanhaId)
         {
             var campanha = await campanhaRepository.BuscarPorIdAsync(campanhaId, missao.UsuarioId, cancellationToken);
-            if (campanha is not null && campanha.ValorAtual is not null)
+            // Somente o contador de gamificação usa pontos; medidas de resultado são manuais.
+            if (campanha is not null && campanha.ValorAtual is not null
+                && string.Equals(campanha.Unidade, "pontos", StringComparison.OrdinalIgnoreCase))
             {
                 campanha.ValorAtual += missao.Pontuacao;
             }

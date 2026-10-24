@@ -1,3 +1,4 @@
+using Icarus.Application.UseCases.ConsultarLoja;
 using Icarus.Application.Interfaces;
 using Icarus.Infrastructure.Jobs;
 using Icarus.Infrastructure.Messaging;
@@ -39,6 +40,14 @@ public static class DependencyInjection
         services.AddSingleton<ILoginAttemptLimiter, LoginAttemptLimiter>();
 
         services.AddScoped<IUsuarioRepository, UsuarioRepository>();
+        services.AddScoped<IReferenciasPublicasRepository, ReferenciasPublicasRepository>();
+        services.AddScoped<IIndicadoresPessoaisRepository, IndicadoresPessoaisRepository>();
+        services.AddScoped<IRelatorioSemanalRepository, RelatorioSemanalRepository>();
+        services.AddScoped<ILojaRepository, LojaRepository>();
+        var loja = configuration.GetSection("Loja").Get<LojaOptions>() ?? new();
+        if (loja.CustoProtecao is < 1 or > 1_000_000)
+            throw new InvalidOperationException("Loja:CustoProtecao deve estar entre 1 e 1.000.000.");
+        services.AddSingleton(loja);
         services.AddScoped<ITokenRenovacaoRepository, TokenRenovacaoRepository>();
         services.AddScoped<IEpicoRepository, EpicoRepository>();
         services.AddScoped<ICampanhaRepository, CampanhaRepository>();
@@ -59,6 +68,8 @@ public static class DependencyInjection
         services.AddSingleton<RabbitMqConnectionProvider>();
         services.AddScoped<IOnboardingJobPublisher, OnboardingJobPublisher>();
         services.AddHostedService<OnboardingResultConsumer>();
+        services.AddHostedService<PublicadorOutboxRelatorio>();
+        services.AddHostedService<ConsumidorResultadoRelatorio>();
 
         // RF-04.5: mantém a janela de ocorrências das missões recorrentes ativas.
         services.AddHostedService<RecorrenciaMaintenanceService>();
