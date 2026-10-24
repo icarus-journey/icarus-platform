@@ -1,7 +1,11 @@
+using Icarus.Application.UseCases.ConsultarLoja;
 using Icarus.Application.Interfaces;
+using Icarus.Infrastructure.Jobs;
+using Icarus.Infrastructure.Messaging;
 using Icarus.Infrastructure.Persistence;
 using Icarus.Infrastructure.Persistence.Repositories;
 using Icarus.Infrastructure.Security;
+using Icarus.Infrastructure.Storage;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -36,11 +40,43 @@ public static class DependencyInjection
         services.AddSingleton<ILoginAttemptLimiter, LoginAttemptLimiter>();
 
         services.AddScoped<IUsuarioRepository, UsuarioRepository>();
+        services.AddScoped<IReferenciasPublicasRepository, ReferenciasPublicasRepository>();
+        services.AddScoped<IIndicadoresPessoaisRepository, IndicadoresPessoaisRepository>();
+        services.AddScoped<IRelatorioSemanalRepository, RelatorioSemanalRepository>();
+        services.AddScoped<ILojaRepository, LojaRepository>();
+        var loja = configuration.GetSection("Loja").Get<LojaOptions>() ?? new();
+        if (loja.CustoProtecao is < 1 or > 1_000_000)
+            throw new InvalidOperationException("Loja:CustoProtecao deve estar entre 1 e 1.000.000.");
+        services.AddSingleton(loja);
         services.AddScoped<ITokenRenovacaoRepository, TokenRenovacaoRepository>();
+        services.AddScoped<IEpicoRepository, EpicoRepository>();
+        services.AddScoped<ICampanhaRepository, CampanhaRepository>();
+        services.AddScoped<IMissaoRepository, MissaoRepository>();
+        services.AddScoped<IOcorrenciaRepository, OcorrenciaRepository>();
+        services.AddScoped<IRecorrenciaRepository, RecorrenciaRepository>();
+        services.AddScoped<IMovimentacaoPontosRepository, MovimentacaoPontosRepository>();
+        services.AddScoped<ITrabalhoOnboardingRepository, TrabalhoOnboardingRepository>();
 
         // Mesma instância de IcarusDbContext do escopo (não uma nova) — repositório e
         // unit of work precisam compartilhar o ChangeTracker para salvar na mesma transação.
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<IcarusDbContext>());
+
+        // RabbitMQ (onboarding por IA, icarus-ai): conexão única compartilhada, publisher
+        // escopado (chamado de dentro de um caso de uso) e o consumer do resultado como
+        // hosted service de longa duração.
+        services.Configure<RabbitMqOptions>(configuration.GetSection(RabbitMqOptions.SecaoConfiguracao));
+        services.AddSingleton<RabbitMqConnectionProvider>();
+        services.AddScoped<IOnboardingJobPublisher, OnboardingJobPublisher>();
+        services.AddHostedService<OnboardingResultConsumer>();
+        services.AddHostedService<PublicadorOutboxRelatorio>();
+        services.AddHostedService<ConsumidorResultadoRelatorio>();
+
+        // RF-04.5: mantém a janela de ocorrências das missões recorrentes ativas.
+        services.AddHostedService<RecorrenciaMaintenanceService>();
+
+        // Foto de perfil: objeto guardado no MinIO, não no Postgres.
+        services.Configure<MinioOptions>(configuration.GetSection(MinioOptions.SecaoConfiguracao));
+        services.AddSingleton<IArmazenamentoDeFotoPerfil, MinioArmazenamentoFotoPerfil>();
 
         return services;
     }

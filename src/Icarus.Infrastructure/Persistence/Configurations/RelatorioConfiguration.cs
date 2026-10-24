@@ -27,6 +27,6 @@ public class RelatorioConfiguration : IEntityTypeConfiguration<Relatorio>
             .HasForeignKey(r => r.UsuarioId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasIndex(r => new { r.UsuarioId, r.Tipo, r.PeriodoInicio, r.PeriodoFim });
+        builder.HasIndex(r => new { r.UsuarioId, r.Tipo, r.PeriodoInicio, r.PeriodoFim }).IsUnique();
     }
 }

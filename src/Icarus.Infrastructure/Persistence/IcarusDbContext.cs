@@ -1,3 +1,4 @@
+using Icarus.Application.Exceptions;
 using Icarus.Application.Interfaces;
 using Icarus.Domain.Common;
 using Icarus.Domain.Entities;
@@ -28,6 +29,7 @@ public class IcarusDbContext : DbContext, IUnitOfWork
     public DbSet<InventarioItem> InventarioItens => Set<InventarioItem>();
     public DbSet<MovimentacaoPontos> MovimentacoesPontos => Set<MovimentacaoPontos>();
     public DbSet<TokenRenovacao> TokensRenovacao => Set<TokenRenovacao>();
+    public DbSet<TrabalhoOnboarding> TrabalhosOnboarding => Set<TrabalhoOnboarding>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -48,7 +50,16 @@ public class IcarusDbContext : DbContext, IUnitOfWork
     }
 
     async Task IUnitOfWork.SalvarAlteracoesAsync(CancellationToken cancellationToken)
-        => await SaveChangesAsync(cancellationToken);
+    {
+        try
+        {
+            await SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException erro)
+        {
+            throw new DadosAtualizadosException(erro);
+        }
+    }
 
     private void AtualizarTimestamps()
     {

@@ -19,4 +19,7 @@
     <ProjectReference Include="..\..\src\Icarus.Application\Icarus.Application.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="../../contracts/relatorio-semanal/v1/*.exemplo.json" Link="Contratos/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>
