@@ -39,8 +39,8 @@ e [relatório](../icarus-context/docs/implementation-design/platform/07-relatori
 A migration `AdicionarRelatorioSemanalConfiavel` cria trabalho, inbox/outbox e
 unicidade por período. RabbitMQ e `icarus-ai` geram a síntese real; consultas
 reutilizam o resultado persistido. Sem fuso ou registros, não geram conteúdo.
-Previstas/taxa, sequência, comparação completa e cenários continuam dependentes
-de origens ainda não implementadas; ausência não vira zero.
+Previstas/taxa, sequência e comparação completa continuam dependentes de
+origens ainda não integradas aos indicadores; ausência não vira zero.
 
 [Contratos JSON e exemplos RF-10](contracts/relatorio-semanal/v1/) são versionados
 em conjunto com a cópia independente do trabalhador. Os exemplos são massa de
@@ -62,5 +62,8 @@ pessoal HTTP: a mensagem RF-10 e a lista permitida da IA permanecem 1.0.0.
 consultam e registram o total alcançado pelo titular. A migration
 `20261025190803_RegistrarMedicoesCampanha` acrescenta histórico sem alterar
 valores legados. O registro é atômico, exige versão/tentativa e não altera
-saldo ou conclui a campanha automaticamente. Contrato e limites:
+saldo ou conclui a campanha automaticamente. A leitura 1.1.0 acrescenta evolução
+e cenário condicional, calculados sobre medições comparáveis pelo
+`CalculadorCenarioConquista`; pontos/XP, revisões, dados antigos ou base
+insuficiente não liberam estimativa. Sem migration adicional ou IA. Contrato e limites:
 [progresso mensurado](../icarus-context/docs/implementation-design/platform/09-progresso-mensurado-campanhas.md).

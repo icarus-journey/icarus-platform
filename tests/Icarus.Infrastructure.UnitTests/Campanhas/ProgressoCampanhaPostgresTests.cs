@@ -15,7 +15,7 @@ namespace Icarus.Infrastructure.UnitTests.Campanhas;
 
 public sealed class ProgressoCampanhaPostgresTests(BancoLoja banco) : IClassFixture<BancoLoja>
 {
-    private static ConsultarProgressoCampanhaUseCase Consulta(IcarusDbContext c) => new(new CampanhaRepository(c), new MedicaoCampanhaRepository(c));
+    private static ConsultarProgressoCampanhaUseCase Consulta(IcarusDbContext c) => new(new CampanhaRepository(c), new MedicaoCampanhaRepository(c), TimeProvider.System);
     private static RegistrarProgressoCampanhaUseCase Registro(IcarusDbContext c) => new(new CampanhaRepository(c), new MedicaoCampanhaRepository(c), new UsuarioRepository(c), c, TimeProvider.System, NullLogger<RegistrarProgressoCampanhaUseCase>.Instance);
 
     private async Task<(Guid Usuario, long Id)> PrepararAsync()
@@ -25,11 +25,62 @@ public sealed class ProgressoCampanhaPostgresTests(BancoLoja banco) : IClassFixt
         var pessoa = await c.Usuarios.SingleAsync(u => u.Id == usuario);
         pessoa.FusoHorario = "America/Sao_Paulo";
         var epico = new Epico { UsuarioId = usuario, Titulo = "Estudos", AreaDaVida = AreaDaVida.EstudosEAprendizado };
-        var campanha = new Campanha { Epico = epico, Titulo = "Curso", AreaDaVida = epico.AreaDaVida, ValorAtual = 2,
-            ValorMensurado = 12, Unidade = "módulos", Estado = EstadoCampanha.EmAndamento };
+        var campanha = new Campanha
+        {
+            Epico = epico,
+            Titulo = "Curso",
+            AreaDaVida = epico.AreaDaVida,
+            ValorAtual = 2,
+            ValorMensurado = 12,
+            Unidade = "módulos",
+            Estado = EstadoCampanha.EmAndamento
+        };
         c.Campanhas.Add(campanha);
         await c.SaveChangesAsync();
         return (usuario, campanha.Id);
+    }
+
+    private sealed class RelogioDaMedicao(DateTimeOffset agora) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => agora;
+    }
+
+    [FatoPostgres]
+    public async Task CincoRegistrosSemanaisReaisPersistemEAlimentamConsultaSemEfeitosNaLeitura()
+    {
+        var (usuario, id) = await PrepararAsync();
+        var referencia = new DateTimeOffset(2026, 10, 25, 1, 0, 0, TimeSpan.Zero);
+        await using (var contexto = banco.NovoContexto())
+        {
+            var campanha = await contexto.Campanhas.SingleAsync(c => c.Id == id);
+            campanha.ValorMensurado = 16;
+            await contexto.SaveChangesAsync();
+        }
+        for (var indice = 0; indice < 5; indice++)
+        {
+            await using var contexto = banco.NovoContexto();
+            var relogio = new RelogioDaMedicao(referencia.AddDays(-28 + indice * 7));
+            var consulta = new ConsultarProgressoCampanhaUseCase(new CampanhaRepository(contexto), new MedicaoCampanhaRepository(contexto), relogio);
+            var antes = await consulta.ExecuteAsync(new(usuario, usuario, id), default);
+            var registro = new RegistrarProgressoCampanhaUseCase(new CampanhaRepository(contexto), new MedicaoCampanhaRepository(contexto),
+                new UsuarioRepository(contexto), contexto, relogio, NullLogger<RegistrarProgressoCampanhaUseCase>.Instance);
+            var depois = await registro.ExecuteAsync(new(usuario, usuario, id, 2 + indice * 2, antes.Versao, Guid.NewGuid()), default);
+            Assert.Equal(indice == 4, depois.Cenario.Disponivel);
+        }
+        await using var leitura = banco.NovoContexto();
+        var caso = new ConsultarProgressoCampanhaUseCase(new CampanhaRepository(leitura), new MedicaoCampanhaRepository(leitura), new RelogioDaMedicao(referencia));
+        foreach (var _ in Enumerable.Range(0, 2))
+        {
+            var resposta = await caso.ExecuteAsync(new(usuario, usuario, id), default);
+            Assert.Equal("1.1.0", resposta.VersaoContrato);
+            Assert.Equal(8m, resposta.Evolucao.AvancoRegistrado);
+            Assert.Equal(6m, resposta.Evolucao.Faltante);
+            Assert.Equal(2m, resposta.Cenario.RitmoSemanal);
+            Assert.Equal(3, resposta.Cenario.SemanasAproximadas);
+            Assert.Equal(5, resposta.Medicoes.Count);
+        }
+        Assert.Equal(5, await leitura.MedicoesCampanhas.CountAsync(m => m.CampanhaId == id));
+        Assert.Equal(500, (await leitura.Usuarios.SingleAsync(u => u.Id == usuario)).SaldoPontos);
     }
 
     [FatoPostgres]

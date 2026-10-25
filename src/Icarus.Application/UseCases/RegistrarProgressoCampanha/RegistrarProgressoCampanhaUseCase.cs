@@ -22,7 +22,7 @@ public sealed partial class RegistrarProgressoCampanhaUseCase(ICampanhaRepositor
         {
             if (anterior.ValorAtual != command.ValorAtual)
                 throw new ProgressoCampanhaException("operacao_reutilizada", "Esta tentativa já foi usada para outro registro. Atualize o histórico.");
-            return ProgressoCampanhaResult.DaCampanha(campanha, await medicoes.ListarAsync(campanha.Id, command.UsuarioIdSolicitado, ct));
+            return ProgressoCampanhaResult.DaCampanha(campanha, await medicoes.ListarAsync(campanha.Id, command.UsuarioIdSolicitado, ct), relogio.GetUtcNow());
         }
         if (campanha.Estado is not (EstadoCampanha.Planejada or EstadoCampanha.EmAndamento))
             throw new ProgressoCampanhaException("campanha_encerrada", "Esta campanha não aceita novos registros de progresso.");
@@ -35,16 +35,21 @@ public sealed partial class RegistrarProgressoCampanhaUseCase(ICampanhaRepositor
         var usuario = await usuarios.BuscarPorIdAsync(command.UsuarioIdSolicitado, ct) ?? throw new CampanhaNaoEncontradaException();
         await medicoes.AdicionarAsync(new MedicaoCampanha
         {
-            CampanhaId = campanha.Id, ValorAnterior = campanha.ValorAtual, ValorAtual = command.ValorAtual,
-            ValorMensurado = campanha.ValorMensurado.Value, Unidade = campanha.Unidade,
-            RegistradaEm = relogio.GetUtcNow(), FusoHorario = usuario.FusoHorario, OperacaoId = command.OperacaoId
+            CampanhaId = campanha.Id,
+            ValorAnterior = campanha.ValorAtual,
+            ValorAtual = command.ValorAtual,
+            ValorMensurado = campanha.ValorMensurado.Value,
+            Unidade = campanha.Unidade,
+            RegistradaEm = relogio.GetUtcNow(),
+            FusoHorario = usuario.FusoHorario,
+            OperacaoId = command.OperacaoId
         }, ct);
         campanha.ValorAtual = command.ValorAtual;
         // Mesmo valor também é uma medição: força a versão a participar da gravação atômica.
         campanha.AtualizadoEm = relogio.GetUtcNow();
         await unidade.SalvarAlteracoesAsync(ct);
         LogProgressoRegistrado(campanha.Id);
-        return ProgressoCampanhaResult.DaCampanha(campanha, await medicoes.ListarAsync(campanha.Id, command.UsuarioIdSolicitado, ct));
+        return ProgressoCampanhaResult.DaCampanha(campanha, await medicoes.ListarAsync(campanha.Id, command.UsuarioIdSolicitado, ct), relogio.GetUtcNow());
     }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Progresso da campanha {CampanhaId} registrado")]

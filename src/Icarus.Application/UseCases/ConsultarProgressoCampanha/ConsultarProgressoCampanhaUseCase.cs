@@ -5,7 +5,7 @@ using Icarus.Domain.Enums;
 
 namespace Icarus.Application.UseCases.ConsultarProgressoCampanha;
 
-public sealed class ConsultarProgressoCampanhaUseCase(ICampanhaRepository campanhas, IMedicaoCampanhaRepository medicoes)
+public sealed class ConsultarProgressoCampanhaUseCase(ICampanhaRepository campanhas, IMedicaoCampanhaRepository medicoes, TimeProvider relogio)
 {
     public async Task<ProgressoCampanhaResult> ExecuteAsync(ConsultarProgressoCampanhaCommand command, CancellationToken ct)
     {
@@ -13,6 +13,6 @@ public sealed class ConsultarProgressoCampanhaUseCase(ICampanhaRepository campan
         var campanha = await campanhas.BuscarPorIdAsync(command.CampanhaId, command.UsuarioIdSolicitado, ct)
             ?? throw new CampanhaNaoEncontradaException();
         if (campanha.Estado == EstadoCampanha.Excluida) throw new CampanhaNaoEncontradaException();
-        return ProgressoCampanhaResult.DaCampanha(campanha, await medicoes.ListarAsync(campanha.Id, command.UsuarioIdSolicitado, ct));
+        return ProgressoCampanhaResult.DaCampanha(campanha, await medicoes.ListarAsync(campanha.Id, command.UsuarioIdSolicitado, ct), relogio.GetUtcNow());
     }
 }

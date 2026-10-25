@@ -8,11 +8,12 @@ public sealed record MedicaoCampanhaResponse(long Id, decimal? ValorAnterior, de
 
 public sealed record ProgressoCampanhaResponse(string VersaoContrato, long CampanhaId, decimal? ValorAtual,
     decimal? ValorMensurado, string? Unidade, EstadoCampanha Estado, bool PodeRegistrar,
-    bool MetaAlcancada, string Versao, IReadOnlyList<MedicaoCampanhaResponse> Medicoes)
+    bool MetaAlcancada, string Versao, IReadOnlyList<MedicaoCampanhaResponse> Medicoes,
+    EvolucaoMeta Evolucao, CenarioConquista Cenario)
 {
     public static ProgressoCampanhaResponse DoResultado(ProgressoCampanhaResult r) => new(
         r.VersaoContrato, r.CampanhaId, r.ValorAtual, r.ValorMensurado, r.Unidade, r.Estado,
         r.PodeRegistrar, r.MetaAlcancada, r.Versao,
         r.Medicoes.Select(m => new MedicaoCampanhaResponse(m.Id, m.ValorAnterior, m.ValorAtual,
-            m.ValorMensurado, m.Unidade, m.RegistradaEm, m.FusoHorario)).ToArray());
+            m.ValorMensurado, m.Unidade, m.RegistradaEm, m.FusoHorario)).ToArray(), r.Evolucao, r.Cenario);
 }
