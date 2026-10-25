@@ -1,3 +1,5 @@
+using Icarus.Application.Interfaces;
+using Icarus.Application.UseCases.IniciarCampanhas;
 using Icarus.Application.UseCases.ConsultarProgressoCampanha;
 using Icarus.Application.UseCases.RegistrarProgressoCampanha;
 using Icarus.Application.UseCases.CriarEntradaDiario;
@@ -54,6 +56,7 @@ public static class DependencyInjection
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
         services.AddSingleton(TimeProvider.System);
+        services.AddScoped<IIniciadorCampanhas, IniciarCampanhasUseCase>();
         services.AddScoped<ConsultarProgressoCampanhaUseCase>();
         services.AddScoped<RegistrarProgressoCampanhaUseCase>();
         services.AddScoped<CriarEntradaDiarioUseCase>();

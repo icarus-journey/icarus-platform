@@ -9,11 +9,12 @@ namespace Icarus.Application.UseCases.RegistrarProgressoCampanha;
 
 public sealed partial class RegistrarProgressoCampanhaUseCase(ICampanhaRepository campanhas,
     IMedicaoCampanhaRepository medicoes, IUsuarioRepository usuarios, IUnitOfWork unidade,
-    TimeProvider relogio, ILogger<RegistrarProgressoCampanhaUseCase> logger)
+    TimeProvider relogio, ILogger<RegistrarProgressoCampanhaUseCase> logger, IIniciadorCampanhas iniciador)
 {
     public async Task<ProgressoCampanhaResult> ExecuteAsync(RegistrarProgressoCampanhaCommand command, CancellationToken ct)
     {
         if (command.UsuarioIdAutenticado != command.UsuarioIdSolicitado) throw new CampanhaNaoEncontradaException();
+        await iniciador.ExecuteAsync(command.UsuarioIdSolicitado, ct);
         var campanha = await campanhas.BuscarPorIdAsync(command.CampanhaId, command.UsuarioIdSolicitado, ct)
             ?? throw new CampanhaNaoEncontradaException();
         if (campanha.Estado == EstadoCampanha.Excluida) throw new CampanhaNaoEncontradaException();

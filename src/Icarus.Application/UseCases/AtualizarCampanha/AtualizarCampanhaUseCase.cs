@@ -6,11 +6,11 @@ using Microsoft.Extensions.Logging;
 
 namespace Icarus.Application.UseCases.AtualizarCampanha;
 
-/// <summary>Caso de uso de edição de campanha (RF-01) — não altera área da vida, estado nem o épico dono.</summary>
+/// <summary>Caso de uso de edição de campanha planejada (RF-03.4) — não altera área da vida, estado nem o épico dono.</summary>
 public sealed partial class AtualizarCampanhaUseCase(
     ICampanhaRepository campanhaRepository,
     IUnitOfWork unitOfWork,
-    ILogger<AtualizarCampanhaUseCase> logger)
+    ILogger<AtualizarCampanhaUseCase> logger, IIniciadorCampanhas iniciador, TimeProvider relogio)
 {
     public async Task<AtualizarCampanhaResult> ExecuteAsync(AtualizarCampanhaCommand command, CancellationToken cancellationToken)
     {
@@ -20,14 +20,19 @@ public sealed partial class AtualizarCampanhaUseCase(
             throw new PerfilNaoEncontradoException();
         }
 
+        await iniciador.ExecuteAsync(command.UsuarioIdSolicitado, cancellationToken);
         var campanha = await campanhaRepository.BuscarPorIdAsync(command.CampanhaId, command.UsuarioIdSolicitado, cancellationToken)
             ?? throw new CampanhaNaoEncontradaException();
+
+        if (campanha.Estado == EstadoCampanha.Excluida) throw new CampanhaNaoEncontradaException();
 
         if (campanha.Estado == EstadoCampanha.Concluida)
         {
             LogEdicaoRejeitada(campanha.Id);
             throw new CampanhaConcluidaException();
         }
+
+        if (campanha.Estado != EstadoCampanha.Planejada) throw new ConfiguracaoCampanhaBloqueadaException();
 
         campanha.Titulo = command.Titulo;
         campanha.Descricao = command.Descricao;
@@ -46,6 +51,9 @@ public sealed partial class AtualizarCampanhaUseCase(
             campanha.Unidade = command.Unidade;
             campanha.ValorAtual ??= 0;
         }
+
+        if (campanha.PrazoInicio <= FusoHorario.DataLocal(relogio.GetUtcNow(), campanha.Epico?.Usuario?.FusoHorario))
+            campanha.Estado = EstadoCampanha.EmAndamento;
 
         await unitOfWork.SalvarAlteracoesAsync(cancellationToken);
 

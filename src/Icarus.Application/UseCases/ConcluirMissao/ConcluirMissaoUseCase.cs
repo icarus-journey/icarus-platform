@@ -62,6 +62,15 @@ public sealed partial class ConcluirMissaoUseCase(
                 missao.Pontuacao, usuarioAtual?.SaldoPontos ?? 0);
         }
 
+        Campanha? campanhaVinculada = null;
+        if (missao.CampanhaId is { } idCampanha)
+        {
+            campanhaVinculada = await campanhaRepository.BuscarPorIdAsync(idCampanha, missao.UsuarioId, cancellationToken)
+                ?? throw new CampanhaNaoEncontradaException();
+            if (campanhaVinculada.Estado == EstadoCampanha.Excluida) throw new CampanhaNaoEncontradaException();
+            if (campanhaVinculada.Estado == EstadoCampanha.Concluida) throw new CampanhaConcluidaException();
+            campanhaVinculada.AtualizadoEm = DateTimeOffset.UtcNow;
+        }
         var agora = DateTimeOffset.UtcNow;
 
         if (ocorrencia is null)
@@ -97,9 +106,8 @@ public sealed partial class ConcluirMissaoUseCase(
             ?? throw new PerfilNaoEncontradoException();
         usuario.SaldoPontos += missao.Pontuacao;
 
-        if (missao.CampanhaId is { } campanhaId)
+        if (campanhaVinculada is { } campanha)
         {
-            var campanha = await campanhaRepository.BuscarPorIdAsync(campanhaId, missao.UsuarioId, cancellationToken);
             // Somente o contador de gamificação usa pontos; medidas de resultado são manuais.
             if (campanha is not null && campanha.ValorAtual is not null
                 && string.Equals(campanha.Unidade, "pontos", StringComparison.OrdinalIgnoreCase))

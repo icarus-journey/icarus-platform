@@ -35,6 +35,16 @@ public sealed partial class EstenderJanelaDeOcorrenciasUseCase(
 
         foreach (var missao in missoes)
         {
+            // Inclui também campanhas encerradas antes desta regra existir; não recria planejamento.
+            if (missao.Campanha?.Estado is EstadoCampanha.Concluida or EstadoCampanha.Excluida)
+            {
+                var hojeDoTitular = FusoHorario.DataLocal(DateTimeOffset.UtcNow, missao.Campanha.Epico?.Usuario?.FusoHorario);
+                foreach (var pendente in await ocorrenciaRepository.ListarPendentesNaoVencidasAsync(missao.Id, hojeDoTitular, cancellationToken))
+                    pendente.Status = StatusOcorrencia.Excluida;
+                missao.Status = StatusMissao.Inativa;
+                totalInativadas++;
+                continue;
+            }
             var recorrencia = missao.Recorrencia!;
 
             if (recorrencia.DataFim is { } dataFimVencida && dataFimVencida < hoje)
@@ -68,6 +78,8 @@ public sealed partial class EstenderJanelaDeOcorrenciasUseCase(
                 await ocorrenciaRepository.AdicionarAsync(new Ocorrencia { MissaoId = missao.Id, DataPrevista = data }, cancellationToken);
             }
 
+            if (datasFaltantes.Count > 0 && missao.Campanha is not null)
+                missao.Campanha.AtualizadoEm = DateTimeOffset.UtcNow;
             totalCriadas += datasFaltantes.Count;
         }
 

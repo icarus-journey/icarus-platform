@@ -12,7 +12,7 @@ public sealed partial class CriarCampanhaUseCase(
     IEpicoRepository epicoRepository,
     ICampanhaRepository campanhaRepository,
     IUnitOfWork unitOfWork,
-    ILogger<CriarCampanhaUseCase> logger)
+    ILogger<CriarCampanhaUseCase> logger, TimeProvider relogio)
 {
     public async Task<CriarCampanhaResult> ExecuteAsync(CriarCampanhaCommand command, CancellationToken cancellationToken)
     {
@@ -31,12 +31,14 @@ public sealed partial class CriarCampanhaUseCase(
             throw new EpicoConcluidoException();
         }
 
-        var prazoInicio = command.PrazoInicio ?? DateOnly.FromDateTime(DateTime.UtcNow);
+        var hoje = FusoHorario.DataLocal(relogio.GetUtcNow(), epico.Usuario?.FusoHorario);
+        var prazoInicio = command.PrazoInicio ?? hoje;
         var prazoFim = command.PrazoFim ?? epico.PrazoFim;
 
         var campanha = new Campanha
         {
             EpicoId = epico.Id,
+            Estado = prazoInicio <= hoje ? EstadoCampanha.EmAndamento : EstadoCampanha.Planejada,
             Titulo = command.Titulo,
             Descricao = command.Descricao,
             AreaDaVida = epico.AreaDaVida,

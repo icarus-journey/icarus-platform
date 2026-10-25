@@ -34,7 +34,7 @@ public class ListarEpicosUseCaseTests
 
     public ListarEpicosUseCaseTests()
     {
-        _useCase = new ListarEpicosUseCase(_repositorio, NullLogger<ListarEpicosUseCase>.Instance);
+        _useCase = new ListarEpicosUseCase(_repositorio, NullLogger<ListarEpicosUseCase>.Instance, new IniciadorCampanhasInerte());
     }
 
     [Fact(DisplayName = "Lista os épicos do usuário com campanhas e missões aninhadas, ignorando os de outro usuário")]
@@ -44,13 +44,27 @@ public class ListarEpicosUseCaseTests
         var missao = new Missao { Id = 1, UsuarioId = usuarioId, Titulo = "Missão", Dificuldade = Dificuldade.Facil, Pontuacao = 30 };
         var campanha = new Campanha
         {
-            Id = 1, EpicoId = 1, Titulo = "Campanha", AreaDaVida = AreaDaVida.Financas, Dificuldade = Dificuldade.Media,
-            Pontuacao = 45, PrazoInicio = new DateOnly(2026, 1, 1), PrazoFim = new DateOnly(2026, 12, 31), Missoes = [missao]
+            Id = 1,
+            EpicoId = 1,
+            Titulo = "Campanha",
+            AreaDaVida = AreaDaVida.Financas,
+            Dificuldade = Dificuldade.Media,
+            Pontuacao = 45,
+            PrazoInicio = new DateOnly(2026, 1, 1),
+            PrazoFim = new DateOnly(2026, 12, 31),
+            Missoes = [missao]
         };
         var meuEpico = new Epico
         {
-            Id = 1, UsuarioId = usuarioId, Titulo = "Meu épico", AreaDaVida = AreaDaVida.Financas, Dificuldade = Dificuldade.Facil,
-            Pontuacao = 30, PrazoInicio = new DateOnly(2026, 1, 1), PrazoFim = new DateOnly(2026, 12, 31), Campanhas = [campanha]
+            Id = 1,
+            UsuarioId = usuarioId,
+            Titulo = "Meu épico",
+            AreaDaVida = AreaDaVida.Financas,
+            Dificuldade = Dificuldade.Facil,
+            Pontuacao = 30,
+            PrazoInicio = new DateOnly(2026, 1, 1),
+            PrazoFim = new DateOnly(2026, 12, 31),
+            Campanhas = [campanha]
         };
         var epicoDeOutroUsuario = new Epico { Id = 2, UsuarioId = Guid.NewGuid(), Titulo = "Não é meu" };
         _repositorio.Epicos.Add(meuEpico);

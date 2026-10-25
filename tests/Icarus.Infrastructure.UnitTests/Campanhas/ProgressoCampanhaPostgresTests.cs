@@ -1,4 +1,5 @@
 using Icarus.Application.Common;
+using Icarus.Application.UseCases.IniciarCampanhas;
 using Icarus.Application.Exceptions;
 using Icarus.Application.Interfaces;
 using Icarus.Application.UseCases.ConsultarProgressoCampanha;
@@ -15,8 +16,8 @@ namespace Icarus.Infrastructure.UnitTests.Campanhas;
 
 public sealed class ProgressoCampanhaPostgresTests(BancoLoja banco) : IClassFixture<BancoLoja>
 {
-    private static ConsultarProgressoCampanhaUseCase Consulta(IcarusDbContext c) => new(new CampanhaRepository(c), new MedicaoCampanhaRepository(c), TimeProvider.System);
-    private static RegistrarProgressoCampanhaUseCase Registro(IcarusDbContext c) => new(new CampanhaRepository(c), new MedicaoCampanhaRepository(c), new UsuarioRepository(c), c, TimeProvider.System, NullLogger<RegistrarProgressoCampanhaUseCase>.Instance);
+    private static ConsultarProgressoCampanhaUseCase Consulta(IcarusDbContext c) => new(new CampanhaRepository(c), new MedicaoCampanhaRepository(c), TimeProvider.System, new IniciarCampanhasUseCase(new CicloCampanhaRepository(c), TimeProvider.System));
+    private static RegistrarProgressoCampanhaUseCase Registro(IcarusDbContext c) => new(new CampanhaRepository(c), new MedicaoCampanhaRepository(c), new UsuarioRepository(c), c, TimeProvider.System, NullLogger<RegistrarProgressoCampanhaUseCase>.Instance, new IniciarCampanhasUseCase(new CicloCampanhaRepository(c), TimeProvider.System));
 
     private async Task<(Guid Usuario, long Id)> PrepararAsync()
     {
@@ -60,15 +61,15 @@ public sealed class ProgressoCampanhaPostgresTests(BancoLoja banco) : IClassFixt
         {
             await using var contexto = banco.NovoContexto();
             var relogio = new RelogioDaMedicao(referencia.AddDays(-28 + indice * 7));
-            var consulta = new ConsultarProgressoCampanhaUseCase(new CampanhaRepository(contexto), new MedicaoCampanhaRepository(contexto), relogio);
+            var consulta = new ConsultarProgressoCampanhaUseCase(new CampanhaRepository(contexto), new MedicaoCampanhaRepository(contexto), relogio, new IniciarCampanhasUseCase(new CicloCampanhaRepository(contexto), relogio));
             var antes = await consulta.ExecuteAsync(new(usuario, usuario, id), default);
             var registro = new RegistrarProgressoCampanhaUseCase(new CampanhaRepository(contexto), new MedicaoCampanhaRepository(contexto),
-                new UsuarioRepository(contexto), contexto, relogio, NullLogger<RegistrarProgressoCampanhaUseCase>.Instance);
+                new UsuarioRepository(contexto), contexto, relogio, NullLogger<RegistrarProgressoCampanhaUseCase>.Instance, new IniciarCampanhasUseCase(new CicloCampanhaRepository(contexto), relogio));
             var depois = await registro.ExecuteAsync(new(usuario, usuario, id, 2 + indice * 2, antes.Versao, Guid.NewGuid()), default);
             Assert.Equal(indice == 4, depois.Cenario.Disponivel);
         }
         await using var leitura = banco.NovoContexto();
-        var caso = new ConsultarProgressoCampanhaUseCase(new CampanhaRepository(leitura), new MedicaoCampanhaRepository(leitura), new RelogioDaMedicao(referencia));
+        var caso = new ConsultarProgressoCampanhaUseCase(new CampanhaRepository(leitura), new MedicaoCampanhaRepository(leitura), new RelogioDaMedicao(referencia), new IniciarCampanhasUseCase(new CicloCampanhaRepository(leitura), new RelogioDaMedicao(referencia)));
         foreach (var _ in Enumerable.Range(0, 2))
         {
             var resposta = await caso.ExecuteAsync(new(usuario, usuario, id), default);

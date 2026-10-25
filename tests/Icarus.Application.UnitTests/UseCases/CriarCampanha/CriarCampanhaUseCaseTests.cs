@@ -52,15 +52,21 @@ public class CriarCampanhaUseCaseTests
     public CriarCampanhaUseCaseTests()
     {
         _useCase = new CriarCampanhaUseCase(
-            _epicoRepositorio, _campanhaRepositorio, _campanhaRepositorio, NullLogger<CriarCampanhaUseCase>.Instance);
+            _epicoRepositorio, _campanhaRepositorio, _campanhaRepositorio, NullLogger<CriarCampanhaUseCase>.Instance, TimeProvider.System);
     }
 
     private Epico AdicionarEpico(Guid usuarioId, DateOnly prazoFim)
     {
         var epico = new Epico
         {
-            Id = 1, UsuarioId = usuarioId, Titulo = "Épico", AreaDaVida = AreaDaVida.PropositoEEspiritualidade,
-            Dificuldade = Dificuldade.Media, Pontuacao = 45, PrazoInicio = new DateOnly(2026, 1, 1), PrazoFim = prazoFim
+            Id = 1,
+            UsuarioId = usuarioId,
+            Titulo = "Épico",
+            AreaDaVida = AreaDaVida.PropositoEEspiritualidade,
+            Dificuldade = Dificuldade.Media,
+            Pontuacao = 45,
+            PrazoInicio = new DateOnly(2026, 1, 1),
+            PrazoFim = prazoFim
         };
         _epicoRepositorio.Epicos.Add(epico);
         return epico;

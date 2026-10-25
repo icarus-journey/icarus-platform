@@ -40,10 +40,11 @@ public class CampanhasController(
         return CreatedAtAction(nameof(Atualizar), new { usuarioId, campanhaId = resultado.Id }, response);
     }
 
-    /// <summary>Edita uma campanha (RF-01) — não altera área da vida, estado nem o épico dono.</summary>
+    /// <summary>Edita a configuração somente enquanto planejada (RF-03.4); mantém o épico e a área de origem.</summary>
     [Authorize]
     [HttpPatch("{campanhaId:long}")]
     [ProducesResponseType<CampanhaResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]

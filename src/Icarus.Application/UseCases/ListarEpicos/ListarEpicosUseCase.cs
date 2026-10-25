@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 namespace Icarus.Application.UseCases.ListarEpicos;
 
 /// <summary>Caso de uso de listagem dos épicos do usuário, com campanhas e missões (RF-01.5).</summary>
-public sealed partial class ListarEpicosUseCase(IEpicoRepository epicoRepository, ILogger<ListarEpicosUseCase> logger)
+public sealed partial class ListarEpicosUseCase(IEpicoRepository epicoRepository, ILogger<ListarEpicosUseCase> logger, IIniciadorCampanhas iniciador)
 {
     public async Task<List<EpicoListadoResult>> ExecuteAsync(ListarEpicosCommand command, CancellationToken cancellationToken)
     {
@@ -15,6 +15,7 @@ public sealed partial class ListarEpicosUseCase(IEpicoRepository epicoRepository
             throw new PerfilNaoEncontradoException();
         }
 
+        await iniciador.ExecuteAsync(command.UsuarioIdSolicitado, cancellationToken);
         var epicos = await epicoRepository.ListarComCampanhasEMissoesAsync(command.UsuarioIdSolicitado, cancellationToken);
 
         return epicos.Select(epico => new EpicoListadoResult(

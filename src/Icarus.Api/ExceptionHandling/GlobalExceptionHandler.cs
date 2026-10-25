@@ -148,6 +148,13 @@ public sealed partial class GlobalExceptionHandler(
                 Title = "Missão não recorrente",
                 Detail = "Somente missão recorrente pode ser inativada."
             },
+            ConfiguracaoCampanhaBloqueadaException bloqueio => new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Title = "Campanha em andamento",
+                Detail = bloqueio.Message,
+                Extensions = { ["codigo"] = "configuracao_campanha_bloqueada" }
+            },
             CampanhaConcluidaException => new ProblemDetails
             {
                 Status = StatusCodes.Status409Conflict,

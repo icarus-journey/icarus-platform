@@ -52,6 +52,7 @@ public static class DependencyInjection
         services.AddScoped<ITokenRenovacaoRepository, TokenRenovacaoRepository>();
         services.AddScoped<IEpicoRepository, EpicoRepository>();
         services.AddScoped<ICampanhaRepository, CampanhaRepository>();
+        services.AddScoped<ICicloCampanhaRepository, CicloCampanhaRepository>();
         services.AddScoped<IMedicaoCampanhaRepository, MedicaoCampanhaRepository>();
         services.AddScoped<IMissaoRepository, MissaoRepository>();
         services.AddScoped<IOcorrenciaRepository, OcorrenciaRepository>();
@@ -75,6 +76,7 @@ public static class DependencyInjection
 
         // RF-04.5: mantém a janela de ocorrências das missões recorrentes ativas.
         services.AddHostedService<RecorrenciaMaintenanceService>();
+        services.AddHostedService<InicioCampanhasService>();
 
         // Foto de perfil: objeto guardado no MinIO, não no Postgres.
         services.Configure<MinioOptions>(configuration.GetSection(MinioOptions.SecaoConfiguracao));

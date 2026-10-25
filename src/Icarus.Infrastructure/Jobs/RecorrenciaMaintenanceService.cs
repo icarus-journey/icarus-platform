@@ -1,4 +1,5 @@
 using Icarus.Application.UseCases.EstenderJanelaDeOcorrencias;
+using Icarus.Application.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -41,6 +42,7 @@ public sealed partial class RecorrenciaMaintenanceService(
         try
         {
             using var escopo = scopeFactory.CreateScope();
+            await escopo.ServiceProvider.GetRequiredService<IIniciadorCampanhas>().ExecuteAsync(null, cancellationToken);
             var useCase = escopo.ServiceProvider.GetRequiredService<EstenderJanelaDeOcorrenciasUseCase>();
             await useCase.ExecuteAsync(cancellationToken);
         }

@@ -17,7 +17,7 @@ public class EpicoRepository(IcarusDbContext context) : IEpicoRepository
             .SingleOrDefaultAsync(e => e.Id == epicoId && e.UsuarioId == usuarioId, cancellationToken);
 
     public Task<Epico?> BuscarPorIdAsync(long epicoId, Guid usuarioId, CancellationToken cancellationToken)
-        => context.Epicos.SingleOrDefaultAsync(e => e.Id == epicoId && e.UsuarioId == usuarioId, cancellationToken);
+        => context.Epicos.Include(e => e.Usuario).SingleOrDefaultAsync(e => e.Id == epicoId && e.UsuarioId == usuarioId, cancellationToken);
 
     public async Task<List<Epico>> ListarComCampanhasEMissoesAsync(Guid usuarioId, CancellationToken cancellationToken)
         => await context.Epicos

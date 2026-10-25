@@ -56,7 +56,13 @@ Sem conclusões, a série é ausente; zeros internos indicam datas sem conclusã
 registrada, sem afirmar ausência de atividade. É extensão apenas da leitura
 pessoal HTTP: a mensagem RF-10 e a lista permitida da IA permanecem 1.0.0.
 
-## Progresso mensurado das campanhas
+## Ciclo e progresso das campanhas
+
+Campanhas iniciam automaticamente na data local do titular (rotina de um minuto
+com recuperação na subida e nas consultas). Configuração só pode ser editada
+quando planejada; em andamento, use o registro de progresso. Concluir inativa
+recorrentes e cancela seus dias pendentes de hoje em diante, preservando
+conclusões, atrasos anteriores, histórico e pontos. Sem migration adicional.
 
 `GET` e `POST /api/usuarios/{usuarioId}/campanhas/{campanhaId}/progresso`
 consultam e registram o total alcançado pelo titular. A migration

@@ -26,5 +26,6 @@ public class MissaoRepository(IcarusDbContext context) : IMissaoRepository
         => await context.Missoes
             .Where(m => m.Status == StatusMissao.Ativa && m.Recorrencia != null)
             .Include(m => m.Recorrencia)
+            .Include(m => m.Campanha).ThenInclude(c => c!.Epico).ThenInclude(e => e.Usuario)
             .ToListAsync(cancellationToken);
 }

@@ -30,7 +30,7 @@ public class AtualizarCampanhaUseCaseTests
 
     public AtualizarCampanhaUseCaseTests()
     {
-        _useCase = new AtualizarCampanhaUseCase(_repositorio, _repositorio, NullLogger<AtualizarCampanhaUseCase>.Instance);
+        _useCase = new AtualizarCampanhaUseCase(_repositorio, _repositorio, NullLogger<AtualizarCampanhaUseCase>.Instance, new IniciadorCampanhasInerte(), TimeProvider.System);
     }
 
     [Fact(DisplayName = "Atualiza campanha recalculando a pontuação a partir da nova dificuldade")]
@@ -38,8 +38,14 @@ public class AtualizarCampanhaUseCaseTests
     {
         var campanha = new Campanha
         {
-            Id = 1, EpicoId = 1, Titulo = "Antiga", AreaDaVida = AreaDaVida.LazerECriatividade, Dificuldade = Dificuldade.Trivial,
-            Pontuacao = 15, PrazoInicio = new DateOnly(2026, 1, 1), PrazoFim = new DateOnly(2026, 6, 1)
+            Id = 1,
+            EpicoId = 1,
+            Titulo = "Antiga",
+            AreaDaVida = AreaDaVida.LazerECriatividade,
+            Dificuldade = Dificuldade.Trivial,
+            Pontuacao = 15,
+            PrazoInicio = new DateOnly(2026, 1, 1),
+            PrazoFim = new DateOnly(2026, 6, 1)
         };
         _repositorio.Campanhas.Add(campanha);
 
@@ -70,8 +76,15 @@ public class AtualizarCampanhaUseCaseTests
     {
         var campanha = new Campanha
         {
-            Id = 1, EpicoId = 1, Titulo = "Concluída", AreaDaVida = AreaDaVida.LazerECriatividade, Dificuldade = Dificuldade.Facil,
-            Pontuacao = 30, PrazoInicio = new DateOnly(2026, 1, 1), PrazoFim = new DateOnly(2026, 6, 1), Estado = EstadoCampanha.Concluida
+            Id = 1,
+            EpicoId = 1,
+            Titulo = "Concluída",
+            AreaDaVida = AreaDaVida.LazerECriatividade,
+            Dificuldade = Dificuldade.Facil,
+            Pontuacao = 30,
+            PrazoInicio = new DateOnly(2026, 1, 1),
+            PrazoFim = new DateOnly(2026, 6, 1),
+            Estado = EstadoCampanha.Concluida
         };
         _repositorio.Campanhas.Add(campanha);
 
@@ -92,4 +105,33 @@ public class AtualizarCampanhaUseCaseTests
 
         await Assert.ThrowsAsync<PerfilNaoEncontradoException>(() => _useCase.ExecuteAsync(command, CancellationToken.None));
     }
+    [Fact]
+    public async Task EmAndamentoRejeitaConfiguracaoSemAlterarMetaOuProgresso()
+    {
+        _repositorio.Campanhas.Add(new Campanha
+        {
+            Id = 1,
+            Titulo = "Curso",
+            Estado = EstadoCampanha.EmAndamento,
+            ValorMensurado = 12,
+            ValorAtual = 3,
+            Unidade = "módulos"
+        });
+        var command = new AtualizarCampanhaCommand(Guid.Empty, Guid.Empty, 1, "Outro", null, Dificuldade.Media,
+            new(2026, 1, 1), new(2026, 12, 1), 20, "livros");
+        await Assert.ThrowsAsync<ConfiguracaoCampanhaBloqueadaException>(() => _useCase.ExecuteAsync(command, default));
+        Assert.Equal("Curso", _repositorio.Campanhas[0].Titulo);
+        Assert.Equal(12, _repositorio.Campanhas[0].ValorMensurado);
+        Assert.Equal(3, _repositorio.Campanhas[0].ValorAtual);
+    }
+
+    [Fact]
+    public async Task ExcluidaNaoPodeSerEditadaOuReaberta()
+    {
+        _repositorio.Campanhas.Add(new Campanha { Id = 1, Estado = EstadoCampanha.Excluida });
+        await Assert.ThrowsAsync<CampanhaNaoEncontradaException>(() => _useCase.ExecuteAsync(
+            new(Guid.Empty, Guid.Empty, 1, "Outro", null, Dificuldade.Media, new(2026, 1, 1), new(2026, 12, 1), null, null), default));
+        Assert.Equal(EstadoCampanha.Excluida, _repositorio.Campanhas[0].Estado);
+    }
+
 }

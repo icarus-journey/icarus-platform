@@ -11,6 +11,6 @@ public class CampanhaRepository(IcarusDbContext context) : ICampanhaRepository
 
     public Task<Campanha?> BuscarPorIdAsync(long campanhaId, Guid usuarioId, CancellationToken cancellationToken)
         => context.Campanhas
-            .Include(c => c.Epico)
+            .Include(c => c.Epico).ThenInclude(e => e.Usuario)
             .SingleOrDefaultAsync(c => c.Id == campanhaId && c.Epico.UsuarioId == usuarioId, cancellationToken);
 }

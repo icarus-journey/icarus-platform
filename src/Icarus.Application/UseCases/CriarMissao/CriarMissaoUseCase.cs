@@ -34,11 +34,14 @@ public sealed partial class CriarMissaoUseCase(
             var campanha = await campanhaRepository.BuscarPorIdAsync(campanhaId, command.UsuarioIdSolicitado, cancellationToken)
                 ?? throw new CampanhaNaoEncontradaException();
 
+            if (campanha.Estado == EstadoCampanha.Excluida) throw new CampanhaNaoEncontradaException();
             if (campanha.Estado == EstadoCampanha.Concluida)
             {
                 LogAtribuicaoRecusadaCampanhaConcluida(campanhaId);
                 throw new CampanhaConcluidaException();
             }
+            // A versão da campanha impede criar planejamento durante um encerramento concorrente.
+            campanha.AtualizadoEm = DateTimeOffset.UtcNow;
         }
 
         var hoje = DateOnly.FromDateTime(DateTime.UtcNow);
