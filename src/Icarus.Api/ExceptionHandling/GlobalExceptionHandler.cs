@@ -29,6 +29,13 @@ public sealed partial class GlobalExceptionHandler(
                 Title = "Entrada de diário não encontrada",
                 Detail = "Essa entrada não está disponível."
             },
+            ProgressoCampanhaException progresso => new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Title = "Não foi possível registrar o progresso",
+                Detail = progresso.Message,
+                Extensions = { ["codigo"] = progresso.Codigo }
+            },
             DadosAtualizadosException => new ProblemDetails
             {
                 Status = StatusCodes.Status409Conflict,

@@ -52,6 +52,7 @@ public static class DependencyInjection
         services.AddScoped<ITokenRenovacaoRepository, TokenRenovacaoRepository>();
         services.AddScoped<IEpicoRepository, EpicoRepository>();
         services.AddScoped<ICampanhaRepository, CampanhaRepository>();
+        services.AddScoped<IMedicaoCampanhaRepository, MedicaoCampanhaRepository>();
         services.AddScoped<IMissaoRepository, MissaoRepository>();
         services.AddScoped<IOcorrenciaRepository, OcorrenciaRepository>();
         services.AddScoped<IRecorrenciaRepository, RecorrenciaRepository>();

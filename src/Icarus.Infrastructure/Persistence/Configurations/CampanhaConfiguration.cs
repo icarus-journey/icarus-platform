@@ -11,6 +11,7 @@ public class CampanhaConfiguration : IEntityTypeConfiguration<Campanha>
         builder.ToTable("campanha", t => t.HasCheckConstraint("ck_campanha_pontuacao_nao_negativa", "pontuacao >= 0"));
 
         builder.HasKey(c => c.Id);
+        builder.Property(c => c.AtualizadoEm).IsConcurrencyToken();
 
         builder.Property(c => c.Titulo)
             .IsRequired()

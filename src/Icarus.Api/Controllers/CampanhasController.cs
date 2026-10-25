@@ -1,3 +1,5 @@
+using Icarus.Application.UseCases.ConsultarProgressoCampanha;
+using Icarus.Application.UseCases.RegistrarProgressoCampanha;
 using System.Security.Claims;
 using Icarus.Api.Contracts.Campanhas;
 using Icarus.Application.UseCases.AtualizarCampanha;
@@ -14,7 +16,9 @@ namespace Icarus.Api.Controllers;
 public class CampanhasController(
     CriarCampanhaUseCase criarCampanha,
     AtualizarCampanhaUseCase atualizarCampanha,
-    ConcluirCampanhaUseCase concluirCampanha) : ControllerBase
+    ConcluirCampanhaUseCase concluirCampanha,
+    ConsultarProgressoCampanhaUseCase consultarProgresso,
+    RegistrarProgressoCampanhaUseCase registrarProgresso) : ControllerBase
 {
     /// <summary>Cria uma campanha manualmente (RF-01), sempre atrelada a um épico do usuário.</summary>
     [Authorize]
@@ -73,6 +77,21 @@ public class CampanhasController(
 
         return Ok(new ConcluirCampanhaResponse(resultado.Id, resultado.Estado));
     }
+
+    [Authorize]
+    [HttpGet("{campanhaId:long}/progresso")]
+    [ProducesResponseType<ProgressoCampanhaResponse>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> ConsultarProgresso(Guid usuarioId, long campanhaId, CancellationToken ct)
+        => Ok(ProgressoCampanhaResponse.DoResultado(await consultarProgresso.ExecuteAsync(new(ObterUsuarioIdAutenticado(), usuarioId, campanhaId), ct)));
+
+    [Authorize]
+    [HttpPost("{campanhaId:long}/progresso")]
+    [ProducesResponseType<ProgressoCampanhaResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> RegistrarProgresso(Guid usuarioId, long campanhaId, RegistrarProgressoCampanhaRequest dados, CancellationToken ct)
+        => Ok(ProgressoCampanhaResponse.DoResultado(await registrarProgresso.ExecuteAsync(new(ObterUsuarioIdAutenticado(), usuarioId, campanhaId,
+            dados.ValorAtual!.Value, dados.VersaoEsperada, dados.OperacaoId), ct)));
 
     private Guid ObterUsuarioIdAutenticado() => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 

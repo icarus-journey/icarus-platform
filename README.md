@@ -55,3 +55,12 @@ civis. Série e total usam o mesmo conjunto de realizações no fuso do titular.
 Sem conclusões, a série é ausente; zeros internos indicam datas sem conclusão
 registrada, sem afirmar ausência de atividade. É extensão apenas da leitura
 pessoal HTTP: a mensagem RF-10 e a lista permitida da IA permanecem 1.0.0.
+
+## Progresso mensurado das campanhas
+
+`GET` e `POST /api/usuarios/{usuarioId}/campanhas/{campanhaId}/progresso`
+consultam e registram o total alcançado pelo titular. A migration
+`20261025190803_RegistrarMedicoesCampanha` acrescenta histórico sem alterar
+valores legados. O registro é atômico, exige versão/tentativa e não altera
+saldo ou conclui a campanha automaticamente. Contrato e limites:
+[progresso mensurado](../icarus-context/docs/implementation-design/platform/09-progresso-mensurado-campanhas.md).

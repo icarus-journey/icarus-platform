@@ -69,6 +69,7 @@ public static class DependencyInjection
         services.AddSingleton<IValidator<CriarEpicoRequest>, CriarEpicoRequestValidator>();
         services.AddSingleton<IValidator<AtualizarEpicoRequest>, AtualizarEpicoRequestValidator>();
         services.AddSingleton<IValidator<CriarCampanhaRequest>, CriarCampanhaRequestValidator>();
+        services.AddSingleton<IValidator<RegistrarProgressoCampanhaRequest>, RegistrarProgressoCampanhaRequestValidator>();
         services.AddSingleton<IValidator<AtualizarCampanhaRequest>, AtualizarCampanhaRequestValidator>();
         services.AddSingleton<IValidator<CriarMissaoRequest>, CriarMissaoRequestValidator>();
         services.AddSingleton<IValidator<AtualizarMissaoRequest>, AtualizarMissaoRequestValidator>();

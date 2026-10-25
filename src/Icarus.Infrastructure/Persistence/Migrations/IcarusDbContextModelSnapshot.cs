@@ -38,6 +38,7 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         .HasColumnName("area_da_vida");
 
                     b.Property<DateTimeOffset>("AtualizadoEm")
+                        .IsConcurrencyToken()
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("atualizado_em");
 
@@ -383,6 +384,66 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                     b.ToTable("item", null, t =>
                         {
                             t.HasCheckConstraint("ck_item_valor_nao_negativo", "valor >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("Icarus.Domain.Entities.MedicaoCampanha", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CampanhaId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("campanha_id");
+
+                    b.Property<string>("FusoHorario")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("fuso_horario");
+
+                    b.Property<Guid>("OperacaoId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operacao_id");
+
+                    b.Property<DateTimeOffset>("RegistradaEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("registrada_em");
+
+                    b.Property<string>("Unidade")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("unidade");
+
+                    b.Property<decimal?>("ValorAnterior")
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("valor_anterior");
+
+                    b.Property<decimal>("ValorAtual")
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("valor_atual");
+
+                    b.Property<decimal>("ValorMensurado")
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("valor_mensurado");
+
+                    b.HasKey("Id")
+                        .HasName("pk_medicao_campanha");
+
+                    b.HasIndex("CampanhaId", "OperacaoId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_medicao_campanha_operacao");
+
+                    b.HasIndex("CampanhaId", "RegistradaEm", "Id")
+                        .HasDatabaseName("ix_medicao_campanha_campanha_id_registrada_em_id");
+
+                    b.ToTable("medicao_campanha", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_medicao_campanha_valores", "valor_atual >= 0 AND valor_mensurado > 0 AND (valor_anterior IS NULL OR valor_anterior >= 0)");
                         });
                 });
 
@@ -1299,6 +1360,18 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_item_usuarios_usuario_id");
 
                     b.Navigation("Usuario");
+                });
+
+            modelBuilder.Entity("Icarus.Domain.Entities.MedicaoCampanha", b =>
+                {
+                    b.HasOne("Icarus.Domain.Entities.Campanha", "Campanha")
+                        .WithMany()
+                        .HasForeignKey("CampanhaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_medicao_campanha_campanha_campanha_id");
+
+                    b.Navigation("Campanha");
                 });
 
             modelBuilder.Entity("Icarus.Domain.Entities.Missao", b =>

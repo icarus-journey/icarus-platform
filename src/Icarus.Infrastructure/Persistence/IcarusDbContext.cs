@@ -3,6 +3,7 @@ using Icarus.Application.Interfaces;
 using Icarus.Domain.Common;
 using Icarus.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Icarus.Infrastructure.Persistence;
 
@@ -19,6 +20,7 @@ public class IcarusDbContext : DbContext, IUnitOfWork
     public DbSet<Rotina> Rotinas => Set<Rotina>();
     public DbSet<Epico> Epicos => Set<Epico>();
     public DbSet<Campanha> Campanhas => Set<Campanha>();
+    public DbSet<MedicaoCampanha> MedicoesCampanhas => Set<MedicaoCampanha>();
     public DbSet<Missao> Missoes => Set<Missao>();
     public DbSet<MissaoIA> MissoesIA => Set<MissaoIA>();
     public DbSet<Recorrencia> Recorrencias => Set<Recorrencia>();
@@ -55,6 +57,10 @@ public class IcarusDbContext : DbContext, IUnitOfWork
         {
             await SaveChangesAsync(cancellationToken);
         }
+        catch (DbUpdateException erro) when (erro.InnerException is PostgresException { SqlState: "23505", ConstraintName: "uq_medicao_campanha_operacao" })
+        {
+            throw new DadosAtualizadosException(erro);
+        }
         catch (DbUpdateConcurrencyException erro)
         {
             throw new DadosAtualizadosException(erro);
@@ -63,6 +69,8 @@ public class IcarusDbContext : DbContext, IUnitOfWork
 
     private void AtualizarTimestamps()
     {
+        if (ChangeTracker.Entries<MedicaoCampanha>().Any(e => e.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("O histórico de medições é imutável.");
         var agora = DateTimeOffset.UtcNow;
 
         foreach (var entry in ChangeTracker.Entries<EntidadeBase>())
