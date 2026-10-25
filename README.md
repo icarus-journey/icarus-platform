@@ -12,6 +12,19 @@ A consulta existente inclui estudo/trabalho opcionais; `PUT /api/usuarios/{id}/p
 atualiza esses quatro campos e `PUT /api/usuarios/{id}/fuso` mantém o fuso IANA.
 Cadastro e saldo permanecem protegidos por contratos separados.
 
+## Diário autenticado
+
+`/api/usuarios/{usuarioId}/diario` permite listar (`GET`), criar (`POST`),
+editar (`PATCH /{entradaId}`) e excluir logicamente (`DELETE /{entradaId}`).
+Tipo (`reflexao`/`deslize`), data e texto de até 10.000 caracteres compõem a
+entrada. A migration `20261025022507_PersistirEntradasDiario` acrescenta tipo e
+data de exclusão, preservando o texto existente. A autorização ocorre no caso
+de uso e na consulta por titular. Diário não altera pontos nem entra na IA.
+Contrato e limites: [Diário](../icarus-context/docs/implementation-design/platform/08-contrato-do-diario.md).
+
+Os testes de Diário usam `ICARUS_TESTES_POSTGRES` para criar/remover um banco
+isolado; verificam persistência, isolamento, exclusão e concorrência.
+
 ## Consumo analítico
 
 Referências públicas Gold 2.0.0 são lidas somente do snapshot PostgreSQL vigente

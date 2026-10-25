@@ -118,6 +118,7 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
                     b.Property<DateTimeOffset>("AtualizadoEm")
+                        .IsConcurrencyToken()
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("atualizado_em");
 
@@ -129,10 +130,22 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         .HasColumnType("date")
                         .HasColumnName("data_registro");
 
+                    b.Property<DateTimeOffset?>("ExcluidaEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("excluida_em");
+
                     b.Property<string>("Texto")
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("texto");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Reflexao")
+                        .HasColumnName("tipo");
 
                     b.Property<Guid>("UsuarioId")
                         .HasColumnType("uuid")

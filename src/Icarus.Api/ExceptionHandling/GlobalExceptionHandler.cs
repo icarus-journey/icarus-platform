@@ -23,6 +23,12 @@ public sealed partial class GlobalExceptionHandler(
                 Detail = loja.Message,
                 Extensions = { ["codigo"] = loja.Codigo }
             },
+            EntradaDiarioNaoEncontradaException => new ProblemDetails
+            {
+                Status = StatusCodes.Status404NotFound,
+                Title = "Entrada de diário não encontrada",
+                Detail = "Essa entrada não está disponível."
+            },
             DadosAtualizadosException => new ProblemDetails
             {
                 Status = StatusCodes.Status409Conflict,

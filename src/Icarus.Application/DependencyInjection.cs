@@ -1,3 +1,7 @@
+using Icarus.Application.UseCases.CriarEntradaDiario;
+using Icarus.Application.UseCases.ListarEntradasDiario;
+using Icarus.Application.UseCases.AtualizarEntradaDiario;
+using Icarus.Application.UseCases.ExcluirEntradaDiario;
 using Icarus.Application.UseCases.ConsultarRelatorioSemanal;
 using Icarus.Application.UseCases.SolicitarRelatorioSemanal;
 using Icarus.Application.UseCases.PersistirRelatorioSemanal;
@@ -48,6 +52,11 @@ public static class DependencyInjection
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
         services.AddSingleton(TimeProvider.System);
+        services.AddScoped<CriarEntradaDiarioUseCase>();
+        services.AddScoped<ListarEntradasDiarioUseCase>();
+        services.AddScoped<AtualizarEntradaDiarioUseCase>();
+        services.AddScoped<ExcluirEntradaDiarioUseCase>();
+
         services.AddScoped<ConsultarReferenciasPublicasUseCase>();
         services.AddScoped<ConsultarProgressoUseCase>();
         services.AddScoped<ConsultarRelatorioSemanalUseCase>();

@@ -1,3 +1,4 @@
+using Icarus.Api.Contracts.Diario;
 using Icarus.Api.Contracts.Analise;
 using Icarus.Api.Contracts.Loja;
 using System.Globalization;
@@ -57,6 +58,7 @@ public static class DependencyInjection
         services.AddSingleton<IValidator<ConsultarReferenciasPublicasRequest>, ConsultarReferenciasPublicasRequestValidator>();
         services.AddSingleton<IValidator<ConsultarProgressoRequest>, ConsultarProgressoRequestValidator>();
         services.AddSingleton<IValidator<RegisterRequest>, RegisterRequestValidator>();
+        services.AddSingleton<IValidator<EntradaDiarioRequest>, EntradaDiarioRequestValidator>();
         services.AddSingleton<IValidator<RecompensaRequest>, RecompensaRequestValidator>();
         services.AddSingleton<IValidator<ResgateRequest>, ResgateRequestValidator>();
         services.AddSingleton<IValidator<LoginRequest>, LoginRequestValidator>();
