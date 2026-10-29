@@ -16,6 +16,33 @@ public sealed partial class GlobalExceptionHandler(
     {
         var problemDetails = exception switch
         {
+            OperacaoLojaException loja => new ProblemDetails
+            {
+                Status = loja.NaoEncontrado ? StatusCodes.Status404NotFound : StatusCodes.Status409Conflict,
+                Title = "Não foi possível realizar a operação da loja",
+                Detail = loja.Message,
+                Extensions = { ["codigo"] = loja.Codigo }
+            },
+            EntradaDiarioNaoEncontradaException => new ProblemDetails
+            {
+                Status = StatusCodes.Status404NotFound,
+                Title = "Entrada de diário não encontrada",
+                Detail = "Essa entrada não está disponível."
+            },
+            ProgressoCampanhaException progresso => new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Title = "Não foi possível registrar o progresso",
+                Detail = progresso.Message,
+                Extensions = { ["codigo"] = progresso.Codigo }
+            },
+            DadosAtualizadosException => new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Title = "Dados atualizados por outra operação",
+                Detail = "Seus dados mudaram. Atualize a tela e tente novamente.",
+                Extensions = { ["codigo"] = "dados_atualizados" }
+            },
             EmailJaCadastradoException => new ProblemDetails
             {
                 Status = StatusCodes.Status409Conflict,
@@ -50,6 +77,97 @@ public sealed partial class GlobalExceptionHandler(
                 Type = "https://tools.ietf.org/html/rfc9110#section-15.5.5",
                 Title = "Perfil não encontrado",
                 Detail = "Perfil não encontrado."
+            },
+            TrabalhoOnboardingNaoEncontradoException => new ProblemDetails
+            {
+                Status = StatusCodes.Status404NotFound,
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.5",
+                Title = "Trabalho de onboarding não encontrado",
+                Detail = "Trabalho de onboarding não encontrado."
+            },
+            EpicoNaoEncontradoException => new ProblemDetails
+            {
+                Status = StatusCodes.Status404NotFound,
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.5",
+                Title = "Épico não encontrado",
+                Detail = "Épico não encontrado."
+            },
+            CampanhaNaoEncontradaException => new ProblemDetails
+            {
+                Status = StatusCodes.Status404NotFound,
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.5",
+                Title = "Campanha não encontrada",
+                Detail = "Campanha não encontrada."
+            },
+            MissaoNaoEncontradaException => new ProblemDetails
+            {
+                Status = StatusCodes.Status404NotFound,
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.5",
+                Title = "Missão não encontrada",
+                Detail = "Missão não encontrada."
+            },
+            MissaoConcluidaException => new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.10",
+                Title = "Missão concluída",
+                Detail = "Missão concluída não pode ser editada."
+            },
+            MissaoInativaException => new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.10",
+                Title = "Missão inativa",
+                Detail = "Missão inativa não pode ser concluída."
+            },
+            MissaoRecorrenteImutavelException => new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.10",
+                Title = "Missão recorrente imutável",
+                Detail = "Missão recorrente não pode ser editada. Pare esta missão e crie uma nova para alterar algo."
+            },
+            FotoPerfilInvalidaException fotoInvalida => new ProblemDetails
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+                Title = "Foto de perfil inválida",
+                Detail = fotoInvalida.Message
+            },
+            FotoPerfilNaoEncontradaException => new ProblemDetails
+            {
+                Status = StatusCodes.Status404NotFound,
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.5",
+                Title = "Foto de perfil não encontrada",
+                Detail = "Usuário não tem foto de perfil."
+            },
+            MissaoNaoRecorrenteException => new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.10",
+                Title = "Missão não recorrente",
+                Detail = "Somente missão recorrente pode ser inativada."
+            },
+            ConfiguracaoCampanhaBloqueadaException bloqueio => new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Title = "Campanha em andamento",
+                Detail = bloqueio.Message,
+                Extensions = { ["codigo"] = "configuracao_campanha_bloqueada" }
+            },
+            CampanhaConcluidaException => new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.10",
+                Title = "Campanha concluída",
+                Detail = "Campanha concluída não pode ser alterada."
+            },
+            EpicoConcluidoException => new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.10",
+                Title = "Épico concluído",
+                Detail = "Épico concluído não pode ser alterado."
             },
             _ => null
         };

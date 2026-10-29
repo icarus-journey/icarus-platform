@@ -14,7 +14,11 @@ public class Missao : EntidadeBase
     public long? CampanhaId { get; set; }
     public string Titulo { get; set; } = string.Empty;
     public string? Descricao { get; set; }
+    public Dificuldade Dificuldade { get; set; }
+
+    /// <summary>Calculada a partir de <see cref="Dificuldade"/> (ver MapeadorPontuacao) — nunca atribuída diretamente.</summary>
     public int Pontuacao { get; set; }
+
     public string? Beneficio { get; set; }
     public DateOnly? DataLimite { get; set; }
     public DateTimeOffset Horario { get; set; }

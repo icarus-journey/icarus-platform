@@ -14,6 +14,8 @@ public class Item : EntidadeBase
     public int Valor { get; set; }
 
     public string? Descricao { get; set; }
+    public EstadoRecompensa Estado { get; set; } = EstadoRecompensa.Disponivel;
+    public DateTimeOffset? PrimeiroResgateEm { get; set; }
 
     /// <summary>Indica se o item controla o aplicativo (ex.: proteção de sequência).</summary>
     public ControlaApp ControlaApp { get; set; } = ControlaApp.Nao;

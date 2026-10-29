@@ -8,16 +8,23 @@ public class CampanhaConfiguration : IEntityTypeConfiguration<Campanha>
 {
     public void Configure(EntityTypeBuilder<Campanha> builder)
     {
-        builder.ToTable("campanha");
+        builder.ToTable("campanha", t => t.HasCheckConstraint("ck_campanha_pontuacao_nao_negativa", "pontuacao >= 0"));
 
         builder.HasKey(c => c.Id);
+        builder.Property(c => c.AtualizadoEm).IsConcurrencyToken();
 
         builder.Property(c => c.Titulo)
             .IsRequired()
             .HasMaxLength(200);
 
-        builder.Property(c => c.Cor)
+        builder.Property(c => c.AreaDaVida)
             .IsRequired()
+            .HasConversion<string>()
+            .HasMaxLength(30);
+
+        builder.Property(c => c.Dificuldade)
+            .IsRequired()
+            .HasConversion<string>()
             .HasMaxLength(20);
 
         builder.Property(c => c.Unidade)

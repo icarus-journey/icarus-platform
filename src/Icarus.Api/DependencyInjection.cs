@@ -1,7 +1,16 @@
+using Icarus.Api.Contracts.Diario;
+using Icarus.Api.Contracts.Analise;
+using Icarus.Api.Contracts.Loja;
 using System.Globalization;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using FluentValidation;
 using Icarus.Api.Contracts.Auth;
+using Icarus.Api.Contracts.Campanhas;
+using Icarus.Api.Contracts.Epicos;
+using Icarus.Api.Contracts.Missoes;
+using Icarus.Api.Contracts.Usuarios;
 using Icarus.Api.ExceptionHandling;
 using Icarus.Api.Filters;
 using Icarus.Api.OpenApi;
@@ -28,6 +37,11 @@ public static class DependencyInjection
             // Campo ausente vira null e cai no FluentValidation (mensagem em pt-BR), em vez do
             // "required" implícito do MVC, que responderia antes em inglês.
             options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
+        }).AddJsonOptions(options =>
+        {
+            // Primeiro enum exposto via HTTP (onboarding) — camelCase consistente com o resto
+            // do JSON da API (ex.: "concluido", "saude", "facil"), em vez do valor numérico padrão.
+            options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
         });
 
         // Saiba mais sobre como configurar o OpenAPI em https://aka.ms/aspnet/openapi
@@ -41,9 +55,24 @@ public static class DependencyInjection
         services.AddExceptionHandler<GlobalExceptionHandler>();
 
         // Validadores são stateless, então singleton. Um por Request; o ValidationFilter os encontra sozinho.
+        services.AddSingleton<IValidator<ConsultarReferenciasPublicasRequest>, ConsultarReferenciasPublicasRequestValidator>();
+        services.AddSingleton<IValidator<ConsultarProgressoRequest>, ConsultarProgressoRequestValidator>();
         services.AddSingleton<IValidator<RegisterRequest>, RegisterRequestValidator>();
+        services.AddSingleton<IValidator<EntradaDiarioRequest>, EntradaDiarioRequestValidator>();
+        services.AddSingleton<IValidator<RecompensaRequest>, RecompensaRequestValidator>();
+        services.AddSingleton<IValidator<ResgateRequest>, ResgateRequestValidator>();
         services.AddSingleton<IValidator<LoginRequest>, LoginRequestValidator>();
         services.AddSingleton<IValidator<RefreshRequest>, RefreshRequestValidator>();
+        services.AddSingleton<IValidator<IniciarOnboardingRequest>, IniciarOnboardingRequestValidator>();
+        services.AddSingleton<IValidator<AtualizarPerfilRequest>, AtualizarPerfilRequestValidator>();
+        services.AddSingleton<IValidator<AtualizarFusoRequest>, AtualizarFusoRequestValidator>();
+        services.AddSingleton<IValidator<CriarEpicoRequest>, CriarEpicoRequestValidator>();
+        services.AddSingleton<IValidator<AtualizarEpicoRequest>, AtualizarEpicoRequestValidator>();
+        services.AddSingleton<IValidator<CriarCampanhaRequest>, CriarCampanhaRequestValidator>();
+        services.AddSingleton<IValidator<RegistrarProgressoCampanhaRequest>, RegistrarProgressoCampanhaRequestValidator>();
+        services.AddSingleton<IValidator<AtualizarCampanhaRequest>, AtualizarCampanhaRequestValidator>();
+        services.AddSingleton<IValidator<CriarMissaoRequest>, CriarMissaoRequestValidator>();
+        services.AddSingleton<IValidator<AtualizarMissaoRequest>, AtualizarMissaoRequestValidator>();
 
         // "Saúde da API" (seção 11 do icarus-context): /health responde 200 só se também
         // conseguir falar com o Postgres — não é só "o processo está de pé", é "a API funciona".

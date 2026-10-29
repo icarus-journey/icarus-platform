@@ -1,3 +1,4 @@
+using Icarus.Domain.Enums;
 using Icarus.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -11,6 +12,9 @@ public class ItemConfiguration : IEntityTypeConfiguration<Item>
         builder.ToTable("item", t => t.HasCheckConstraint("ck_item_valor_nao_negativo", "valor >= 0"));
 
         builder.HasKey(i => i.Id);
+        builder.Property(i => i.Estado).HasConversion<string>().HasMaxLength(20)
+            .HasDefaultValue(EstadoRecompensa.Disponivel);
+        builder.HasIndex(i => i.UsuarioId).IsUnique().HasFilter("controla_app = 'Sim'");
 
         builder.Property(i => i.Nome)
             .IsRequired()
