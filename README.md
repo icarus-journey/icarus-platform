@@ -73,3 +73,16 @@ e cenário condicional, calculados sobre medições comparáveis pelo
 `CalculadorCenarioConquista`; pontos/XP, revisões, dados antigos ou base
 insuficiente não liberam estimativa. Sem migration adicional ou IA. Contrato e limites:
 [progresso mensurado](../icarus-context/docs/implementation-design/platform/09-progresso-mensurado-campanhas.md).
+## Acesso local pelo aplicativo
+
+Para testar em Android físico ou iPhone na mesma rede, inicie a API com o perfil
+de desenvolvimento `rede-local`:
+
+```bash
+dotnet run --project src/Icarus.Api --launch-profile rede-local
+```
+
+Configure `EXPO_PUBLIC_API_URL=http://IP_DA_MAQUINA:5138` no `icarus-mobile`.
+O perfil `http` padrão continua ligado apenas a `localhost`. Use o perfil
+`rede-local` somente em uma rede de desenvolvimento confiável; o ambiente
+publicado deverá expor a API por HTTPS pelo proxy.
