@@ -27,6 +27,13 @@ isolado; verificam persistência, isolamento, exclusão e concorrência.
 
 ## Consumo analítico
 
+O cabeçalho usa `GET /api/usuarios/{id}/jornada` (HTTP 1.0.0): saldo disponível
+e sequência por dias distintos de realização, com fuso histórico preservado,
+sete dias de calendário e recálculo de registros retroativos. Ausência de
+metadados relevante retorna incerteza, sem backfill. Leitura consistente do
+PostgreSQL, sem alterar dados ou consumir proteção. Contrato:
+[sequência diária](../icarus-context/docs/implementation-design/platform/10-sequencia-diaria.md).
+
 Referências públicas Gold 2.0.0 são lidas somente do snapshot PostgreSQL vigente
 em `dados_publicos`; a API não executa ETL. HTTP autenticado e isolado por titular (referências/relatório 1.0.0,
 progresso 1.1.0): `GET /api/usuarios/{id}/referencias-publicas` (área e tipo de dia),
@@ -39,7 +46,7 @@ e [relatório](../icarus-context/docs/implementation-design/platform/07-relatori
 A migration `AdicionarRelatorioSemanalConfiavel` cria trabalho, inbox/outbox e
 unicidade por período. RabbitMQ e `icarus-ai` geram a síntese real; consultas
 reutilizam o resultado persistido. Sem fuso ou registros, não geram conteúdo.
-Previstas/taxa, sequência e comparação completa continuam dependentes de
+Previstas/taxa, sequência no relatório por período e comparação completa continuam dependentes de
 origens ainda não integradas aos indicadores; ausência não vira zero.
 
 [Contratos JSON e exemplos RF-10](contracts/relatorio-semanal/v1/) são versionados
@@ -109,8 +116,9 @@ Resposta 1.3.0 acrescenta realização, fuso histórico, ocorrência e data prev
 retry devolve os valores originais na precisão do PostgreSQL. A persistência
 impede reescrever realização/registro/fuso depois da conclusão. Migration
 `20261031013518_PreservarFusoRealizacaoMissao` acrescenta somente fuso nullable,
-sem preencher legado. Sequência/reconciliação e relatório persistido permanecem
-nas respectivas entregas; contrato na arquitetura 9.11.
+sem preencher legado. A sequência atual já usa essa origem em `/jornada`;
+reconciliação de proteção e relatório persistido permanecem nas respectivas
+entregas; contrato na arquitetura 9.11.
 
 ## Exclusão do planejamento
 

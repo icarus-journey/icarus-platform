@@ -40,6 +40,7 @@ public static class DependencyInjection
         services.AddSingleton<ILoginAttemptLimiter, LoginAttemptLimiter>();
 
         services.AddScoped<IUsuarioRepository, UsuarioRepository>();
+        services.AddScoped<IJornadaRepository, JornadaRepository>();
         services.AddScoped<IDiarioRepository, DiarioRepository>();
         services.AddScoped<IReferenciasPublicasRepository, ReferenciasPublicasRepository>();
         services.AddScoped<IIndicadoresPessoaisRepository, IndicadoresPessoaisRepository>();
