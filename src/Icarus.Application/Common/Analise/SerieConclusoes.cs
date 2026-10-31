@@ -25,4 +25,4 @@ public sealed record SerieConclusoes(string Granularidade, IReadOnlyList<PontoSe
     }
 }
 
-public sealed record ProgressoCalculado(IndicadoresPessoais Indicadores, SerieConclusoes? Evolucao);
+public sealed record ProgressoCalculado(IndicadoresPessoais Indicadores, SerieConclusoes? Evolucao, ResumoAdesao? Adesao = null);

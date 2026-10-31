@@ -12,8 +12,11 @@ namespace Icarus.Infrastructure.Persistence;
 /// </summary>
 public class IcarusDbContext : DbContext, IUnitOfWork
 {
-    public IcarusDbContext(DbContextOptions<IcarusDbContext> options) : base(options)
+    private readonly TimeProvider _relogio;
+
+    public IcarusDbContext(DbContextOptions<IcarusDbContext> options, TimeProvider? relogio = null) : base(options)
     {
+        _relogio = relogio ?? TimeProvider.System;
     }
 
     public DbSet<Usuario> Usuarios => Set<Usuario>();
@@ -94,7 +97,33 @@ public class IcarusDbContext : DbContext, IUnitOfWork
                 && (resgate.Property(x => x.Estado).IsModified || resgate.Property(x => x.UtilizadoEm).IsModified))
                 throw new InvalidOperationException("O uso de uma recompensa é irreversível.");
         }
-        var agora = DateTimeOffset.UtcNow;
+        if (ChangeTracker.Entries<RegistroPlanejamentoOcorrencia>().Any(e => e.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("O histórico do planejamento é imutável.");
+        var agora = _relogio.GetUtcNow();
+        foreach (var entry in ChangeTracker.Entries<Ocorrencia>().ToArray())
+        {
+            var alterada = entry.State == EntityState.Modified &&
+                (entry.Property(o => o.DataPrevista).IsModified ||
+                 (entry.Property(o => o.Status).OriginalValue == Domain.Enums.StatusOcorrencia.Excluida)
+                    != (entry.Entity.Status == Domain.Enums.StatusOcorrencia.Excluida));
+            if (entry.State != EntityState.Added && !alterada) continue;
+            var ativa = entry.Entity.Status != Domain.Enums.StatusOcorrencia.Excluida;
+            if (ChangeTracker.Entries<RegistroPlanejamentoOcorrencia>().Any(r => r.State == EntityState.Added
+                && ReferenceEquals(r.Entity.Ocorrencia, entry.Entity) && r.Entity.DataPrevista == entry.Entity.DataPrevista && r.Entity.Ativa == ativa)) continue;
+            Add(new RegistroPlanejamentoOcorrencia
+            {
+                Ocorrencia = entry.Entity,
+                DataPrevista = entry.Entity.DataPrevista,
+                Ativa = ativa,
+                RegistradoEm = agora
+            });
+        }
+        foreach (var entry in ChangeTracker.Entries<Missao>().Where(e => e.State == EntityState.Modified))
+            if (entry.Property(m => m.Status).OriginalValue == Domain.Enums.StatusMissao.Ativa
+                && entry.Entity.Status != Domain.Enums.StatusMissao.Ativa)
+                entry.Entity.PlanejamentoEncerradoEm ??= agora;
+        foreach (var entry in ChangeTracker.Entries<Usuario>().Where(e => e.State == EntityState.Added))
+            if (entry.Entity.PlanejamentoVersionadoDesde == default) entry.Entity.PlanejamentoVersionadoDesde = agora;
 
         foreach (var entry in ChangeTracker.Entries<EntidadeBase>())
         {

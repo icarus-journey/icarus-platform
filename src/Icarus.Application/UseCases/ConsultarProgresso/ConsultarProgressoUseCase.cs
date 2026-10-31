@@ -19,6 +19,6 @@ public sealed class ConsultarProgressoUseCase(IUsuarioRepository usuarios, IIndi
             "historico_mensurado_indisponivel", dados.QuantidadeRegistros == 0
                 ? "Ainda não há registros neste período. Isso não significa que você não realizou atividades."
                 : "Estes indicadores resumem apenas os registros do aplicativo, não sua rotina inteira.",
-            Evolucao: calculado.Evolucao);
+            Evolucao: calculado.Evolucao, Adesao: calculado.Adesao);
     }
 }

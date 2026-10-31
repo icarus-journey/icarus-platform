@@ -5,7 +5,7 @@ dos dados transacionais do Icarus.
 
 Loja autenticada: [`05-contrato-da-loja.md`](../icarus-context/docs/implementation-design/platform/05-contrato-da-loja.md)
 (RF-06.1 a RF-06.4). Configure o preço da proteção por `Loja__CustoProtecao`
-(padrão: 500 pontos). O consumo automático diário é uma entrega separada.
+(padrão: 500 pontos). O consumo automático diário está integrado no MVP-10, descrito ao final.
 
 Perfil autenticado: [`04-contrato-de-autenticacao.md`](../icarus-context/docs/implementation-design/platform/04-contrato-de-autenticacao.md).
 A consulta existente inclui estudo/trabalho opcionais; `PUT /api/usuarios/{id}/perfil`
@@ -27,7 +27,7 @@ isolado; verificam persistência, isolamento, exclusão e concorrência.
 
 ## Consumo analítico
 
-O cabeçalho usa `GET /api/usuarios/{id}/jornada` (HTTP 1.0.0): saldo disponível
+O cabeçalho usa `GET /api/usuarios/{id}/jornada` (HTTP 1.1.0): saldo disponível
 e sequência por dias distintos de realização, com fuso histórico preservado,
 sete dias de calendário e recálculo de registros retroativos. Ausência de
 metadados relevante retorna incerteza, sem backfill. Leitura consistente do
@@ -36,7 +36,7 @@ PostgreSQL, sem alterar dados ou consumir proteção. Contrato:
 
 Referências públicas Gold 2.0.0 são lidas somente do snapshot PostgreSQL vigente
 em `dados_publicos`; a API não executa ETL. HTTP autenticado e isolado por titular (referências/relatório 1.0.0,
-progresso 1.1.0): `GET /api/usuarios/{id}/referencias-publicas` (área e tipo de dia),
+progresso 1.2.0): `GET /api/usuarios/{id}/referencias-publicas` (área e tipo de dia),
 `GET /api/usuarios/{id}/progresso` (períodos completos) e relatório semanal
 `GET /api/usuarios/{id}/relatorios/semanais/atual`, `POST .../semanais` e
 `POST .../semanais/tentar-novamente`. Consulte os contratos
@@ -62,6 +62,17 @@ civis. Série e total usam o mesmo conjunto de realizações no fuso do titular.
 Sem conclusões, a série é ausente; zeros internos indicam datas sem conclusão
 registrada, sem afirmar ausência de atividade. É extensão apenas da leitura
 pessoal HTTP: a mensagem RF-10 e a lista permitida da IA permanecem 1.0.0.
+
+O progresso 1.2.0 acrescenta `adesao`: planejamento vigente ao fechar o período,
+feitas desse conjunto, pendentes, atrasadas e porcentagem calculada na API.
+Atividade realizada e adesão são conjuntos separados. A migração
+`20261031211015_RegistrarPlanejamentoAnalitico` observa o legado somente na
+implantação e preserva novas versões na transação da mutação; não recompõe o
+passado. Legado, janela incompleta e realização sem data deixam a taxa ausente,
+com registros observados disponíveis. Consulta não cria planejamento.
+A integração dessas métricas ao contrato consumidor RF-10 permanece no MVP-13;
+`CalcularAsync` conserva sua base anterior. Detalhes e fórmulas no contrato
+[analítico 1.2.0](../icarus-context/docs/implementation-design/platform/06-consumo-analitico-mobile-api.md).
 
 ## Editar missão recorrente
 

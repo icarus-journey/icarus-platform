@@ -583,6 +583,10 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("horario");
 
+                    b.Property<DateTimeOffset?>("PlanejamentoEncerradoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("planejamento_encerrado_em");
+
                     b.Property<int>("Pontuacao")
                         .HasColumnType("integer")
                         .HasColumnName("pontuacao");
@@ -977,6 +981,40 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_recorrencia_missao_id");
 
                     b.ToTable("recorrencia", (string)null);
+                });
+
+            modelBuilder.Entity("Icarus.Domain.Entities.RegistroPlanejamentoOcorrencia", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<bool>("Ativa")
+                        .HasColumnType("boolean")
+                        .HasColumnName("ativa");
+
+                    b.Property<DateOnly>("DataPrevista")
+                        .HasColumnType("date")
+                        .HasColumnName("data_prevista");
+
+                    b.Property<long>("OcorrenciaId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("ocorrencia_id");
+
+                    b.Property<DateTimeOffset>("RegistradoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("registrado_em");
+
+                    b.HasKey("Id")
+                        .HasName("pk_registro_planejamento_ocorrencia");
+
+                    b.HasIndex("OcorrenciaId", "RegistradoEm", "Id")
+                        .HasDatabaseName("ix_registro_planejamento_ocorrencia_ocorrencia_id_registrado_e");
+
+                    b.ToTable("registro_planejamento_ocorrencia", (string)null);
                 });
 
             modelBuilder.Entity("Icarus.Domain.Entities.Relatorio", b =>
@@ -1412,6 +1450,12 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("nome");
 
+                    b.Property<DateTimeOffset>("PlanejamentoVersionadoDesde")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("planejamento_versionado_desde")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
                     b.Property<DateTimeOffset>("ProtecaoAtivadaEm")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -1698,6 +1742,18 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_recorrencia_missao_missao_id");
 
                     b.Navigation("Missao");
+                });
+
+            modelBuilder.Entity("Icarus.Domain.Entities.RegistroPlanejamentoOcorrencia", b =>
+                {
+                    b.HasOne("Icarus.Domain.Entities.Ocorrencia", "Ocorrencia")
+                        .WithMany()
+                        .HasForeignKey("OcorrenciaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_registro_planejamento_ocorrencia_ocorrencia_ocorrencia_id");
+
+                    b.Navigation("Ocorrencia");
                 });
 
             modelBuilder.Entity("Icarus.Domain.Entities.Relatorio", b =>

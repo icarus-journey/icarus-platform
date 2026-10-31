@@ -20,6 +20,7 @@ public class Usuario : EntidadeBase
     public string? FusoHorario { get; set; }
     public DateTimeOffset ProtecaoAtivadaEm { get; set; }
     public string? FusoInicioProtecao { get; set; }
+    public DateTimeOffset PlanejamentoVersionadoDesde { get; set; }
 
     /// <summary>Chave do objeto no MinIO (bucket de fotos de perfil); nula quando o usuário não tem foto.</summary>
     public string? FotoChave { get; set; }
