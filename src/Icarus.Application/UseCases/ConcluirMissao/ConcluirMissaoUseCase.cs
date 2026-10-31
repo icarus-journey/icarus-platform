@@ -17,6 +17,7 @@ public sealed partial class ConcluirMissaoUseCase(
     ICampanhaRepository campanhaRepository,
     IUsuarioRepository usuarioRepository,
     IUnitOfWork unitOfWork,
+    ITransacaoConclusaoMissao transacao,
     ILogger<ConcluirMissaoUseCase> logger, TimeProvider? relogio = null, IIniciadorCampanhas? iniciador = null)
 {
     public async Task<ConcluirMissaoResult> ExecuteAsync(ConcluirMissaoCommand command, CancellationToken cancellationToken)
@@ -28,6 +29,16 @@ public sealed partial class ConcluirMissaoUseCase(
         }
 
         if (iniciador is not null) await iniciador.ExecuteAsync(command.UsuarioIdSolicitado, cancellationToken);
+        var resultado = await transacao.ExecutarAsync(command.UsuarioIdSolicitado,
+            token => ConcluirProtegidoAsync(command, token), cancellationToken);
+        if (resultado is null) throw new MissaoInativaException();
+        if (resultado.Repetida) LogConclusaoDuplicada(resultado.Id, resultado.OcorrenciaId!.Value);
+        else LogMissaoConcluida(resultado.Id, resultado.OcorrenciaId!.Value, resultado.PontuacaoCreditada);
+        return resultado;
+    }
+
+    private async Task<ConcluirMissaoResult?> ConcluirProtegidoAsync(ConcluirMissaoCommand command, CancellationToken cancellationToken)
+    {
         var missao = await missaoRepository.BuscarPorIdAsync(command.MissaoId, command.UsuarioIdSolicitado, cancellationToken)
             ?? throw new MissaoNaoEncontradaException();
         if (missao.Status == StatusMissao.Excluida) throw new MissaoNaoEncontradaException();
@@ -47,7 +58,8 @@ public sealed partial class ConcluirMissaoUseCase(
         var hoje = FusoHorario.DataLocal(agora, usuario.FusoHorario);
         if (RegrasRecorrencia.EncerrarSeNecessario(missao, hoje))
             await unitOfWork.SalvarAlteracoesAsync(cancellationToken);
-        if (missao.Status == StatusMissao.Inativa) throw new MissaoInativaException();
+        // O encerramento por prazo é uma sincronização persistida mesmo quando a conclusão é recusada.
+        if (missao.Status == StatusMissao.Inativa) return null;
         Ocorrencia? escolhida = null;
         if (command.OcorrenciaId is { } id)
         {
@@ -71,7 +83,6 @@ public sealed partial class ConcluirMissaoUseCase(
         {
             if (ocorrencia.ConcluidaEm is null)
                 throw new EdicaoMissaoException("historico_incompleto", "Esta execução já está concluída e precisa ser revisada.", true);
-            LogConclusaoDuplicada(missao.Id, ocorrencia.Id);
             return new ConcluirMissaoResult(missao.Id, ocorrencia.ConcluidaEm!.Value,
                 ocorrencia.Status == StatusOcorrencia.ConcluidaComAtraso, disponibilidade.Pontuacao!.Value, usuario.SaldoPontos, true,
                 ocorrencia.RealizadaEm, ocorrencia.FusoHorarioRealizacao, ocorrencia.Id, ocorrencia.DataPrevista);
@@ -124,8 +135,6 @@ public sealed partial class ConcluirMissaoUseCase(
         }
 
         await unitOfWork.SalvarAlteracoesAsync(cancellationToken);
-
-        LogMissaoConcluida(missao.Id, ocorrencia.Id, pontuacao);
 
         return new ConcluirMissaoResult(missao.Id, agora, concluidaComAtraso, pontuacao, usuario.SaldoPontos, false,
             ocorrencia.RealizadaEm, ocorrencia.FusoHorarioRealizacao, ocorrencia.Id, ocorrencia.DataPrevista);

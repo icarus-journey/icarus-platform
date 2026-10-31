@@ -17,7 +17,7 @@ public sealed class RealizacaoMissaoPostgresTests(BancoLoja banco) : IClassFixtu
     private static readonly DateOnly Hoje = new(2026, 10, 30);
     private sealed class Relogio : TimeProvider { public override DateTimeOffset GetUtcNow() => Agora; }
     private static ConcluirMissaoUseCase Conclusao(IcarusDbContext c, TimeProvider? relogio = null) => new(new MissaoRepository(c), new OcorrenciaRepository(c),
-        new MovimentacaoPontosRepository(c), new CampanhaRepository(c), new UsuarioRepository(c), c,
+        new MovimentacaoPontosRepository(c), new CampanhaRepository(c), new UsuarioRepository(c), c, new TransacaoConclusaoMissao(c),
         NullLogger<ConcluirMissaoUseCase>.Instance, relogio ?? new Relogio());
     private static ConsultarMissaoUseCase Consulta(IcarusDbContext c) => new(new PlanejamentoMissaoRepository(c), c, new Relogio());
 

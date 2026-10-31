@@ -26,7 +26,7 @@ public sealed class DatasRecorrenciaPostgresTests(BancoLoja banco) : IClassFixtu
     private static ConsultarMissaoUseCase Consulta(IcarusDbContext c) => new(new PlanejamentoMissaoRepository(c), c, new Relogio(), Inicio(c));
     private static ConcluirMissaoUseCase Conclusao(IcarusDbContext c, IUnitOfWork? unidade = null) => new(new MissaoRepository(c),
         new OcorrenciaRepository(c), new MovimentacaoPontosRepository(c), new CampanhaRepository(c), new UsuarioRepository(c),
-        unidade ?? c, NullLogger<ConcluirMissaoUseCase>.Instance, new Relogio(), Inicio(c));
+        unidade ?? c, new TransacaoConclusaoMissao(c), NullLogger<ConcluirMissaoUseCase>.Instance, new Relogio(), Inicio(c));
     private static EstenderJanelaDeOcorrenciasUseCase Manutencao(IcarusDbContext c) => new(new MissaoRepository(c),
         new OcorrenciaRepository(c), c, NullLogger<EstenderJanelaDeOcorrenciasUseCase>.Instance, new Relogio());
     private static CriarMissaoUseCase Criacao(IcarusDbContext c) => new(new CampanhaRepository(c), new MissaoRepository(c),

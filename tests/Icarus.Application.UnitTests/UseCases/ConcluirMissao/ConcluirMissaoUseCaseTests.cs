@@ -138,7 +138,7 @@ public class ConcluirMissaoUseCaseTests
         _missaoRepositorio.Ocorrencias = _ocorrenciaRepositorio.Ocorrencias;
         _useCase = new ConcluirMissaoUseCase(
             _missaoRepositorio, _ocorrenciaRepositorio, _movimentacaoRepositorio, _campanhaRepositorio,
-            _usuarioRepositorio, _usuarioRepositorio, NullLogger<ConcluirMissaoUseCase>.Instance);
+            _usuarioRepositorio, _usuarioRepositorio, new TransacaoConclusaoEmMemoria(), NullLogger<ConcluirMissaoUseCase>.Instance);
     }
 
     private Usuario AdicionarUsuario(Guid id, long saldoInicial = 0)
@@ -346,4 +346,10 @@ public class ConcluirMissaoUseCaseTests
         Assert.True(resultado.ConcluidaComAtraso);
         Assert.Equal(StatusOcorrencia.ConcluidaComAtraso, _ocorrenciaRepositorio.Ocorrencias.Single().Status);
     }
+}
+
+internal sealed class TransacaoConclusaoEmMemoria : ITransacaoConclusaoMissao
+{
+    public Task<T> ExecutarAsync<T>(Guid usuarioId, Func<CancellationToken, Task<T>> operacao, CancellationToken ct)
+        => operacao(ct);
 }

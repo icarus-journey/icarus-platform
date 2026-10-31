@@ -60,6 +60,7 @@ public static class DependencyInjection
         services.AddScoped<IOcorrenciaRepository, OcorrenciaRepository>();
         services.AddScoped<IRecorrenciaRepository, RecorrenciaRepository>();
         services.AddScoped<IMovimentacaoPontosRepository, MovimentacaoPontosRepository>();
+        services.AddScoped<ITransacaoConclusaoMissao, TransacaoConclusaoMissao>();
         services.AddScoped<ITrabalhoOnboardingRepository, TrabalhoOnboardingRepository>();
 
         // Mesma instância de IcarusDbContext do escopo (não uma nova) — repositório e

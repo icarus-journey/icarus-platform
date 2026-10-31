@@ -84,7 +84,19 @@ vincular o envio à execução mostrada; sem corpo, mantém compatibilidade. Nun
 antecipa datas nem conclui campanha planejada. Repetição retorna `repetida: true`
 e o crédito efetivo, sem novo lançamento. `409` para execução indisponível;
 `404` para identificador alheio/ausente, `401` sem sessão e `400` para corpo
-inválido. Concorrência integral de créditos segue no MVP-08.
+inválido.
+
+RF-05.2: conclusão usa transação explícita e bloqueia o saldo antes de consultar
+a execução, na ordem da loja. Missões diferentes e resgates compartilham essa
+coordenação; mesma ocorrência confirmada retorna o resultado original com
+`repetida: true`. Crédito/saldo/contador e conclusão são confirmados ou revertidos
+juntos, inclusive após salvar e antes do commit. Versões dos pais preservam os
+conflitos com edição/exclusão/manutenção. A migration
+`20261031143311_GarantirCreditoUnicoPorOcorrencia` cria o índice parcial de um
+`GanhoMissao` por ocorrência não nula, sem alterar dados anteriores. Violação do
+índice retorna `409 dados_atualizados`. O alvo da idempotência é a ocorrência:
+use o identificador do GET para repetir a mesma execução; sem identificador,
+a seleção vigente pode apontar outra pendência. HTTP 1.3.0 e mobile inalterados.
 
 RF-05.1: omitir os campos de realização mantém **agora**, pelo relógio da API.
 Para outro momento, o POST aceita `dataRealizacao` (`YYYY-MM-DD`) e

@@ -683,6 +683,11 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                     b.HasIndex("UsuarioId", "Tipo")
                         .HasDatabaseName("ix_movimentacao_pontos_usuario_id_tipo");
 
+                    b.HasIndex(new[] { "OcorrenciaId" }, "credito_missao_unico")
+                        .IsUnique()
+                        .HasDatabaseName("uq_movimentacao_ganho_missao_ocorrencia")
+                        .HasFilter("tipo = 'GanhoMissao' AND ocorrencia_id IS NOT NULL");
+
                     b.ToTable("movimentacao_pontos", (string)null);
                 });
 

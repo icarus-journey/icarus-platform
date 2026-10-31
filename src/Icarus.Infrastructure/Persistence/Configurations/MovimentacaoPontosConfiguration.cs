@@ -41,5 +41,9 @@ public class MovimentacaoPontosConfiguration : IEntityTypeConfiguration<Moviment
         builder.HasIndex(m => new { m.UsuarioId, m.CriadoEm });
         builder.HasIndex(m => new { m.UsuarioId, m.Tipo });
         builder.HasIndex(m => m.OcorrenciaId);
+        builder.HasIndex(m => m.OcorrenciaId, "credito_missao_unico")
+            .IsUnique()
+            .HasDatabaseName("uq_movimentacao_ganho_missao_ocorrencia")
+            .HasFilter("tipo = 'GanhoMissao' AND ocorrencia_id IS NOT NULL");
     }
 }
