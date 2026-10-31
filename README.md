@@ -162,3 +162,21 @@ Configure `EXPO_PUBLIC_API_URL=http://IP_DA_MAQUINA:5138` no `icarus-mobile`.
 O perfil `http` padrão continua ligado apenas a `localhost`. Use o perfil
 `rede-local` somente em uma rede de desenvolvimento confiável; o ambiente
 publicado deverá expor a API por HTTPS pelo proxy.
+
+
+## Proteção automática da sequência — MVP-10
+
+A migration `20261031201138_ProtecaoAutomaticaSequencia` acrescenta fechamento,
+consumo auditado, compensação e outbox; aplique via `dotnet ef database update`
+conforme a configuração local. Não cobra faltas anteriores à ativação. Regras e
+transações ficam em C#; `icarus-ai` coordena ciclos de um minuto e encaminha UUIDs
+opacos em `jornada.fechamento.v1`, sem IA ou dados pessoais nesse fluxo.
+Dia protegido mantém a contagem; sequência zerada poupa estoque. Retroativo
+reconcilia cronologicamente, sem apagar usos nem gerar pontos. Devolução
+excedente aguarda vaga; reposição mantém no máximo três unidades disponíveis.
+A Loja sincroniza o fechamento sob o bloqueio do titular. `/jornada` 1.1.0
+acrescenta `dias[].protegida` e `protecoesPendentes`; a leitura continua isolada e
+sem gravação. `RabbitMq:Vhost` permite separar o transporte em testes (padrão `/`).
+Testes PostgreSQL usam banco exclusivo por fixture e verificam duplicatas,
+concorrência, rollback, fuso, estoque, retroativo e falha de conexão ao broker.
+Contrato: [jornada e transporte operacional](../icarus-context/docs/implementation-design/platform/10-sequencia-diaria.md).

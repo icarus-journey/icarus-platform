@@ -18,7 +18,7 @@ public sealed partial class ConcluirMissaoUseCase(
     IUsuarioRepository usuarioRepository,
     IUnitOfWork unitOfWork,
     ITransacaoConclusaoMissao transacao,
-    ILogger<ConcluirMissaoUseCase> logger, TimeProvider? relogio = null, IIniciadorCampanhas? iniciador = null)
+    ILogger<ConcluirMissaoUseCase> logger, TimeProvider? relogio = null, IIniciadorCampanhas? iniciador = null, IProtecaoSequencia? protecoes = null)
 {
     public async Task<ConcluirMissaoResult> ExecuteAsync(ConcluirMissaoCommand command, CancellationToken cancellationToken)
     {
@@ -134,6 +134,7 @@ public sealed partial class ConcluirMissaoUseCase(
             }
         }
 
+        protecoes?.SolicitarRecalculo(usuario.Id);
         await unitOfWork.SalvarAlteracoesAsync(cancellationToken);
 
         return new ConcluirMissaoResult(missao.Id, agora, concluidaComAtraso, pontuacao, usuario.SaldoPontos, false,

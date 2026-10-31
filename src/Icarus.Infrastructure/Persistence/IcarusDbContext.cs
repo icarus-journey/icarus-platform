@@ -79,6 +79,21 @@ public class IcarusDbContext : DbContext, IUnitOfWork
                 .Any(nome => !Equals(ocorrencia.Property(nome).OriginalValue, ocorrencia.Property(nome).CurrentValue)))
                 throw new InvalidOperationException("Realização, registro e fuso de uma conclusão são imutáveis.");
         }
+        foreach (var consumo in ChangeTracker.Entries<ConsumoProtecao>().Where(e => e.State == EntityState.Modified))
+        {
+            if (new[] { nameof(ConsumoProtecao.UsuarioId), nameof(ConsumoProtecao.Data), nameof(ConsumoProtecao.FusoHorario),
+                    nameof(ConsumoProtecao.ResgateId), nameof(ConsumoProtecao.ConsumidoEm) }
+                .Any(nome => !Equals(consumo.Property(nome).OriginalValue, consumo.Property(nome).CurrentValue))
+                || (consumo.Property(x => x.CompensadoEm).OriginalValue is not null && consumo.Property(x => x.CompensadoEm).IsModified)
+                || (consumo.Property(x => x.DevolucaoId).OriginalValue is not null && consumo.Property(x => x.DevolucaoId).IsModified))
+                throw new InvalidOperationException("O consumo e sua compensação preservam o histórico original.");
+        }
+        foreach (var resgate in ChangeTracker.Entries<ResgateItem>().Where(e => e.State == EntityState.Modified))
+        {
+            if (resgate.Property(x => x.Estado).OriginalValue == Domain.Enums.EstadoResgate.Utilizado
+                && (resgate.Property(x => x.Estado).IsModified || resgate.Property(x => x.UtilizadoEm).IsModified))
+                throw new InvalidOperationException("O uso de uma recompensa é irreversível.");
+        }
         var agora = DateTimeOffset.UtcNow;
 
         foreach (var entry in ChangeTracker.Entries<EntidadeBase>())

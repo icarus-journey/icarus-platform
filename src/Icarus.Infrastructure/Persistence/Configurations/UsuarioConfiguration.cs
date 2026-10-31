@@ -42,6 +42,8 @@ public class UsuarioConfiguration : IEntityTypeConfiguration<Usuario>
         builder.Property(u => u.CargaHorariaEstudoSemanal).HasPrecision(5, 2);
         builder.Property(u => u.CargaHorariaTrabalhoSemanal).HasPrecision(5, 2);
         builder.Property(u => u.FusoHorario).HasMaxLength(100);
+        builder.Property(u => u.ProtecaoAtivadaEm).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        builder.Property(u => u.FusoInicioProtecao).HasMaxLength(100);
 
         builder.Property(u => u.FotoChave)
             .HasMaxLength(100);

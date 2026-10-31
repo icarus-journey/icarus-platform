@@ -16,8 +16,13 @@ public sealed class IndicadoresPessoaisRepository(IcarusDbContext contexto) : II
         var conclusoes = await contexto.Ocorrencias.AsNoTracking()
             .Where(o => o.Missao.UsuarioId == usuarioId && o.RealizadaEm >= inicio && o.RealizadaEm < fim
                 && (o.Status == StatusOcorrencia.Concluida || o.Status == StatusOcorrencia.ConcluidaComAtraso))
-            .Select(o => new { o.RealizadaEm, o.Status, o.Missao.CampanhaId,
-                Area = o.Missao.Campanha != null ? (AreaDaVida?)o.Missao.Campanha.AreaDaVida : null })
+            .Select(o => new
+            {
+                o.RealizadaEm,
+                o.Status,
+                o.Missao.CampanhaId,
+                Area = o.Missao.Campanha != null ? (AreaDaVida?)o.Missao.Campanha.AreaDaVida : null
+            })
             .ToListAsync(ct);
         var movimentos = await contexto.MovimentacoesPontos.AsNoTracking()
             .Where(m => m.UsuarioId == usuarioId && m.CriadoEm >= inicio && m.CriadoEm < fim)
@@ -25,15 +30,23 @@ public sealed class IndicadoresPessoaisRepository(IcarusDbContext contexto) : II
         var resgates = await contexto.Set<Icarus.Domain.Entities.ResgateItem>().AsNoTracking()
             .Where(r => r.UsuarioId == usuarioId && ((r.ResgatadoEm >= inicio && r.ResgatadoEm < fim)
                 || (r.UtilizadoEm >= inicio && r.UtilizadoEm < fim)))
-            .Select(r => new { r.ResgatadoEm, r.UtilizadoEm }).ToListAsync(ct);
+            .Select(r => new
+            {
+                r.ResgatadoEm,
+                r.UtilizadoEm,
+                r.CompensacaoOrigemId,
+                UsoCompensado = contexto.Set<Icarus.Domain.Entities.ConsumoProtecao>().Any(c => c.ResgateId == r.Id && c.CompensadoEm != null)
+            }).ToListAsync(ct);
         var fuso = TimeZoneInfo.FindSystemTimeZoneById(periodo.FusoHorario);
         var areas = conclusoes.Where(o => o.Area is not null).GroupBy(o => o.Area!.Value)
             .Select(g => new ConclusoesPorArea(CatalogoAreasAnaliticas.Areas.Single(a => a.Area == g.Key).Codigo, g.Count()))
             .OrderBy(a => a.AreaDaVida, StringComparer.Ordinal).ToArray();
         var ganhos = movimentos.Where(m => m.Quantidade > 0 && (m.Tipo is TipoMovimentacaoPontos.GanhoMissao or TipoMovimentacaoPontos.Bonus)).ToArray();
         var gastos = movimentos.Where(m => m.Quantidade < 0 && m.Tipo == TipoMovimentacaoPontos.CompraItem).ToArray();
-        var compras = resgates.Count(r => r.ResgatadoEm >= inicio && r.ResgatadoEm < fim);
-        var usos = resgates.Count(r => r.UtilizadoEm >= inicio && r.UtilizadoEm < fim);
+        var compras = resgates.Count(r => r.CompensacaoOrigemId == null && r.ResgatadoEm >= inicio && r.ResgatadoEm < fim);
+        var usos = resgates.Count(r => !r.UsoCompensado && r.UtilizadoEm >= inicio && r.UtilizadoEm < fim);
+        var registrosLoja = resgates.Count(r => (r.CompensacaoOrigemId == null && r.ResgatadoEm >= inicio && r.ResgatadoEm < fim)
+            || (!r.UsoCompensado && r.UtilizadoEm >= inicio && r.UtilizadoEm < fim));
         var maiorAtividade = conclusoes.Where(o => o.CampanhaId is not null).GroupBy(o => o.CampanhaId)
             .Select(g => (int?)g.Count()).OrderDescending().FirstOrDefault();
         var datas = conclusoes.Select(o => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(o.RealizadaEm!.Value, fuso).DateTime)).ToArray();
@@ -43,7 +56,7 @@ public sealed class IndicadoresPessoaisRepository(IcarusDbContext contexto) : II
             compras == 0 ? null : compras, usos == 0 ? null : usos, areas,
             conclusoes.Count == 0 ? null : conclusoes.Count(o => o.Area is null), maiorAtividade, null,
             datas.Distinct().Count(),
-            conclusoes.Count + movimentos.Count + resgates.Count, true,
+            conclusoes.Count + movimentos.Count + registrosLoja, true,
             ["A ausência de registro não significa ausência da atividade.",
              "Conclusões usam a data de realização registrada no aplicativo e o fuso do período.",
              "Previstas, pendentes, atrasadas e taxa ainda dependem do histórico completo das ocorrências planejadas; não são estimadas pelas conclusões.",

@@ -156,4 +156,25 @@ public sealed class CalculadorSequenciaTests
         Assert.Equal(0, resultado.DiasAtuais);
         Assert.Equal("sem_registros", resultado.Estado);
     }
+
+    [Fact]
+    public void DiaProtegidoMantemContagemSemFingirRealizacao()
+    {
+        var dados = new DadosJornada(20, "America/Sao_Paulo", [Feita("2026-10-29"), Feita("2026-10-31")], [new(2026, 10, 30)]);
+        var resultado = CalculadorSequencia.Calcular(dados, Agora);
+        Assert.Equal(2, resultado.DiasAtuais);
+        var dia = resultado.Dias.Single(d => d.Data == new DateOnly(2026, 10, 30));
+        Assert.True(dia.Protegida); Assert.False(dia.Realizada);
+        Assert.True(resultado.RealizouHoje);
+    }
+
+    [Fact]
+    public void ProtecaoNuncaPintaChamaDeHojeComoRealizada()
+    {
+        var dados = new DadosJornada(20, "America/Sao_Paulo", [Feita("2026-10-29")], [new(2026, 10, 30)]);
+        var resultado = CalculadorSequencia.Calcular(dados, Agora);
+        Assert.Equal(1, resultado.DiasAtuais);
+        Assert.False(resultado.RealizouHoje);
+        Assert.False(resultado.Dias.Last().Protegida);
+    }
 }

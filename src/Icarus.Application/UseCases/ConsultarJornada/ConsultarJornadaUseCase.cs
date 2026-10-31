@@ -10,6 +10,6 @@ public sealed class ConsultarJornadaUseCase(IJornadaRepository repositorio, Time
     {
         if (command.UsuarioIdAutenticado != command.UsuarioIdSolicitado) throw new PerfilNaoEncontradoException();
         var dados = await repositorio.BuscarAsync(command.UsuarioIdSolicitado, ct) ?? throw new PerfilNaoEncontradoException();
-        return new(dados.SaldoPontos, CalculadorSequencia.Calcular(dados, relogio.GetUtcNow()));
+        return new(dados.SaldoPontos, CalculadorSequencia.Calcular(dados, relogio.GetUtcNow()), ProtecoesPendentes: dados.ProtecoesPendentes);
     }
 }

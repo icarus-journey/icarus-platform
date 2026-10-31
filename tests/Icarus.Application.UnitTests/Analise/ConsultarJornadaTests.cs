@@ -25,7 +25,7 @@ public sealed class ConsultarJornadaTests
         var r = new Repositorio(); var id = Guid.NewGuid();
         var resultado = await new ConsultarJornadaUseCase(r, TimeProvider.System).ExecuteAsync(new(id, id), default);
         Assert.Equal(1270, resultado.SaldoPontos);
-        Assert.Equal("1.0.0", resultado.VersaoContrato);
+        Assert.Equal("1.1.0", resultado.VersaoContrato);
         Assert.Equal("sem_registros", resultado.Sequencia.Estado);
     }
 

@@ -41,6 +41,7 @@ public static class DependencyInjection
 
         services.AddScoped<IUsuarioRepository, UsuarioRepository>();
         services.AddScoped<IJornadaRepository, JornadaRepository>();
+        services.AddScoped<IProtecaoSequencia, ProtecaoSequenciaRepository>();
         services.AddScoped<IDiarioRepository, DiarioRepository>();
         services.AddScoped<IReferenciasPublicasRepository, ReferenciasPublicasRepository>();
         services.AddScoped<IIndicadoresPessoaisRepository, IndicadoresPessoaisRepository>();
@@ -77,6 +78,9 @@ public static class DependencyInjection
         services.AddHostedService<OnboardingResultConsumer>();
         services.AddHostedService<PublicadorOutboxRelatorio>();
         services.AddHostedService<ConsumidorResultadoRelatorio>();
+        services.AddScoped<ProcessadorJornada>();
+        services.AddHostedService<PublicadorOutboxJornada>();
+        services.AddHostedService<ConsumidorJornada>();
 
         // RF-04.5: mantém a janela de ocorrências das missões recorrentes ativas.
         services.AddHostedService<RecorrenciaMaintenanceService>();

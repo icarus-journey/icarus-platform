@@ -1,7 +1,6 @@
 using System.Data;
 using Icarus.Application.Common.Jornada;
 using Icarus.Application.Interfaces;
-using Icarus.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace Icarus.Infrastructure.Persistence.Repositories;
@@ -15,16 +14,12 @@ public sealed class JornadaRepository(IcarusDbContext contexto) : IJornadaReposi
         var usuario = await contexto.Usuarios.AsNoTracking().Where(u => u.Id == usuarioId)
             .Select(u => new { u.SaldoPontos, u.FusoHorario }).SingleOrDefaultAsync(ct);
         if (usuario is null) return null;
-        var realizacoes = await contexto.Ocorrencias.AsNoTracking()
-            .Where(o => o.Missao.UsuarioId == usuarioId
-                && (o.Status == StatusOcorrencia.Concluida || o.Status == StatusOcorrencia.ConcluidaComAtraso))
-            .Select(o => new RealizacaoSequencia(o.RealizadaEm, o.FusoHorarioRealizacao, o.ConcluidaEm)).ToListAsync(ct);
-        var legadas = await contexto.Missoes.AsNoTracking()
-            .Where(m => m.UsuarioId == usuarioId && m.ConcluidaEm != null
-                && !m.Ocorrencias.Any(o => o.Status == StatusOcorrencia.Concluida || o.Status == StatusOcorrencia.ConcluidaComAtraso))
-            .Select(m => new RealizacaoSequencia(null, null, m.ConcluidaEm)).ToListAsync(ct);
-        realizacoes.AddRange(legadas);
+        var realizacoes = await LeitorRealizacoes.LerAsync(contexto, usuarioId, ct);
+        var protegidos = await contexto.Set<Icarus.Domain.Entities.FechamentoJornada>().AsNoTracking()
+            .Where(d => d.UsuarioId == usuarioId && d.Estado == "protegido").Select(d => d.Data).ToListAsync(ct);
+        var pendentes = await contexto.Set<Icarus.Domain.Entities.ConsumoProtecao>().AsNoTracking()
+            .CountAsync(x => x.UsuarioId == usuarioId && x.CompensadoEm != null && x.DevolucaoId == null, ct);
         await leitura.CommitAsync(ct);
-        return new(usuario.SaldoPontos, usuario.FusoHorario, realizacoes);
+        return new(usuario.SaldoPontos, usuario.FusoHorario, realizacoes, protegidos, pendentes);
     }
 }

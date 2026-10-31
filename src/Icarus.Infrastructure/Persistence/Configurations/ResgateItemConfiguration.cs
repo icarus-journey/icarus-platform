@@ -15,7 +15,8 @@ public sealed class ResgateItemConfiguration : IEntityTypeConfiguration<ResgateI
         builder.Property(r => r.Estado).HasConversion<string>().HasMaxLength(20);
         builder.HasIndex(r => new { r.UsuarioId, r.OperacaoId }).IsUnique();
         builder.HasIndex(r => new { r.UsuarioId, r.Estado });
-        builder.HasOne(r => r.Item).WithMany().HasForeignKey(r => r.ItemId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(r => r.CompensacaoOrigemId).IsUnique();
+        builder.HasOne(r => r.Item).WithMany().HasForeignKey(r => r.ItemId).HasConstraintName("fk_resgate_item_item_item_id").OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Usuario>().WithMany().HasForeignKey(r => r.UsuarioId).OnDelete(DeleteBehavior.Cascade);
     }
 }

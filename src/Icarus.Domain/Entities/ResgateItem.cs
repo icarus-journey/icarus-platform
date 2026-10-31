@@ -17,5 +17,7 @@ public class ResgateItem
     public DateTimeOffset ResgatadoEm { get; set; }
     public DateTimeOffset? EstornadoEm { get; set; }
     public DateTimeOffset? UtilizadoEm { get; set; }
+    public Guid? CompensacaoOrigemId { get; set; }
+    public DateTimeOffset? DisponivelProtecaoDesde { get; set; }
     public Item Item { get; set; } = null!;
 }
