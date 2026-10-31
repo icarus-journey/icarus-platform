@@ -10,6 +10,7 @@ namespace Icarus.Application.UnitTests.UseCases.ConcluirMissao;
 internal sealed class MissaoRepositorioEmMemoriaParaConcluir : IMissaoRepository
 {
     public List<Missao> Missoes { get; } = [];
+    public List<Ocorrencia> Ocorrencias { get; set; } = [];
 
     public Task AdicionarAsync(Missao missao, CancellationToken cancellationToken)
     {
@@ -18,7 +19,11 @@ internal sealed class MissaoRepositorioEmMemoriaParaConcluir : IMissaoRepository
     }
 
     public Task<Missao?> BuscarPorIdAsync(long missaoId, Guid usuarioId, CancellationToken cancellationToken)
-        => Task.FromResult(Missoes.SingleOrDefault(m => m.Id == missaoId && m.UsuarioId == usuarioId));
+    {
+        var missao = Missoes.SingleOrDefault(m => m.Id == missaoId && m.UsuarioId == usuarioId);
+        if (missao is not null) missao.Ocorrencias = Ocorrencias.Where(o => o.MissaoId == missaoId).ToList();
+        return Task.FromResult(missao);
+    }
 
     public Task<List<Missao>> ListarAvulsasAsync(Guid usuarioId, CancellationToken cancellationToken)
         => Task.FromResult(Missoes.Where(m => m.UsuarioId == usuarioId && m.CampanhaId == null).ToList());
@@ -130,6 +135,7 @@ public class ConcluirMissaoUseCaseTests
 
     public ConcluirMissaoUseCaseTests()
     {
+        _missaoRepositorio.Ocorrencias = _ocorrenciaRepositorio.Ocorrencias;
         _useCase = new ConcluirMissaoUseCase(
             _missaoRepositorio, _ocorrenciaRepositorio, _movimentacaoRepositorio, _campanhaRepositorio,
             _usuarioRepositorio, _usuarioRepositorio, NullLogger<ConcluirMissaoUseCase>.Instance);
@@ -172,7 +178,11 @@ public class ConcluirMissaoUseCaseTests
         AdicionarUsuario(usuarioId);
         var missao = new Missao
         {
-            Id = 1, UsuarioId = usuarioId, Titulo = "Atrasada", Dificuldade = Dificuldade.Facil, Pontuacao = 30,
+            Id = 1,
+            UsuarioId = usuarioId,
+            Titulo = "Atrasada",
+            Dificuldade = Dificuldade.Facil,
+            Pontuacao = 30,
             DataLimite = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-5)
         };
         _missaoRepositorio.Missoes.Add(missao);
@@ -189,7 +199,7 @@ public class ConcluirMissaoUseCaseTests
     {
         var usuarioId = Guid.NewGuid();
         AdicionarUsuario(usuarioId);
-        var campanha = new Campanha { Id = 10, EpicoId = 1, Titulo = "Campanha", ValorMensurado = 100m, ValorAtual = 40m, Unidade = "pontos" };
+        var campanha = new Campanha { Id = 10, EpicoId = 1, Titulo = "Campanha", Estado = EstadoCampanha.EmAndamento, PrazoInicio = new(2020, 1, 1), PrazoFim = new(2030, 12, 31), ValorMensurado = 100m, ValorAtual = 40m, Unidade = "pontos" };
         _campanhaRepositorio.Campanhas.Add(campanha);
         var missao = new Missao { Id = 1, UsuarioId = usuarioId, CampanhaId = campanha.Id, Titulo = "M", Dificuldade = Dificuldade.Media, Pontuacao = 45 };
         _missaoRepositorio.Missoes.Add(missao);
@@ -207,7 +217,7 @@ public class ConcluirMissaoUseCaseTests
     {
         var usuarioId = Guid.NewGuid();
         AdicionarUsuario(usuarioId);
-        var campanha = new Campanha { Id = 10, EpicoId = 1, Titulo = "Campanha", ValorMensurado = 10m, ValorAtual = 4m, Unidade = unidade };
+        var campanha = new Campanha { Id = 10, EpicoId = 1, Titulo = "Campanha", Estado = EstadoCampanha.EmAndamento, PrazoInicio = new(2020, 1, 1), PrazoFim = new(2030, 12, 31), ValorMensurado = 10m, ValorAtual = 4m, Unidade = unidade };
         _campanhaRepositorio.Campanhas.Add(campanha);
         _missaoRepositorio.Missoes.Add(new Missao { Id = 1, UsuarioId = usuarioId, CampanhaId = campanha.Id, Titulo = "M", Dificuldade = Dificuldade.Media, Pontuacao = 45 });
 
@@ -270,8 +280,12 @@ public class ConcluirMissaoUseCaseTests
         var hoje = DateOnly.FromDateTime(DateTime.UtcNow);
         var missao = new Missao
         {
-            Id = 1, UsuarioId = usuarioId, Titulo = "Beber água", Dificuldade = Dificuldade.Trivial, Pontuacao = 15,
-            Recorrencia = new Recorrencia { MissaoId = 1, Tipo = "DIARIA", DataInicio = hoje }
+            Id = 1,
+            UsuarioId = usuarioId,
+            Titulo = "Beber água",
+            Dificuldade = Dificuldade.Trivial,
+            Pontuacao = 15,
+            Recorrencia = new Recorrencia { MissaoId = 1, Tipo = "DIARIA", DataInicio = hoje.AddDays(-30) }
         };
         _missaoRepositorio.Missoes.Add(missao);
         _ocorrenciaRepositorio.Ocorrencias.Add(new Ocorrencia { Id = 1, MissaoId = missao.Id, DataPrevista = hoje });
@@ -291,8 +305,12 @@ public class ConcluirMissaoUseCaseTests
         var hoje = DateOnly.FromDateTime(DateTime.UtcNow);
         var missao = new Missao
         {
-            Id = 1, UsuarioId = usuarioId, Titulo = "Beber água", Dificuldade = Dificuldade.Trivial, Pontuacao = 15,
-            Recorrencia = new Recorrencia { MissaoId = 1, Tipo = "DIARIA", DataInicio = hoje }
+            Id = 1,
+            UsuarioId = usuarioId,
+            Titulo = "Beber água",
+            Dificuldade = Dificuldade.Trivial,
+            Pontuacao = 15,
+            Recorrencia = new Recorrencia { MissaoId = 1, Tipo = "DIARIA", DataInicio = hoje.AddDays(-30) }
         };
         _missaoRepositorio.Missoes.Add(missao);
         _ocorrenciaRepositorio.Ocorrencias.Add(new Ocorrencia { Id = 1, MissaoId = missao.Id, DataPrevista = hoje });
@@ -313,7 +331,11 @@ public class ConcluirMissaoUseCaseTests
         var ontem = hoje.AddDays(-1);
         var missao = new Missao
         {
-            Id = 1, UsuarioId = usuarioId, Titulo = "Beber água", Dificuldade = Dificuldade.Trivial, Pontuacao = 15,
+            Id = 1,
+            UsuarioId = usuarioId,
+            Titulo = "Beber água",
+            Dificuldade = Dificuldade.Trivial,
+            Pontuacao = 15,
             Recorrencia = new Recorrencia { MissaoId = 1, Tipo = "DIARIA", DataInicio = ontem }
         };
         _missaoRepositorio.Missoes.Add(missao);

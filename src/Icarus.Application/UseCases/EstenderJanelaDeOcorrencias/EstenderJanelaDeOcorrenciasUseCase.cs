@@ -6,107 +6,67 @@ using Microsoft.Extensions.Logging;
 
 namespace Icarus.Application.UseCases.EstenderJanelaDeOcorrencias;
 
-/// <summary>
-/// Rotina de manutenção da janela de ocorrências (RF-04.5, DER seção 12): para cada missão
-/// recorrente ativa, garante que exista ocorrência gerada para todo dia aplicável nos próximos
-/// 30 dias, sem duplicar as que já existem. Chamada periodicamente por
-/// <c>RecorrenciaMaintenanceService</c> (hosted service) — não é disparada pela API
-/// diretamente, então não há ownership a checar aqui.
-///
-/// Também inativa automaticamente (RF-04.6) a missão cuja <see cref="Recorrencia.DataFim"/> já
-/// passou — mesma regra do botão manual de parar: cancela pendentes não vencidas (não deveria
-/// haver nenhuma, já que a geração parou na data fim) e preserva pendentes já vencidas como
-/// histórico, sem permitir concluí-las depois (<c>ConcluirMissaoUseCase</c> rejeita conclusão de
-/// missão inativa).
-/// </summary>
+/// <summary>Mantém a janela no dia civil de cada titular, sem alterar passado ou conclusões.</summary>
 public sealed partial class EstenderJanelaDeOcorrenciasUseCase(
-    IMissaoRepository missaoRepository,
-    IOcorrenciaRepository ocorrenciaRepository,
-    IUnitOfWork unitOfWork,
-    ILogger<EstenderJanelaDeOcorrenciasUseCase> logger)
+    IMissaoRepository missaoRepository, IOcorrenciaRepository ocorrenciaRepository,
+    IUnitOfWork unitOfWork, ILogger<EstenderJanelaDeOcorrenciasUseCase> logger, TimeProvider? relogio = null)
 {
-    public async Task<EstenderJanelaDeOcorrenciasResult> ExecuteAsync(CancellationToken cancellationToken)
+    public async Task<EstenderJanelaDeOcorrenciasResult> ExecuteAsync(CancellationToken ct)
     {
-        var missoes = await missaoRepository.ListarRecorrentesAtivasAsync(cancellationToken);
-        var hoje = DateOnly.FromDateTime(DateTime.UtcNow);
-        var totalCriadas = 0;
-        var totalInativadas = 0;
-
+        var missoes = await missaoRepository.ListarRecorrentesAtivasAsync(ct);
+        var agora = (relogio ?? TimeProvider.System).GetUtcNow();
+        var criadas = 0; var inativadas = 0; var canceladas = 0; var reativadas = 0;
         foreach (var missao in missoes)
         {
-            // Inclui também campanhas encerradas antes desta regra existir; não recria planejamento.
-            if (missao.Campanha?.Estado is EstadoCampanha.Concluida or EstadoCampanha.Excluida)
+            var hoje = FusoHorario.DataLocal(agora, missao.Usuario?.FusoHorario ?? missao.Campanha?.Epico?.Usuario?.FusoHorario);
+            if (RegrasRecorrencia.EncerrarSeNecessario(missao, hoje))
             {
-                var hojeDoTitular = FusoHorario.DataLocal(DateTimeOffset.UtcNow, missao.Campanha.Epico?.Usuario?.FusoHorario);
-                foreach (var pendente in await ocorrenciaRepository.ListarPendentesNaoVencidasAsync(missao.Id, hojeDoTitular, cancellationToken))
-                    pendente.Status = StatusOcorrencia.Excluida;
-                missao.Status = StatusMissao.Inativa;
-                totalInativadas++;
+                // O repositório mantém a mesma elegibilidade para todos os fluxos de encerramento.
+                foreach (var o in await ocorrenciaRepository.ListarPendentesNaoVencidasAsync(missao.Id, hoje, ct))
+                    o.Status = StatusOcorrencia.Excluida;
+                inativadas++;
                 continue;
             }
-            var recorrencia = missao.Recorrencia!;
-            var dataBase = recorrencia.AlteracoesAPartirDe is null ? hoje
-                : FusoHorario.DataLocal(DateTimeOffset.UtcNow, missao.Usuario?.FusoHorario);
-            var fimDaJanela = dataBase.AddDays(GeradorDeDatasRecorrencia.DiasDaJanelaPadrao);
-
-            if (recorrencia.DataFim is { } dataFimVencida && dataFimVencida < dataBase)
+            var alterou = false;
+            foreach (var o in missao.Ocorrencias.Where(o => RegrasRecorrencia.Pendente(o) && o.DataPrevista >= hoje
+                && !RegrasRecorrencia.DentroDosLimites(missao, o.DataPrevista)))
             {
-                var pendentesNaoVencidas = await ocorrenciaRepository.ListarPendentesNaoVencidasAsync(missao.Id, dataBase, cancellationToken);
-                foreach (var ocorrenciaPendente in pendentesNaoVencidas)
+                o.Status = StatusOcorrencia.Excluida; canceladas++; alterou = true;
+            }
+            var (inicio, fim) = RegrasRecorrencia.Janela(missao, hoje);
+            var regra = missao.Recorrencia!;
+            var datas = GeradorDeDatasRecorrencia.Gerar(inicio, fim, Enum.Parse<TipoRecorrencia>(regra.Tipo, true), regra.Regra);
+            var existentes = await ocorrenciaRepository.ListarDatasExistentesAsync(missao.Id, inicio, fim, ct);
+            // A missão permanece ativa: uma mudança de prazo planejado pode tornar uma data
+            // futura elegível novamente. Não reativa cancelamentos de missões paradas/excluídas.
+            foreach (var o in missao.Ocorrencias.Where(o => o.Status == StatusOcorrencia.Excluida && !RegrasRecorrencia.Concluida(o)
+                && o.DataPrevista > hoje && datas.Contains(o.DataPrevista)))
+            {
+                o.Status = StatusOcorrencia.Pendente;
+                o.Planejamento = PlanejamentoOcorrencia.Capturar(missao);
+                reativadas++; alterou = true;
+            }
+            foreach (var data in datas.Except(existentes))
+            {
+                await ocorrenciaRepository.AdicionarAsync(new Ocorrencia
                 {
-                    ocorrenciaPendente.Status = StatusOcorrencia.Excluida;
-                }
-
-                missao.Status = StatusMissao.Inativa;
-                totalInativadas++;
-                continue;
+                    MissaoId = missao.Id,
+                    DataPrevista = data,
+                    Planejamento = PlanejamentoOcorrencia.Capturar(missao)
+                }, ct);
+                criadas++; alterou = true;
             }
-
-            var tipo = Enum.Parse<TipoRecorrencia>(recorrencia.Tipo, ignoreCase: true);
-
-            var inicioEfetivo = recorrencia.DataInicio > dataBase ? recorrencia.DataInicio : dataBase;
-            var fimEfetivo = recorrencia.DataFim is { } dataFim && dataFim < fimDaJanela ? dataFim : fimDaJanela;
-            if (recorrencia.AlteracoesAPartirDe is { } alteracoes)
+            if (alterou)
             {
-                if (alteracoes > inicioEfetivo) inicioEfetivo = alteracoes;
-                if (missao.Campanha is { } campanha)
-                {
-                    if (campanha.PrazoInicio > inicioEfetivo) inicioEfetivo = campanha.PrazoInicio;
-                    if (campanha.PrazoFim < fimEfetivo) fimEfetivo = campanha.PrazoFim;
-                }
+                missao.AtualizadoEm = agora;
+                if (missao.Campanha is not null) missao.Campanha.AtualizadoEm = agora;
             }
-            if (inicioEfetivo > fimEfetivo)
-            {
-                continue;
-            }
-
-            var datasPossiveis = GeradorDeDatasRecorrencia.Gerar(inicioEfetivo, fimEfetivo, tipo, recorrencia.Regra);
-            var datasExistentes = await ocorrenciaRepository.ListarDatasExistentesAsync(missao.Id, inicioEfetivo, fimEfetivo, cancellationToken);
-            var datasFaltantes = datasPossiveis.Except(datasExistentes).ToList();
-
-            foreach (var data in datasFaltantes)
-            {
-                await ocorrenciaRepository.AdicionarAsync(new Ocorrencia { MissaoId = missao.Id, DataPrevista = data, Planejamento = PlanejamentoOcorrencia.Capturar(missao) }, cancellationToken);
-            }
-
-            if (datasFaltantes.Count > 0)
-            {
-                missao.AtualizadoEm = DateTimeOffset.UtcNow;
-                if (missao.Campanha is not null) missao.Campanha.AtualizadoEm = DateTimeOffset.UtcNow;
-            }
-            totalCriadas += datasFaltantes.Count;
         }
-
-        if (totalCriadas > 0 || totalInativadas > 0)
-        {
-            await unitOfWork.SalvarAlteracoesAsync(cancellationToken);
-        }
-
-        LogJanelaEstendida(missoes.Count, totalCriadas, totalInativadas);
-
-        return new EstenderJanelaDeOcorrenciasResult(missoes.Count, totalCriadas, totalInativadas);
+        if (criadas + inativadas + canceladas + reativadas > 0) await unitOfWork.SalvarAlteracoesAsync(ct);
+        LogJanelaEstendida(missoes.Count, criadas, inativadas);
+        return new(missoes.Count, criadas, inativadas);
     }
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Janela de ocorrências mantida: {MissoesProcessadas} missões recorrentes verificadas, {OcorrenciasCriadas} ocorrências novas criadas, {MissoesInativadas} inativada(s) por fim da recorrência")]
-    private partial void LogJanelaEstendida(int missoesProcessadas, int ocorrenciasCriadas, int missoesInativadas);
+    [LoggerMessage(Level = LogLevel.Information, Message = "Janela mantida: {Missoes} missões, {Criadas} execuções criadas, {Inativadas} missões inativadas")]
+    private partial void LogJanelaEstendida(int missoes, int criadas, int inativadas);
 }

@@ -57,7 +57,7 @@ public class IcarusDbContext : DbContext, IUnitOfWork
         {
             await SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException erro) when (erro.InnerException is PostgresException { SqlState: "23505", ConstraintName: "uq_medicao_campanha_operacao" })
+        catch (DbUpdateException erro) when (erro.InnerException is PostgresException { SqlState: "23505", ConstraintName: "uq_medicao_campanha_operacao" or "ix_ocorrencia_missao_id_data_prevista" })
         {
             throw new DadosAtualizadosException(erro);
         }

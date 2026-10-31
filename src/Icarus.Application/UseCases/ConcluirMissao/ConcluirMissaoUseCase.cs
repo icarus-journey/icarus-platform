@@ -7,22 +7,9 @@ using Microsoft.Extensions.Logging;
 
 namespace Icarus.Application.UseCases.ConcluirMissao;
 
-/// <summary>
-/// Caso de uso de conclusão de missão (RF-04.6), para missão recorrente ou não. A ocorrência a
-/// concluir é resolvida por <see cref="IOcorrenciaRepository.BuscarParaConcluirAsync"/>: a de
-/// hoje, senão a pendente/atrasada mais antiga (recupera um dia perdido). Normalmente ela já
-/// existe — gerada na criação da missão ou pela manutenção diária da janela
-/// (<c>EstenderJanelaDeOcorrenciasUseCase</c>); se não existir (caso defensivo, ex.: missão
-/// criada antes desta funcionalidade), cria uma pontualmente para hoje.
-///
-/// <see cref="Missao.ConcluidaEm"/> só é espelhado para missão **não recorrente** (DER seção
-/// 9) — para recorrente, a missão continua ativa entre uma conclusão e outra; é imutável
-/// (RF-04.3) só quando preenchido, então <c>AtualizarMissaoUseCase</c> nunca bloqueia edição de
-/// missão recorrente por esta via.
-///
-/// Idempotente: concluir de novo a ocorrência de hoje (ou a única, pra não recorrente) não
-/// credita pontos nem gera uma segunda movimentação — apenas devolve o resultado já registrado.
-/// </summary>
+/// <summary>Conclui uma execução elegível no dia local do titular: hoje, senão o atraso mais
+/// antigo. Nunca antecipa, recria canceladas ou conclui campanha planejada. Repetição da
+/// execução concluída devolve seu crédito original, sem alterar saldo.</summary>
 public sealed partial class ConcluirMissaoUseCase(
     IMissaoRepository missaoRepository,
     IOcorrenciaRepository ocorrenciaRepository,
@@ -30,7 +17,7 @@ public sealed partial class ConcluirMissaoUseCase(
     ICampanhaRepository campanhaRepository,
     IUsuarioRepository usuarioRepository,
     IUnitOfWork unitOfWork,
-    ILogger<ConcluirMissaoUseCase> logger, TimeProvider? relogio = null)
+    ILogger<ConcluirMissaoUseCase> logger, TimeProvider? relogio = null, IIniciadorCampanhas? iniciador = null)
 {
     public async Task<ConcluirMissaoResult> ExecuteAsync(ConcluirMissaoCommand command, CancellationToken cancellationToken)
     {
@@ -40,59 +27,59 @@ public sealed partial class ConcluirMissaoUseCase(
             throw new PerfilNaoEncontradoException();
         }
 
+        if (iniciador is not null) await iniciador.ExecuteAsync(command.UsuarioIdSolicitado, cancellationToken);
         var missao = await missaoRepository.BuscarPorIdAsync(command.MissaoId, command.UsuarioIdSolicitado, cancellationToken)
             ?? throw new MissaoNaoEncontradaException();
         if (missao.Status == StatusMissao.Excluida) throw new MissaoNaoEncontradaException();
-
-        if (missao.Status == StatusMissao.Inativa)
-        {
-            LogConclusaoRecusadaInativa(missao.Id);
-            throw new MissaoInativaException();
-        }
-
-        var agora = (relogio ?? TimeProvider.System).GetUtcNow();
-        var hoje = DateOnly.FromDateTime(agora.UtcDateTime);
-        var ehRecorrente = missao.Recorrencia is not null;
-
-        var ocorrencia = await ocorrenciaRepository.BuscarParaConcluirAsync(missao.Id, hoje, cancellationToken);
-
-        if (ocorrencia?.Status == StatusOcorrencia.Excluida)
-            throw new EdicaoMissaoException("ocorrencia_indisponivel", "Não há execução disponível para concluir nesta data.", true);
-
-        if (ocorrencia is not null && ocorrencia.Status is StatusOcorrencia.Concluida or StatusOcorrencia.ConcluidaComAtraso)
-        {
-            LogConclusaoDuplicada(missao.Id, ocorrencia.Id);
-            var usuarioAtual = await usuarioRepository.BuscarPorIdAsync(command.UsuarioIdSolicitado, cancellationToken);
-            return new ConcluirMissaoResult(
-                missao.Id, ocorrencia.ConcluidaEm!.Value, ocorrencia.Status == StatusOcorrencia.ConcluidaComAtraso,
-                checked((int)(ocorrencia.MovimentacoesPontos.FirstOrDefault(m => m.Tipo == TipoMovimentacaoPontos.GanhoMissao)?.Quantidade
-                    ?? PlanejamentoOcorrencia.DaExecucao(missao, ocorrencia)?.Pontuacao ?? missao.Pontuacao)), usuarioAtual?.SaldoPontos ?? 0);
-        }
-
+        var usuario = await usuarioRepository.BuscarPorIdAsync(command.UsuarioIdSolicitado, cancellationToken)
+            ?? throw new PerfilNaoEncontradoException();
+        missao.Usuario = usuario;
         Campanha? campanhaVinculada = null;
         if (missao.CampanhaId is { } idCampanha)
         {
             campanhaVinculada = await campanhaRepository.BuscarPorIdAsync(idCampanha, missao.UsuarioId, cancellationToken)
                 ?? throw new CampanhaNaoEncontradaException();
+            missao.Campanha = campanhaVinculada;
             if (campanhaVinculada.Estado == EstadoCampanha.Excluida) throw new CampanhaNaoEncontradaException();
             if (campanhaVinculada.Estado == EstadoCampanha.Concluida) throw new CampanhaConcluidaException();
-            campanhaVinculada.AtualizadoEm = agora;
+        }
+        var agora = (relogio ?? TimeProvider.System).GetUtcNow();
+        var hoje = FusoHorario.DataLocal(agora, usuario.FusoHorario);
+        if (RegrasRecorrencia.EncerrarSeNecessario(missao, hoje))
+            await unitOfWork.SalvarAlteracoesAsync(cancellationToken);
+        if (missao.Status == StatusMissao.Inativa) throw new MissaoInativaException();
+        Ocorrencia? escolhida = null;
+        if (command.OcorrenciaId is { } id)
+        {
+            escolhida = missao.Ocorrencias.SingleOrDefault(o => o.Id == id) ?? throw new MissaoNaoEncontradaException();
+            if (escolhida.DataPrevista > hoje) throw new EdicaoMissaoException("execucao_futura", "Esta execução ainda não está disponível.", true);
+            if (!RegrasRecorrencia.DentroDosLimites(missao, escolhida.DataPrevista) || escolhida.Status == StatusOcorrencia.Excluida)
+                throw new EdicaoMissaoException("ocorrencia_indisponivel", "Esta execução não está disponível para concluir.", true);
+        }
+        var disponibilidade = ExecucaoMissaoResult.DaMissao(missao, agora, selecionada: escolhida);
+        if (disponibilidade.CodigoBloqueio is { } bloqueio)
+            throw new EdicaoMissaoException(bloqueio,
+                bloqueio == "campanha_nao_iniciada" ? "A campanha ainda não começou."
+                : bloqueio == "execucao_futura" ? "Esta execução ainda não está disponível."
+                : "Não há execução pendente disponível para concluir.", true);
+        var ehRecorrente = missao.Recorrencia is not null;
+        var ocorrencia = escolhida ?? RegrasRecorrencia.Selecionar(missao, hoje)
+            ?? throw new EdicaoMissaoException("sem_execucao_pendente", "Não há execução pendente disponível para concluir.", true);
+        if (RegrasRecorrencia.Concluida(ocorrencia))
+        {
+            if (ocorrencia.ConcluidaEm is null)
+                throw new EdicaoMissaoException("historico_incompleto", "Esta execução já está concluída e precisa ser revisada.", true);
+            LogConclusaoDuplicada(missao.Id, ocorrencia.Id);
+            return new ConcluirMissaoResult(missao.Id, ocorrencia.ConcluidaEm!.Value,
+                ocorrencia.Status == StatusOcorrencia.ConcluidaComAtraso, disponibilidade.Pontuacao!.Value, usuario.SaldoPontos, true);
+        }
+        if (ocorrencia.Id == 0)
+        {
+            await ocorrenciaRepository.AdicionarAsync(ocorrencia, cancellationToken);
+            if (!missao.Ocorrencias.Contains(ocorrencia)) missao.Ocorrencias.Add(ocorrencia);
         }
         missao.AtualizadoEm = agora;
-
-        if (ocorrencia is null)
-        {
-            // Defensivo: não deveria faltar (gerada na criação ou pela manutenção diária), mas
-            // cobre missão criada antes desta funcionalidade existir. Usa a data limite da
-            // missão (quando houver) para que o atraso seja calculado corretamente.
-            ocorrencia = new Ocorrencia
-            {
-                MissaoId = missao.Id,
-                DataPrevista = missao.DataLimite ?? hoje,
-                Planejamento = null
-            };
-            await ocorrenciaRepository.AdicionarAsync(ocorrencia, cancellationToken);
-        }
+        if (campanhaVinculada is not null) campanhaVinculada.AtualizadoEm = agora;
 
         var planejamento = ehRecorrente ? PlanejamentoOcorrencia.DaExecucao(missao, ocorrencia) : null;
         var pontuacao = planejamento?.Pontuacao ?? missao.Pontuacao;
@@ -117,8 +104,6 @@ public sealed partial class ConcluirMissaoUseCase(
             CriadoEm = agora
         }, cancellationToken);
 
-        var usuario = await usuarioRepository.BuscarPorIdAsync(missao.UsuarioId, cancellationToken)
-            ?? throw new PerfilNaoEncontradoException();
         usuario.SaldoPontos += pontuacao;
 
         if (campanhaVinculada is { } campanha)

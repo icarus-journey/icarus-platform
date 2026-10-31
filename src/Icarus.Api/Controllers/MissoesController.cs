@@ -45,7 +45,7 @@ public class MissoesController(
             .ToList());
     }
 
-    /// <summary>Consulta a configuração vigente e sua versão para edição (HTTP 1.1.0).</summary>
+    /// <summary>Consulta a configuração vigente e sua versão para edição e execução elegível (HTTP 1.2.0).</summary>
     [Authorize]
     [HttpGet("{missaoId:long}")]
     [ProducesResponseType<EdicaoMissaoResponse>(StatusCodes.Status200OK)]
@@ -100,23 +100,25 @@ public class MissoesController(
 
     /// <summary>
     /// Conclui uma missão (RF-04.6). Credita pontos ao usuário e, se a missão pertencer a uma
-    /// campanha mensurável, soma à evolução do valor atual dela. Idempotente: concluir de novo
+    /// campanha na unidade pontos, soma ao contador dela. Idempotente: concluir de novo
     /// uma missão já concluída não credita pontos de novo.
     /// </summary>
     [Authorize]
     [HttpPost("{missaoId:long}/concluir")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     [ProducesResponseType<ConcluirMissaoResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Concluir(Guid usuarioId, long missaoId, CancellationToken cancellationToken)
+    public async Task<IActionResult> Concluir(Guid usuarioId, long missaoId, CancellationToken cancellationToken,
+        [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] ConcluirMissaoRequest? request = null)
     {
         var usuarioIdAutenticado = ObterUsuarioIdAutenticado();
-        var command = new ConcluirMissaoCommand(usuarioIdAutenticado, usuarioId, missaoId);
+        var command = new ConcluirMissaoCommand(usuarioIdAutenticado, usuarioId, missaoId, request?.OcorrenciaId);
 
         var resultado = await concluirMissao.ExecuteAsync(command, cancellationToken);
 
         return Ok(new ConcluirMissaoResponse(
-            resultado.Id, resultado.ConcluidaEm, resultado.ConcluidaComAtraso, resultado.PontuacaoCreditada, resultado.SaldoPontosAtual));
+            resultado.Id, resultado.ConcluidaEm, resultado.ConcluidaComAtraso, resultado.PontuacaoCreditada, resultado.SaldoPontosAtual, resultado.Repetida));
     }
 
     /// <summary>

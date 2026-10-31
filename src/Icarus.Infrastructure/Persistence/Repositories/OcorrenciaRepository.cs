@@ -16,14 +16,14 @@ public class OcorrenciaRepository(IcarusDbContext context) : IOcorrenciaReposito
     public async Task<Ocorrencia?> BuscarParaConcluirAsync(long missaoId, DateOnly hoje, CancellationToken cancellationToken)
     {
         var deHoje = await context.Ocorrencias.Include(o => o.MovimentacoesPontos)
-            .SingleOrDefaultAsync(o => o.MissaoId == missaoId && o.DataPrevista == hoje, cancellationToken);
+            .SingleOrDefaultAsync(o => o.MissaoId == missaoId && o.DataPrevista == hoje && o.Status != StatusOcorrencia.Excluida, cancellationToken);
         if (deHoje is not null)
         {
             return deHoje;
         }
 
         var pendente = await context.Ocorrencias
-            .Where(o => o.MissaoId == missaoId && (o.Status == StatusOcorrencia.Pendente || o.Status == StatusOcorrencia.Atrasada))
+            .Where(o => o.MissaoId == missaoId && o.DataPrevista <= hoje && (o.Status == StatusOcorrencia.Pendente || o.Status == StatusOcorrencia.Atrasada))
             .OrderBy(o => o.DataPrevista)
             .FirstOrDefaultAsync(cancellationToken);
         if (pendente is not null)
@@ -35,7 +35,7 @@ public class OcorrenciaRepository(IcarusDbContext context) : IOcorrenciaReposito
         // data_prevista diferente de hoje) já tem uma concluída, devolve a mais recente —
         // garante idempotência mesmo quando a data prevista não coincide com o dia da chamada.
         return await context.Ocorrencias.Include(o => o.MovimentacoesPontos)
-            .Where(o => o.MissaoId == missaoId && (o.Status == StatusOcorrencia.Concluida || o.Status == StatusOcorrencia.ConcluidaComAtraso))
+            .Where(o => o.MissaoId == missaoId && o.DataPrevista <= hoje && (o.Status == StatusOcorrencia.Concluida || o.Status == StatusOcorrencia.ConcluidaComAtraso))
             .OrderByDescending(o => o.DataPrevista)
             .FirstOrDefaultAsync(cancellationToken);
     }
@@ -48,6 +48,6 @@ public class OcorrenciaRepository(IcarusDbContext context) : IOcorrenciaReposito
 
     public async Task<List<Ocorrencia>> ListarPendentesNaoVencidasAsync(long missaoId, DateOnly hoje, CancellationToken cancellationToken)
         => await context.Ocorrencias
-            .Where(o => o.MissaoId == missaoId && o.Status == StatusOcorrencia.Pendente && o.DataPrevista >= hoje)
+            .Where(o => o.MissaoId == missaoId && (o.Status == StatusOcorrencia.Pendente || o.Status == StatusOcorrencia.Atrasada) && o.DataPrevista >= hoje)
             .ToListAsync(cancellationToken);
 }

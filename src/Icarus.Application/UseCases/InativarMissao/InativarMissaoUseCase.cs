@@ -1,3 +1,4 @@
+using Icarus.Application.Common;
 using Icarus.Application.Exceptions;
 using Icarus.Application.Interfaces;
 using Icarus.Domain.Entities;
@@ -8,7 +9,7 @@ namespace Icarus.Application.UseCases.InativarMissao;
 
 /// <summary>
 /// Caso de uso de parar uma missão recorrente (RF-04.6) — "ação manual" de inativação, ao
-/// lado do fim da recorrência ou da campanha (não implementados aqui). Só missão recorrente
+/// lado do fim da recorrência ou da campanha, tratados pela manutenção. Só missão recorrente
 /// pode ser inativada; a não recorrente só conclui, no prazo ou com atraso.
 ///
 /// Cancela as ocorrências pendentes ainda não vencidas (<see cref="Ocorrencia.DataPrevista"/>
@@ -21,7 +22,7 @@ public sealed partial class InativarMissaoUseCase(
     IMissaoRepository missaoRepository,
     IOcorrenciaRepository ocorrenciaRepository,
     IUnitOfWork unitOfWork,
-    ILogger<InativarMissaoUseCase> logger)
+    ILogger<InativarMissaoUseCase> logger, TimeProvider? relogio = null)
 {
     public async Task<InativarMissaoResult> ExecuteAsync(InativarMissaoCommand command, CancellationToken cancellationToken)
     {
@@ -49,7 +50,7 @@ public sealed partial class InativarMissaoUseCase(
 
         missao.Status = StatusMissao.Inativa;
 
-        var hoje = DateOnly.FromDateTime(DateTime.UtcNow);
+        var hoje = FusoHorario.DataLocal((relogio ?? TimeProvider.System).GetUtcNow(), missao.Usuario?.FusoHorario);
         var pendentesNaoVencidas = await ocorrenciaRepository.ListarPendentesNaoVencidasAsync(missao.Id, hoje, cancellationToken);
         foreach (var ocorrencia in pendentesNaoVencidas)
         {

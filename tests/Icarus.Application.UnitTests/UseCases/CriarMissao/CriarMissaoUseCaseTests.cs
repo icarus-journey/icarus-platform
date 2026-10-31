@@ -111,7 +111,7 @@ public class CriarMissaoUseCaseTests
     public async Task ExecuteAsync_DeveCriarMissaoVinculadaACampanha()
     {
         var usuarioId = Guid.NewGuid();
-        var campanha = new Campanha { Id = 1, EpicoId = 1, Titulo = "Campanha", Dificuldade = Dificuldade.Media, Pontuacao = 45 };
+        var campanha = new Campanha { Id = 1, EpicoId = 1, Titulo = "Campanha", PrazoInicio = new(2020, 1, 1), PrazoFim = new(2030, 12, 31), Dificuldade = Dificuldade.Media, Pontuacao = 45 };
         _campanhaRepositorio.Campanhas.Add(campanha);
 
         var command = new CriarMissaoCommand(
@@ -139,7 +139,14 @@ public class CriarMissaoUseCaseTests
         var usuarioId = Guid.NewGuid();
         var campanha = new Campanha
         {
-            Id = 1, EpicoId = 1, Titulo = "Campanha", Dificuldade = Dificuldade.Media, Pontuacao = 45, Estado = EstadoCampanha.Concluida
+            Id = 1,
+            EpicoId = 1,
+            Titulo = "Campanha",
+            PrazoInicio = new(2020, 1, 1),
+            PrazoFim = new(2030, 12, 31),
+            Dificuldade = Dificuldade.Media,
+            Pontuacao = 45,
+            Estado = EstadoCampanha.Concluida
         };
         _campanhaRepositorio.Campanhas.Add(campanha);
 

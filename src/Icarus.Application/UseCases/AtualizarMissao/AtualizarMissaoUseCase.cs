@@ -24,6 +24,11 @@ public sealed partial class AtualizarMissaoUseCase(
         if (missao.Campanha?.Estado == EstadoCampanha.Excluida) throw new CampanhaNaoEncontradaException();
 
         var hoje = FusoHorario.DataLocal(relogio.GetUtcNow(), missao.Usuario?.FusoHorario);
+        if (RegrasRecorrencia.EncerrarSeNecessario(missao, hoje))
+        {
+            await unidade.SalvarAlteracoesAsync(ct);
+            throw new MissaoInativaException();
+        }
         if (missao.Recorrencia is not null)
         {
             ValidarRecorrencia(command, missao, hoje);
@@ -54,11 +59,21 @@ public sealed partial class AtualizarMissaoUseCase(
             Replanejar(missao, hoje);
         }
 
+        if (missao.Recorrencia is null)
+        {
+            var data = command.DataLimite ?? hoje;
+            if (!RegrasRecorrencia.DentroDosLimites(missao, data))
+                throw new EdicaoMissaoException("data_fora_da_campanha", "Escolha uma data dentro do período da campanha.");
+            if (missao.Ocorrencias.Count > 1)
+                throw new EdicaoMissaoException("planejamento_inconsistente", "Esta missão precisa ser revisada antes de alterar sua data.", true);
+            var unica = missao.Ocorrencias.SingleOrDefault();
+            if (unica is not null) unica.DataPrevista = data;
+        }
         missao.AtualizadoEm = relogio.GetUtcNow();
         if (missao.Campanha is { } campanha) campanha.AtualizadoEm = relogio.GetUtcNow();
         await unidade.SalvarAlteracoesAsync(ct);
         LogMissaoAtualizada(missao.Id);
-        return EdicaoMissaoResult.DaMissao(missao);
+        return EdicaoMissaoResult.DaMissao(missao, relogio.GetUtcNow());
     }
 
     private static void ValidarRecorrencia(AtualizarMissaoCommand c, Missao m, DateOnly hoje)
@@ -80,14 +95,7 @@ public sealed partial class AtualizarMissaoUseCase(
     private static void Replanejar(Missao missao, DateOnly hoje)
     {
         var r = missao.Recorrencia!;
-        var inicio = r.DataInicio > hoje.AddDays(1) ? r.DataInicio : hoje.AddDays(1);
-        var fim = hoje.AddDays(GeradorDeDatasRecorrencia.DiasDaJanelaPadrao);
-        if (r.DataFim is { } dataFim && dataFim < fim) fim = dataFim;
-        if (missao.Campanha is { } campanha)
-        {
-            if (campanha.PrazoInicio > inicio) inicio = campanha.PrazoInicio;
-            if (campanha.PrazoFim < fim) fim = campanha.PrazoFim;
-        }
+        var (inicio, fim) = RegrasRecorrencia.Janela(missao, hoje, somenteFuturo: true);
         var datas = GeradorDeDatasRecorrencia.Gerar(inicio, fim, Enum.Parse<TipoRecorrencia>(r.Tipo, true), r.Regra).ToHashSet();
         var planejamento = PlanejamentoOcorrencia.Capturar(missao);
         foreach (var ocorrencia in missao.Ocorrencias.Where(o => o.DataPrevista > hoje && !Concluida(o)))

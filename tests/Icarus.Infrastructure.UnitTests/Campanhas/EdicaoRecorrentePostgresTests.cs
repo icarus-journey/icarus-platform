@@ -26,7 +26,7 @@ public sealed class EdicaoRecorrentePostgresTests(BancoLoja banco) : IClassFixtu
     private static ConcluirMissaoUseCase Conclusao(IcarusDbContext c, IUnitOfWork? unidade = null, TimeProvider? relogio = null)
         => new(new MissaoRepository(c), new OcorrenciaRepository(c), new MovimentacaoPontosRepository(c),
             new CampanhaRepository(c), new UsuarioRepository(c), unidade ?? c, NullLogger<ConcluirMissaoUseCase>.Instance, relogio);
-    private static ConsultarMissaoUseCase Consulta(IcarusDbContext c) => new(new PlanejamentoMissaoRepository(c));
+    private static ConsultarMissaoUseCase Consulta(IcarusDbContext c) => new(new PlanejamentoMissaoRepository(c), c, new Relogio(Agora));
 
     private async Task<(Guid Usuario, long Id)> PrepararAsync(bool vinculada = false, DateOnly? data = null, string fuso = "UTC")
     {

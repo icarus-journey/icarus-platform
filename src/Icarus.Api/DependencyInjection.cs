@@ -72,6 +72,7 @@ public static class DependencyInjection
         services.AddSingleton<IValidator<RegistrarProgressoCampanhaRequest>, RegistrarProgressoCampanhaRequestValidator>();
         services.AddSingleton<IValidator<AtualizarCampanhaRequest>, AtualizarCampanhaRequestValidator>();
         services.AddSingleton<IValidator<CriarMissaoRequest>, CriarMissaoRequestValidator>();
+        services.AddSingleton<IValidator<ConcluirMissaoRequest>, ConcluirMissaoRequestValidator>();
         services.AddSingleton<IValidator<AtualizarMissaoRequest>, AtualizarMissaoRequestValidator>();
 
         // "Saúde da API" (seção 11 do icarus-context): /health responde 200 só se também

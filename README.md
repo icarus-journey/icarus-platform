@@ -59,7 +59,7 @@ pessoal HTTP: a mensagem RF-10 e a lista permitida da IA permanecem 1.0.0.
 ## Editar missão recorrente
 
 `GET /api/usuarios/{usuarioId}/missoes/{missaoId}` retorna configuração e versão
-HTTP 1.1.0. O `PATCH` existente permite editar a recorrente ativa, incluindo
+HTTP 1.2.0, com `execucao` calculada no fuso do perfil. O `PATCH` existente permite editar a recorrente ativa, incluindo
 frequência, dias, dia mensal e fim opcional; exige `recorrencia` e `versaoEsperada`.
 As mudanças valem a partir de amanhã no fuso do perfil. Hoje, atrasos e
 conclusões ficam intactos; os créditos usam o planejamento da execução e, na
@@ -71,8 +71,20 @@ planejamento/versão; não reconstroem conclusões nem criam registros retroativ
 Mudança de regra recalcula a janela futura com cancelamento lógico, reutiliza
 missão/data sem duplicar e respeita os limites da campanha. Conflito reverte a
 transação; parada/encerrada não é editável. Não há conversão entre única e
-recorrente nem mudança de vínculo. Contrato/limites na arquitetura 9.4; MVP-06
-continua pendente para as demais lacunas de recorrência/conclusão.
+recorrente nem mudança de vínculo. Contrato na arquitetura 9.4/9.11.
+
+Criação, manutenção e parada usam o dia local do perfil (UTC para legado sem
+fuso válido). A janela inclusiva hoje–hoje+30 respeita recorrência e campanha;
+seu fim vencido inativa a recorrente sem apagar atrasos/conclusões. Consulta,
+edição e conclusão também sincronizam o encerramento, sem esperar a rotina.
+`execucao` informa `ocorrenciaId`, `podeConcluir`, `concluida`, `codigoBloqueio`,
+`hoje`, `fusoHorario`, `dataPrevista`, `proximaData`, `concluidaEm`, `atrasada` e
+`pontuacao`. O POST de conclusão aceita `{ "ocorrenciaId": 123 }` opcional para
+vincular o envio à execução mostrada; sem corpo, mantém compatibilidade. Nunca
+antecipa datas nem conclui campanha planejada. Repetição retorna `repetida: true`
+e o crédito efetivo, sem novo lançamento. `409` para execução indisponível;
+`404` para identificador alheio/ausente, `401` sem sessão e `400` para corpo
+inválido. Sem nova migration; concorrência integral de créditos segue no MVP-08.
 
 ## Exclusão do planejamento
 

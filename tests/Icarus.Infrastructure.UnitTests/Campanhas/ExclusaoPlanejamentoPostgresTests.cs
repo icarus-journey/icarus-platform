@@ -31,7 +31,7 @@ public sealed class ExclusaoPlanejamentoPostgresTests(BancoLoja banco) : IClassF
         => new(new ExclusaoPlanejamentoRepository(c), unidade ?? c, new Relogio());
     private static ConcluirMissaoUseCase Conclusao(IcarusDbContext c, IUnitOfWork? unidade = null)
         => new(new MissaoRepository(c), new OcorrenciaRepository(c), new MovimentacaoPontosRepository(c),
-            new CampanhaRepository(c), new UsuarioRepository(c), unidade ?? c, NullLogger<ConcluirMissaoUseCase>.Instance);
+            new CampanhaRepository(c), new UsuarioRepository(c), unidade ?? c, NullLogger<ConcluirMissaoUseCase>.Instance, new Relogio());
 
     private async Task<(Guid Usuario, long Epico, long Campanha, long Recorrente, long Concluida, long Pendente)> PrepararAsync()
     {
@@ -43,6 +43,8 @@ public sealed class ExclusaoPlanejamentoPostgresTests(BancoLoja banco) : IClassF
             Epico = new Epico { UsuarioId = usuario, Titulo = "Estudar" },
             Titulo = "Curso",
             Estado = EstadoCampanha.EmAndamento,
+            PrazoInicio = Hoje.AddDays(-30),
+            PrazoFim = Hoje.AddDays(60),
             ValorMensurado = 12,
             ValorAtual = 2,
             Unidade = "módulos"

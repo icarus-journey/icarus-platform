@@ -19,7 +19,7 @@ public sealed partial class CriarMissaoUseCase(
     IRecorrenciaRepository recorrenciaRepository,
     IOcorrenciaRepository ocorrenciaRepository,
     IUnitOfWork unitOfWork,
-    ILogger<CriarMissaoUseCase> logger)
+    ILogger<CriarMissaoUseCase> logger, TimeProvider? relogio = null, IUsuarioRepository? usuarios = null)
 {
     public async Task<CriarMissaoResult> ExecuteAsync(CriarMissaoCommand command, CancellationToken cancellationToken)
     {
@@ -29,6 +29,10 @@ public sealed partial class CriarMissaoUseCase(
             throw new PerfilNaoEncontradoException();
         }
 
+        var agora = (relogio ?? TimeProvider.System).GetUtcNow();
+        var usuario = usuarios is null ? null : await usuarios.BuscarPorIdAsync(command.UsuarioIdSolicitado, cancellationToken)
+            ?? throw new PerfilNaoEncontradoException();
+        Campanha? campanhaVinculada = null;
         if (command.CampanhaId is { } campanhaId)
         {
             var campanha = await campanhaRepository.BuscarPorIdAsync(campanhaId, command.UsuarioIdSolicitado, cancellationToken)
@@ -41,16 +45,18 @@ public sealed partial class CriarMissaoUseCase(
                 throw new CampanhaConcluidaException();
             }
             // A versão da campanha impede criar planejamento durante um encerramento concorrente.
-            campanha.AtualizadoEm = DateTimeOffset.UtcNow;
+            campanha.AtualizadoEm = agora;
+            campanhaVinculada = campanha;
         }
 
-        var hoje = DateOnly.FromDateTime(DateTime.UtcNow);
+        var hoje = FusoHorario.DataLocal(agora, usuario?.FusoHorario ?? campanhaVinculada?.Epico?.Usuario?.FusoHorario);
         var dataReferencia = command.DataLimite ?? hoje;
 
         var missao = new Missao
         {
             UsuarioId = command.UsuarioIdSolicitado,
             CampanhaId = command.CampanhaId,
+            Campanha = campanhaVinculada,
             Titulo = command.Titulo,
             Descricao = command.Descricao,
             Beneficio = command.Beneficio,
@@ -59,8 +65,6 @@ public sealed partial class CriarMissaoUseCase(
             DataLimite = command.DataLimite,
             Horario = ParaHorario(dataReferencia, command.Horario)
         };
-
-        await missaoRepository.AdicionarAsync(missao, cancellationToken);
 
         List<DateOnly> datasDeOcorrencia;
 
@@ -71,26 +75,26 @@ public sealed partial class CriarMissaoUseCase(
             {
                 Missao = missao,
                 Tipo = recorrenciaInfo.Tipo.ToString().ToUpperInvariant(),
-                DataInicio = hoje,
+                DataInicio = campanhaVinculada is { } c && c.PrazoInicio > hoje ? c.PrazoInicio : hoje,
                 DataFim = recorrenciaInfo.DataFim,
                 Regra = regra
             };
             missao.Recorrencia = recorrencia;
-            await recorrenciaRepository.AdicionarAsync(recorrencia, cancellationToken);
 
-            var fimDaJanela = hoje.AddDays(GeradorDeDatasRecorrencia.DiasDaJanelaPadrao);
-            if (recorrenciaInfo.DataFim is { } dataFim && dataFim < fimDaJanela)
-            {
-                fimDaJanela = dataFim;
-            }
-
-            datasDeOcorrencia = GeradorDeDatasRecorrencia.Gerar(hoje, fimDaJanela, recorrenciaInfo.Tipo, regra);
+            if (recorrencia.DataFim < recorrencia.DataInicio || RegrasRecorrencia.Fim(missao) < hoje)
+                throw new EdicaoMissaoException("fim_recorrencia_invalido", "O fim da repetição deve respeitar o início e o prazo da campanha.");
+            var janela = RegrasRecorrencia.Janela(missao, hoje);
+            datasDeOcorrencia = GeradorDeDatasRecorrencia.Gerar(janela.Inicio, janela.Fim, recorrenciaInfo.Tipo, regra);
         }
         else
         {
+            if (!RegrasRecorrencia.DentroDosLimites(missao, dataReferencia))
+                throw new EdicaoMissaoException("data_fora_da_campanha", "Escolha uma data dentro do período da campanha.");
             datasDeOcorrencia = [dataReferencia];
         }
 
+        await missaoRepository.AdicionarAsync(missao, cancellationToken);
+        if (missao.Recorrencia is { } regraPersistida) await recorrenciaRepository.AdicionarAsync(regraPersistida, cancellationToken);
         foreach (var data in datasDeOcorrencia)
         {
             await ocorrenciaRepository.AdicionarAsync(new Ocorrencia

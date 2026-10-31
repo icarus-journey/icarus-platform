@@ -24,14 +24,14 @@ public sealed record ConfiguracaoRecorrenciaResult(TipoRecorrencia Tipo, IReadOn
 public sealed record EdicaoMissaoResult(string VersaoContrato, long Id, long? CampanhaId, string Titulo, string? Descricao,
     string? Beneficio, Dificuldade Dificuldade, int Pontuacao, DateOnly? DataLimite, DateTimeOffset Horario,
     StatusMissao Status, DateTimeOffset? ConcluidaEm, bool Recorrente, string Versao, bool PodeEditar,
-    ConfiguracaoRecorrenciaResult? ConfiguracaoRecorrencia)
+    ConfiguracaoRecorrenciaResult? ConfiguracaoRecorrencia, ExecucaoMissaoResult Execucao)
 {
     public static string VersaoDaMissao(Missao m) => m.AtualizadoEm.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss.ffffff'Z'", CultureInfo.InvariantCulture);
 
-    public static EdicaoMissaoResult DaMissao(Missao m) => new("1.1.0", m.Id, m.CampanhaId, m.Titulo, m.Descricao,
+    public static EdicaoMissaoResult DaMissao(Missao m, DateTimeOffset? agora = null) => new("1.2.0", m.Id, m.CampanhaId, m.Titulo, m.Descricao,
         m.Beneficio, m.Dificuldade, m.Pontuacao, m.DataLimite, m.Horario, m.Status, m.ConcluidaEm,
         m.Recorrencia is not null, VersaoDaMissao(m), m.Status == StatusMissao.Ativa
             && (m.Recorrencia != null || (m.ConcluidaEm == null && !m.Ocorrencias.Any(o => o.ConcluidaEm != null)))
             && m.Campanha?.Estado is not (EstadoCampanha.Concluida or EstadoCampanha.Excluida),
-        ConfiguracaoRecorrenciaResult.DaMissao(m));
+        ConfiguracaoRecorrenciaResult.DaMissao(m), ExecucaoMissaoResult.DaMissao(m, agora ?? TimeProvider.System.GetUtcNow()));
 }

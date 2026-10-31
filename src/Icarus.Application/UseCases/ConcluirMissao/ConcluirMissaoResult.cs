@@ -5,4 +5,5 @@ public sealed record ConcluirMissaoResult(
     DateTimeOffset ConcluidaEm,
     bool ConcluidaComAtraso,
     int PontuacaoCreditada,
-    long SaldoPontosAtual);
+    long SaldoPontosAtual,
+    bool Repetida = false);
