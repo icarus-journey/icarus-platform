@@ -43,7 +43,7 @@ public sealed partial class ConcluirMissaoUseCase(
             if (campanhaVinculada.Estado == EstadoCampanha.Excluida) throw new CampanhaNaoEncontradaException();
             if (campanhaVinculada.Estado == EstadoCampanha.Concluida) throw new CampanhaConcluidaException();
         }
-        var agora = (relogio ?? TimeProvider.System).GetUtcNow();
+        var agora = RealizacaoMissao.NaPrecisaoPersistida((relogio ?? TimeProvider.System).GetUtcNow());
         var hoje = FusoHorario.DataLocal(agora, usuario.FusoHorario);
         if (RegrasRecorrencia.EncerrarSeNecessario(missao, hoje))
             await unitOfWork.SalvarAlteracoesAsync(cancellationToken);
@@ -65,14 +65,20 @@ public sealed partial class ConcluirMissaoUseCase(
         var ehRecorrente = missao.Recorrencia is not null;
         var ocorrencia = escolhida ?? RegrasRecorrencia.Selecionar(missao, hoje)
             ?? throw new EdicaoMissaoException("sem_execucao_pendente", "Não há execução pendente disponível para concluir.", true);
+        if (command.DataPrevistaEsperada is { } prevista && ocorrencia.DataPrevista != prevista)
+            throw new EdicaoMissaoException("execucao_alterada", "A execução mudou. Atualize os dados antes de concluir.", true);
         if (RegrasRecorrencia.Concluida(ocorrencia))
         {
             if (ocorrencia.ConcluidaEm is null)
                 throw new EdicaoMissaoException("historico_incompleto", "Esta execução já está concluída e precisa ser revisada.", true);
             LogConclusaoDuplicada(missao.Id, ocorrencia.Id);
             return new ConcluirMissaoResult(missao.Id, ocorrencia.ConcluidaEm!.Value,
-                ocorrencia.Status == StatusOcorrencia.ConcluidaComAtraso, disponibilidade.Pontuacao!.Value, usuario.SaldoPontos, true);
+                ocorrencia.Status == StatusOcorrencia.ConcluidaComAtraso, disponibilidade.Pontuacao!.Value, usuario.SaldoPontos, true,
+                ocorrencia.RealizadaEm, ocorrencia.FusoHorarioRealizacao, ocorrencia.Id, ocorrencia.DataPrevista);
         }
+        var realizacao = RealizacaoMissao.Resolver(command.DataRealizacao, command.HorarioRealizacao, agora, usuario.FusoHorario);
+        if (command.FusoHorarioEsperado is { } fuso && fuso != realizacao.FusoHorario)
+            throw new EdicaoMissaoException("fuso_alterado", "O horário da conta mudou. Reabra a confirmação.", true);
         if (ocorrencia.Id == 0)
         {
             await ocorrenciaRepository.AdicionarAsync(ocorrencia, cancellationToken);
@@ -84,9 +90,10 @@ public sealed partial class ConcluirMissaoUseCase(
         var planejamento = ehRecorrente ? PlanejamentoOcorrencia.DaExecucao(missao, ocorrencia) : null;
         var pontuacao = planejamento?.Pontuacao ?? missao.Pontuacao;
         var titulo = planejamento?.Titulo ?? missao.Titulo;
-        var concluidaComAtraso = ocorrencia.DataPrevista < hoje;
+        var concluidaComAtraso = ocorrencia.DataPrevista < FusoHorario.DataLocal(realizacao.Instante, realizacao.FusoHorario);
         ocorrencia.Status = concluidaComAtraso ? StatusOcorrencia.ConcluidaComAtraso : StatusOcorrencia.Concluida;
-        ocorrencia.RealizadaEm = agora;
+        ocorrencia.RealizadaEm = realizacao.Instante;
+        ocorrencia.FusoHorarioRealizacao = realizacao.FusoHorario;
         ocorrencia.ConcluidaEm = agora;
 
         if (!ehRecorrente)
@@ -120,7 +127,8 @@ public sealed partial class ConcluirMissaoUseCase(
 
         LogMissaoConcluida(missao.Id, ocorrencia.Id, pontuacao);
 
-        return new ConcluirMissaoResult(missao.Id, agora, concluidaComAtraso, pontuacao, usuario.SaldoPontos);
+        return new ConcluirMissaoResult(missao.Id, agora, concluidaComAtraso, pontuacao, usuario.SaldoPontos, false,
+            ocorrencia.RealizadaEm, ocorrencia.FusoHorarioRealizacao, ocorrencia.Id, ocorrencia.DataPrevista);
     }
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Tentativa de concluir missão de outro usuário rejeitada")]

@@ -71,6 +71,14 @@ public class IcarusDbContext : DbContext, IUnitOfWork
     {
         if (ChangeTracker.Entries<MedicaoCampanha>().Any(e => e.State is EntityState.Modified or EntityState.Deleted))
             throw new InvalidOperationException("O histórico de medições é imutável.");
+        foreach (var ocorrencia in ChangeTracker.Entries<Ocorrencia>().Where(e => e.State == EntityState.Modified))
+        {
+            var concluida = ocorrencia.Property(o => o.ConcluidaEm).OriginalValue is not null
+                || ocorrencia.Property(o => o.Status).OriginalValue is Domain.Enums.StatusOcorrencia.Concluida or Domain.Enums.StatusOcorrencia.ConcluidaComAtraso;
+            if (concluida && new[] { nameof(Ocorrencia.RealizadaEm), nameof(Ocorrencia.ConcluidaEm), nameof(Ocorrencia.FusoHorarioRealizacao) }
+                .Any(nome => !Equals(ocorrencia.Property(nome).OriginalValue, ocorrencia.Property(nome).CurrentValue)))
+                throw new InvalidOperationException("Realização, registro e fuso de uma conclusão são imutáveis.");
+        }
         var agora = DateTimeOffset.UtcNow;
 
         foreach (var entry in ChangeTracker.Entries<EntidadeBase>())

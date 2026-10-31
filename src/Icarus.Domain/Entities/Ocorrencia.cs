@@ -14,6 +14,7 @@ public class Ocorrencia : EntidadeBase
     public StatusOcorrencia Status { get; set; } = StatusOcorrencia.Pendente;
     public DateTimeOffset? RealizadaEm { get; set; }
     public DateTimeOffset? ConcluidaEm { get; set; }
+    public string? FusoHorarioRealizacao { get; set; }
 
     /// <summary>Configuração planejada desta execução. Nula no legado sem versão preservada.</summary>
     public string? Planejamento { get; set; }

@@ -97,7 +97,7 @@ public sealed class DatasRecorrenciaPostgresTests(BancoLoja banco) : IClassFixtu
         var datas = await c.Ocorrencias.Where(o => o.MissaoId == m.Id).OrderBy(o => o.DataPrevista).Select(o => o.DataPrevista).ToListAsync();
         Assert.Equal(Enumerable.Range(2, 4).Select(Hoje.AddDays), datas);
         var leitura = await Consulta(c).ExecuteAsync(new(u, u, m.Id), default);
-        Assert.Equal("1.2.0", leitura.VersaoContrato); Assert.False(leitura.Execucao.PodeConcluir);
+        Assert.Equal("1.3.0", leitura.VersaoContrato); Assert.False(leitura.Execucao.PodeConcluir);
         Assert.Equal("campanha_nao_iniciada", leitura.Execucao.CodigoBloqueio);
         var erro = await Assert.ThrowsAsync<EdicaoMissaoException>(() => Conclusao(c).ExecuteAsync(new(u, u, m.Id), default));
         Assert.Equal("campanha_nao_iniciada", erro.Codigo);

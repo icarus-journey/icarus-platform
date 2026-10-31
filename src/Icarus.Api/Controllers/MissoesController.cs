@@ -45,7 +45,7 @@ public class MissoesController(
             .ToList());
     }
 
-    /// <summary>Consulta a configuração vigente e sua versão para edição e execução elegível (HTTP 1.2.0).</summary>
+    /// <summary>Consulta a configuração vigente e sua versão para edição e execução elegível (HTTP 1.3.0).</summary>
     [Authorize]
     [HttpGet("{missaoId:long}")]
     [ProducesResponseType<EdicaoMissaoResponse>(StatusCodes.Status200OK)]
@@ -113,12 +113,14 @@ public class MissoesController(
         [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] ConcluirMissaoRequest? request = null)
     {
         var usuarioIdAutenticado = ObterUsuarioIdAutenticado();
-        var command = new ConcluirMissaoCommand(usuarioIdAutenticado, usuarioId, missaoId, request?.OcorrenciaId);
+        var command = new ConcluirMissaoCommand(usuarioIdAutenticado, usuarioId, missaoId, request?.OcorrenciaId,
+            request?.DataRealizacao, request?.HorarioRealizacao, request?.DataPrevistaEsperada, request?.FusoHorarioEsperado);
 
         var resultado = await concluirMissao.ExecuteAsync(command, cancellationToken);
 
         return Ok(new ConcluirMissaoResponse(
-            resultado.Id, resultado.ConcluidaEm, resultado.ConcluidaComAtraso, resultado.PontuacaoCreditada, resultado.SaldoPontosAtual, resultado.Repetida));
+            resultado.Id, resultado.ConcluidaEm, resultado.ConcluidaComAtraso, resultado.PontuacaoCreditada, resultado.SaldoPontosAtual, resultado.Repetida,
+            resultado.RealizadaEm, resultado.FusoHorarioRealizacao, resultado.OcorrenciaId, resultado.DataPrevista, resultado.VersaoContrato));
     }
 
     /// <summary>

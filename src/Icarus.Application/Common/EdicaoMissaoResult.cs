@@ -28,7 +28,7 @@ public sealed record EdicaoMissaoResult(string VersaoContrato, long Id, long? Ca
 {
     public static string VersaoDaMissao(Missao m) => m.AtualizadoEm.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss.ffffff'Z'", CultureInfo.InvariantCulture);
 
-    public static EdicaoMissaoResult DaMissao(Missao m, DateTimeOffset? agora = null) => new("1.2.0", m.Id, m.CampanhaId, m.Titulo, m.Descricao,
+    public static EdicaoMissaoResult DaMissao(Missao m, DateTimeOffset? agora = null) => new("1.3.0", m.Id, m.CampanhaId, m.Titulo, m.Descricao,
         m.Beneficio, m.Dificuldade, m.Pontuacao, m.DataLimite, m.Horario, m.Status, m.ConcluidaEm,
         m.Recorrencia is not null, VersaoDaMissao(m), m.Status == StatusMissao.Ativa
             && (m.Recorrencia != null || (m.ConcluidaEm == null && !m.Ocorrencias.Any(o => o.ConcluidaEm != null)))

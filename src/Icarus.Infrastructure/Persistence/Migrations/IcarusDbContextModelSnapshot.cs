@@ -711,6 +711,11 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         .HasColumnType("date")
                         .HasColumnName("data_prevista");
 
+                    b.Property<string>("FusoHorarioRealizacao")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("fuso_horario_realizacao");
+
                     b.Property<long>("MissaoId")
                         .HasColumnType("bigint")
                         .HasColumnName("missao_id");

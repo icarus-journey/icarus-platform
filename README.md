@@ -59,7 +59,7 @@ pessoal HTTP: a mensagem RF-10 e a lista permitida da IA permanecem 1.0.0.
 ## Editar missão recorrente
 
 `GET /api/usuarios/{usuarioId}/missoes/{missaoId}` retorna configuração e versão
-HTTP 1.2.0, com `execucao` calculada no fuso do perfil. O `PATCH` existente permite editar a recorrente ativa, incluindo
+HTTP 1.3.0, com `execucao` calculada no fuso do perfil. O `PATCH` existente permite editar a recorrente ativa, incluindo
 frequência, dias, dia mensal e fim opcional; exige `recorrencia` e `versaoEsperada`.
 As mudanças valem a partir de amanhã no fuso do perfil. Hoje, atrasos e
 conclusões ficam intactos; os créditos usam o planejamento da execução e, na
@@ -84,7 +84,21 @@ vincular o envio à execução mostrada; sem corpo, mantém compatibilidade. Nun
 antecipa datas nem conclui campanha planejada. Repetição retorna `repetida: true`
 e o crédito efetivo, sem novo lançamento. `409` para execução indisponível;
 `404` para identificador alheio/ausente, `401` sem sessão e `400` para corpo
-inválido. Sem nova migration; concorrência integral de créditos segue no MVP-08.
+inválido. Concorrência integral de créditos segue no MVP-08.
+
+RF-05.1: omitir os campos de realização mantém **agora**, pelo relógio da API.
+Para outro momento, o POST aceita `dataRealizacao` (`YYYY-MM-DD`) e
+`horarioRealizacao` (`HH:mm:ss`) juntos, no fuso do perfil. Futuro e horário civil
+inexistente/ambíguo retornam `400`; `dataPrevistaEsperada` e `fusoHorarioEsperado`
+protegem mudanças durante a edição (`409`). A realização autodeclarada não muda
+a ocorrência planejada nem contorna os bloqueios anteriores. Atraso usa o dia da
+realização, enquanto `concluidaEm` permanece o registro automático.
+Resposta 1.3.0 acrescenta realização, fuso histórico, ocorrência e data prevista;
+retry devolve os valores originais na precisão do PostgreSQL. A persistência
+impede reescrever realização/registro/fuso depois da conclusão. Migration
+`20261031013518_PreservarFusoRealizacaoMissao` acrescenta somente fuso nullable,
+sem preencher legado. Sequência/reconciliação e relatório persistido permanecem
+nas respectivas entregas; contrato na arquitetura 9.11.
 
 ## Exclusão do planejamento
 

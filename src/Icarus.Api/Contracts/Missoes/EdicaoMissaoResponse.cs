@@ -19,9 +19,9 @@ public sealed record ConfiguracaoRecorrenciaResponse(TipoRecorrencia Tipo, IRead
 
 public sealed record ExecucaoMissaoResponse(long? OcorrenciaId, bool PodeConcluir, bool Concluida, string? CodigoBloqueio,
     DateOnly Hoje, string FusoHorario, DateOnly? DataPrevista, DateOnly? ProximaData,
-    DateTimeOffset? ConcluidaEm, bool Atrasada, int? Pontuacao)
+    DateTimeOffset? ConcluidaEm, bool Atrasada, int? Pontuacao, DateTimeOffset? RealizadaEm, string? FusoHorarioRealizacao)
 {
     public static ExecucaoMissaoResponse DoResultado(ExecucaoMissaoResult r) => new(r.OcorrenciaId,
         r.PodeConcluir, r.Concluida, r.CodigoBloqueio, r.Hoje, r.FusoHorario, r.DataPrevista,
-        r.ProximaData, r.ConcluidaEm, r.Atrasada, r.Pontuacao);
+        r.ProximaData, r.ConcluidaEm, r.Atrasada, r.Pontuacao, r.RealizadaEm, r.FusoHorarioRealizacao);
 }
