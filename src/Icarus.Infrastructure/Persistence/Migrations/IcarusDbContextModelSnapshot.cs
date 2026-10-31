@@ -177,6 +177,7 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         .HasColumnName("area_da_vida");
 
                     b.Property<DateTimeOffset>("AtualizadoEm")
+                        .IsConcurrencyToken()
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("atualizado_em");
 
@@ -457,6 +458,7 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
                     b.Property<DateTimeOffset>("AtualizadoEm")
+                        .IsConcurrencyToken()
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("atualizado_em");
 
@@ -713,6 +715,10 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("missao_id");
 
+                    b.Property<string>("Planejamento")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("planejamento");
+
                     b.Property<DateTimeOffset?>("RealizadaEm")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("realizada_em");
@@ -792,6 +798,10 @@ namespace Icarus.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<DateOnly?>("AlteracoesAPartirDe")
+                        .HasColumnType("date")
+                        .HasColumnName("alteracoes_a_partir_de");
+
                     b.Property<DateTimeOffset>("AtualizadoEm")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("atualizado_em");
@@ -807,6 +817,10 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                     b.Property<DateOnly>("DataInicio")
                         .HasColumnType("date")
                         .HasColumnName("data_inicio");
+
+                    b.Property<string>("HistoricoPlanejamentos")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("historico_planejamentos");
 
                     b.Property<long>("MissaoId")
                         .HasColumnType("bigint")

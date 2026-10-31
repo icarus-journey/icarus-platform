@@ -1,3 +1,4 @@
+using Icarus.Application.UseCases.ConsultarMissao;
 using Icarus.Application.UseCases.ExcluirMissao;
 using System.Security.Claims;
 using Icarus.Api.Contracts.Missoes;
@@ -15,6 +16,7 @@ namespace Icarus.Api.Controllers;
 [ApiController]
 [Route("api/usuarios/{usuarioId:guid}/missoes")]
 public class MissoesController(
+    ConsultarMissaoUseCase consultarMissao,
     ExcluirMissaoUseCase excluirMissao,
     CriarMissaoUseCase criarMissao,
     AtualizarMissaoUseCase atualizarMissao,
@@ -43,6 +45,15 @@ public class MissoesController(
             .ToList());
     }
 
+    /// <summary>Consulta a configuração vigente e sua versão para edição (HTTP 1.1.0).</summary>
+    [Authorize]
+    [HttpGet("{missaoId:long}")]
+    [ProducesResponseType<EdicaoMissaoResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Consultar(Guid usuarioId, long missaoId, CancellationToken ct)
+        => Ok(EdicaoMissaoResponse.DoResultado(await consultarMissao.ExecuteAsync(new(ObterUsuarioIdAutenticado(), usuarioId, missaoId), ct)));
+
     /// <summary>Cria uma missão manualmente (RF-01), com ou sem campanha (RF-03).</summary>
     [Authorize]
     [HttpPost]
@@ -69,7 +80,8 @@ public class MissoesController(
     /// <summary>Edita uma missão (RF-01) — não altera a campanha dona nem o status.</summary>
     [Authorize]
     [HttpPatch("{missaoId:long}")]
-    [ProducesResponseType<MissaoResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<EdicaoMissaoResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
@@ -78,11 +90,12 @@ public class MissoesController(
         var usuarioIdAutenticado = ObterUsuarioIdAutenticado();
         var command = new AtualizarMissaoCommand(
             usuarioIdAutenticado, usuarioId, missaoId, request.Titulo, request.Descricao,
-            request.Beneficio, request.Dificuldade, request.DataLimite, request.Horario);
+            request.Beneficio, request.Dificuldade, request.DataLimite, request.Horario,
+            request.Recorrencia, request.DiasSemana, request.DataFimRecorrencia, request.DiaDoMes, request.VersaoEsperada);
 
         var resultado = await atualizarMissao.ExecuteAsync(command, cancellationToken);
 
-        return Ok(ParaResponse(resultado));
+        return Ok(EdicaoMissaoResponse.DoResultado(resultado));
     }
 
     /// <summary>
@@ -145,6 +158,4 @@ public class MissoesController(
     private static MissaoResponse ParaResponse(CriarMissaoResult r) => new(
         r.Id, r.CampanhaId, r.Titulo, r.Descricao, r.Beneficio, r.Dificuldade, r.Pontuacao, r.DataLimite, r.Horario, r.Status, r.ConcluidaEm, r.Recorrente);
 
-    private static MissaoResponse ParaResponse(AtualizarMissaoResult r) => new(
-        r.Id, r.CampanhaId, r.Titulo, r.Descricao, r.Beneficio, r.Dificuldade, r.Pontuacao, r.DataLimite, r.Horario, r.Status, r.ConcluidaEm, r.Recorrente);
 }

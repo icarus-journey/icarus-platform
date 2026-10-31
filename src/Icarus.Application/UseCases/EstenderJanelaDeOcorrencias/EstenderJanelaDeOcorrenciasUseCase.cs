@@ -29,7 +29,6 @@ public sealed partial class EstenderJanelaDeOcorrenciasUseCase(
     {
         var missoes = await missaoRepository.ListarRecorrentesAtivasAsync(cancellationToken);
         var hoje = DateOnly.FromDateTime(DateTime.UtcNow);
-        var fimDaJanela = hoje.AddDays(GeradorDeDatasRecorrencia.DiasDaJanelaPadrao);
         var totalCriadas = 0;
         var totalInativadas = 0;
 
@@ -46,10 +45,13 @@ public sealed partial class EstenderJanelaDeOcorrenciasUseCase(
                 continue;
             }
             var recorrencia = missao.Recorrencia!;
+            var dataBase = recorrencia.AlteracoesAPartirDe is null ? hoje
+                : FusoHorario.DataLocal(DateTimeOffset.UtcNow, missao.Usuario?.FusoHorario);
+            var fimDaJanela = dataBase.AddDays(GeradorDeDatasRecorrencia.DiasDaJanelaPadrao);
 
-            if (recorrencia.DataFim is { } dataFimVencida && dataFimVencida < hoje)
+            if (recorrencia.DataFim is { } dataFimVencida && dataFimVencida < dataBase)
             {
-                var pendentesNaoVencidas = await ocorrenciaRepository.ListarPendentesNaoVencidasAsync(missao.Id, hoje, cancellationToken);
+                var pendentesNaoVencidas = await ocorrenciaRepository.ListarPendentesNaoVencidasAsync(missao.Id, dataBase, cancellationToken);
                 foreach (var ocorrenciaPendente in pendentesNaoVencidas)
                 {
                     ocorrenciaPendente.Status = StatusOcorrencia.Excluida;
@@ -62,8 +64,17 @@ public sealed partial class EstenderJanelaDeOcorrenciasUseCase(
 
             var tipo = Enum.Parse<TipoRecorrencia>(recorrencia.Tipo, ignoreCase: true);
 
-            var inicioEfetivo = recorrencia.DataInicio > hoje ? recorrencia.DataInicio : hoje;
+            var inicioEfetivo = recorrencia.DataInicio > dataBase ? recorrencia.DataInicio : dataBase;
             var fimEfetivo = recorrencia.DataFim is { } dataFim && dataFim < fimDaJanela ? dataFim : fimDaJanela;
+            if (recorrencia.AlteracoesAPartirDe is { } alteracoes)
+            {
+                if (alteracoes > inicioEfetivo) inicioEfetivo = alteracoes;
+                if (missao.Campanha is { } campanha)
+                {
+                    if (campanha.PrazoInicio > inicioEfetivo) inicioEfetivo = campanha.PrazoInicio;
+                    if (campanha.PrazoFim < fimEfetivo) fimEfetivo = campanha.PrazoFim;
+                }
+            }
             if (inicioEfetivo > fimEfetivo)
             {
                 continue;
@@ -75,7 +86,7 @@ public sealed partial class EstenderJanelaDeOcorrenciasUseCase(
 
             foreach (var data in datasFaltantes)
             {
-                await ocorrenciaRepository.AdicionarAsync(new Ocorrencia { MissaoId = missao.Id, DataPrevista = data }, cancellationToken);
+                await ocorrenciaRepository.AdicionarAsync(new Ocorrencia { MissaoId = missao.Id, DataPrevista = data, Planejamento = PlanejamentoOcorrencia.Capturar(missao) }, cancellationToken);
             }
 
             if (datasFaltantes.Count > 0)

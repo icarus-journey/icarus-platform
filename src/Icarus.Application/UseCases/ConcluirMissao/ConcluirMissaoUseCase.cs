@@ -1,3 +1,4 @@
+using Icarus.Application.Common;
 using Icarus.Application.Exceptions;
 using Icarus.Application.Interfaces;
 using Icarus.Domain.Entities;
@@ -29,7 +30,7 @@ public sealed partial class ConcluirMissaoUseCase(
     ICampanhaRepository campanhaRepository,
     IUsuarioRepository usuarioRepository,
     IUnitOfWork unitOfWork,
-    ILogger<ConcluirMissaoUseCase> logger)
+    ILogger<ConcluirMissaoUseCase> logger, TimeProvider? relogio = null)
 {
     public async Task<ConcluirMissaoResult> ExecuteAsync(ConcluirMissaoCommand command, CancellationToken cancellationToken)
     {
@@ -49,10 +50,14 @@ public sealed partial class ConcluirMissaoUseCase(
             throw new MissaoInativaException();
         }
 
-        var hoje = DateOnly.FromDateTime(DateTime.UtcNow);
+        var agora = (relogio ?? TimeProvider.System).GetUtcNow();
+        var hoje = DateOnly.FromDateTime(agora.UtcDateTime);
         var ehRecorrente = missao.Recorrencia is not null;
 
         var ocorrencia = await ocorrenciaRepository.BuscarParaConcluirAsync(missao.Id, hoje, cancellationToken);
+
+        if (ocorrencia?.Status == StatusOcorrencia.Excluida)
+            throw new EdicaoMissaoException("ocorrencia_indisponivel", "Não há execução disponível para concluir nesta data.", true);
 
         if (ocorrencia is not null && ocorrencia.Status is StatusOcorrencia.Concluida or StatusOcorrencia.ConcluidaComAtraso)
         {
@@ -60,7 +65,8 @@ public sealed partial class ConcluirMissaoUseCase(
             var usuarioAtual = await usuarioRepository.BuscarPorIdAsync(command.UsuarioIdSolicitado, cancellationToken);
             return new ConcluirMissaoResult(
                 missao.Id, ocorrencia.ConcluidaEm!.Value, ocorrencia.Status == StatusOcorrencia.ConcluidaComAtraso,
-                missao.Pontuacao, usuarioAtual?.SaldoPontos ?? 0);
+                checked((int)(ocorrencia.MovimentacoesPontos.FirstOrDefault(m => m.Tipo == TipoMovimentacaoPontos.GanhoMissao)?.Quantidade
+                    ?? PlanejamentoOcorrencia.DaExecucao(missao, ocorrencia)?.Pontuacao ?? missao.Pontuacao)), usuarioAtual?.SaldoPontos ?? 0);
         }
 
         Campanha? campanhaVinculada = null;
@@ -70,9 +76,8 @@ public sealed partial class ConcluirMissaoUseCase(
                 ?? throw new CampanhaNaoEncontradaException();
             if (campanhaVinculada.Estado == EstadoCampanha.Excluida) throw new CampanhaNaoEncontradaException();
             if (campanhaVinculada.Estado == EstadoCampanha.Concluida) throw new CampanhaConcluidaException();
-            campanhaVinculada.AtualizadoEm = DateTimeOffset.UtcNow;
+            campanhaVinculada.AtualizadoEm = agora;
         }
-        var agora = DateTimeOffset.UtcNow;
         missao.AtualizadoEm = agora;
 
         if (ocorrencia is null)
@@ -80,10 +85,18 @@ public sealed partial class ConcluirMissaoUseCase(
             // Defensivo: não deveria faltar (gerada na criação ou pela manutenção diária), mas
             // cobre missão criada antes desta funcionalidade existir. Usa a data limite da
             // missão (quando houver) para que o atraso seja calculado corretamente.
-            ocorrencia = new Ocorrencia { MissaoId = missao.Id, DataPrevista = missao.DataLimite ?? hoje };
+            ocorrencia = new Ocorrencia
+            {
+                MissaoId = missao.Id,
+                DataPrevista = missao.DataLimite ?? hoje,
+                Planejamento = null
+            };
             await ocorrenciaRepository.AdicionarAsync(ocorrencia, cancellationToken);
         }
 
+        var planejamento = ehRecorrente ? PlanejamentoOcorrencia.DaExecucao(missao, ocorrencia) : null;
+        var pontuacao = planejamento?.Pontuacao ?? missao.Pontuacao;
+        var titulo = planejamento?.Titulo ?? missao.Titulo;
         var concluidaComAtraso = ocorrencia.DataPrevista < hoje;
         ocorrencia.Status = concluidaComAtraso ? StatusOcorrencia.ConcluidaComAtraso : StatusOcorrencia.Concluida;
         ocorrencia.RealizadaEm = agora;
@@ -99,14 +112,14 @@ public sealed partial class ConcluirMissaoUseCase(
             UsuarioId = missao.UsuarioId,
             Ocorrencia = ocorrencia,
             Tipo = TipoMovimentacaoPontos.GanhoMissao,
-            Quantidade = missao.Pontuacao,
-            Descricao = $"Conclusão da missão \"{missao.Titulo}\"",
+            Quantidade = pontuacao,
+            Descricao = $"Conclusão da missão \"{titulo}\"",
             CriadoEm = agora
         }, cancellationToken);
 
         var usuario = await usuarioRepository.BuscarPorIdAsync(missao.UsuarioId, cancellationToken)
             ?? throw new PerfilNaoEncontradoException();
-        usuario.SaldoPontos += missao.Pontuacao;
+        usuario.SaldoPontos += pontuacao;
 
         if (campanhaVinculada is { } campanha)
         {
@@ -114,15 +127,15 @@ public sealed partial class ConcluirMissaoUseCase(
             if (campanha is not null && campanha.ValorAtual is not null
                 && string.Equals(campanha.Unidade, "pontos", StringComparison.OrdinalIgnoreCase))
             {
-                campanha.ValorAtual += missao.Pontuacao;
+                campanha.ValorAtual += pontuacao;
             }
         }
 
         await unitOfWork.SalvarAlteracoesAsync(cancellationToken);
 
-        LogMissaoConcluida(missao.Id, ocorrencia.Id, missao.Pontuacao);
+        LogMissaoConcluida(missao.Id, ocorrencia.Id, pontuacao);
 
-        return new ConcluirMissaoResult(missao.Id, agora, concluidaComAtraso, missao.Pontuacao, usuario.SaldoPontos);
+        return new ConcluirMissaoResult(missao.Id, agora, concluidaComAtraso, pontuacao, usuario.SaldoPontos);
     }
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Tentativa de concluir missão de outro usuário rejeitada")]

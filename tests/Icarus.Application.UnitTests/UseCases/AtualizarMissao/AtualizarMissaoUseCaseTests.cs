@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Icarus.Application.UnitTests.UseCases.AtualizarMissao;
 
-internal sealed class MissaoRepositorioEmMemoriaParaAtualizar : IMissaoRepository, IUnitOfWork
+internal sealed class MissaoRepositorioEmMemoriaParaAtualizar : IMissaoRepository, IPlanejamentoMissaoRepository, IUnitOfWork
 {
     public List<Missao> Missoes { get; } = [];
 
@@ -26,6 +26,8 @@ internal sealed class MissaoRepositorioEmMemoriaParaAtualizar : IMissaoRepositor
     public Task<List<Missao>> ListarRecorrentesAtivasAsync(CancellationToken cancellationToken)
         => Task.FromResult(Missoes.Where(m => m.Status == StatusMissao.Ativa && m.Recorrencia is not null).ToList());
 
+    public Task<Missao?> BuscarAsync(long id, Guid usuario, CancellationToken ct) => BuscarPorIdAsync(id, usuario, ct);
+
     public Task SalvarAlteracoesAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
@@ -36,7 +38,7 @@ public class AtualizarMissaoUseCaseTests
 
     public AtualizarMissaoUseCaseTests()
     {
-        _useCase = new AtualizarMissaoUseCase(_repositorio, _repositorio, NullLogger<AtualizarMissaoUseCase>.Instance);
+        _useCase = new AtualizarMissaoUseCase(_repositorio, _repositorio, NullLogger<AtualizarMissaoUseCase>.Instance, TimeProvider.System);
     }
 
     [Fact(DisplayName = "Atualiza missão recalculando a pontuação a partir da nova dificuldade")]
@@ -60,8 +62,12 @@ public class AtualizarMissaoUseCaseTests
     {
         var missao = new Missao
         {
-            Id = 1, UsuarioId = Guid.NewGuid(), Titulo = "Concluída", Dificuldade = Dificuldade.Facil,
-            Pontuacao = 30, ConcluidaEm = DateTimeOffset.UtcNow
+            Id = 1,
+            UsuarioId = Guid.NewGuid(),
+            Titulo = "Concluída",
+            Dificuldade = Dificuldade.Facil,
+            Pontuacao = 30,
+            ConcluidaEm = DateTimeOffset.UtcNow
         };
         _repositorio.Missoes.Add(missao);
 
@@ -72,12 +78,16 @@ public class AtualizarMissaoUseCaseTests
         Assert.Equal("Concluída", missao.Titulo); // não foi alterada
     }
 
-    [Fact(DisplayName = "Missão recorrente nunca é editável, concluída ou não — edição lança MissaoRecorrenteImutavelException")]
+    [Fact(DisplayName = "Missão recorrente exige configuração explícita e versão para editar")]
     public async Task ExecuteAsync_DeveLancarExcecaoQuandoMissaoRecorrente()
     {
         var missao = new Missao
         {
-            Id = 1, UsuarioId = Guid.NewGuid(), Titulo = "Beber água", Dificuldade = Dificuldade.Trivial, Pontuacao = 15,
+            Id = 1,
+            UsuarioId = Guid.NewGuid(),
+            Titulo = "Beber água",
+            Dificuldade = Dificuldade.Trivial,
+            Pontuacao = 15,
             Recorrencia = new Recorrencia { MissaoId = 1, Tipo = "DIARIA", DataInicio = DateOnly.FromDateTime(DateTime.UtcNow) }
         };
         _repositorio.Missoes.Add(missao);
@@ -85,7 +95,7 @@ public class AtualizarMissaoUseCaseTests
         var command = new AtualizarMissaoCommand(
             missao.UsuarioId, missao.UsuarioId, missao.Id, "Novo título", null, null, Dificuldade.Media, null, null);
 
-        await Assert.ThrowsAsync<MissaoRecorrenteImutavelException>(() => _useCase.ExecuteAsync(command, CancellationToken.None));
+        await Assert.ThrowsAsync<EdicaoMissaoException>(() => _useCase.ExecuteAsync(command, CancellationToken.None));
         Assert.Equal("Beber água", missao.Titulo); // não foi alterada
     }
 

@@ -75,6 +75,7 @@ public sealed partial class CriarMissaoUseCase(
                 DataFim = recorrenciaInfo.DataFim,
                 Regra = regra
             };
+            missao.Recorrencia = recorrencia;
             await recorrenciaRepository.AdicionarAsync(recorrencia, cancellationToken);
 
             var fimDaJanela = hoje.AddDays(GeradorDeDatasRecorrencia.DiasDaJanelaPadrao);
@@ -92,7 +93,12 @@ public sealed partial class CriarMissaoUseCase(
 
         foreach (var data in datasDeOcorrencia)
         {
-            await ocorrenciaRepository.AdicionarAsync(new Ocorrencia { Missao = missao, DataPrevista = data }, cancellationToken);
+            await ocorrenciaRepository.AdicionarAsync(new Ocorrencia
+            {
+                Missao = missao,
+                DataPrevista = data,
+                Planejamento = command.Recorrencia is null ? null : PlanejamentoOcorrencia.Capturar(missao)
+            }, cancellationToken);
         }
 
         await unitOfWork.SalvarAlteracoesAsync(cancellationToken);

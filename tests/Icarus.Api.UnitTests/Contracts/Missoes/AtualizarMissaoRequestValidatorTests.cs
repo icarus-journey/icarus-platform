@@ -26,4 +26,31 @@ public class AtualizarMissaoRequestValidatorTests
 
         resultado.ShouldHaveValidationErrorFor(r => r.Horario);
     }
+    [Theory]
+    [InlineData(0)]
+    [InlineData(32)]
+    public void RejeitaDiaMensalInvalido(int dia)
+    {
+        _validator.TestValidate(RequisicaoValida() with { Recorrencia = TipoRecorrencia.Mensal, DiaDoMes = dia, VersaoEsperada = "versao" })
+            .ShouldHaveValidationErrorFor(r => r.DiaDoMes);
+    }
+
+    [Fact]
+    public void RecorrenteExigeVersaoEDiasValidosParaSemanal()
+    {
+        var invalida = RequisicaoValida() with { Recorrencia = TipoRecorrencia.Semanal, DiasSemana = [] };
+        var resultado = _validator.TestValidate(invalida);
+        resultado.ShouldHaveValidationErrorFor(r => r.VersaoEsperada);
+        resultado.ShouldHaveValidationErrorFor(r => r.DiasSemana);
+        _validator.TestValidate(invalida with { DiasSemana = [(DayOfWeek)9], VersaoEsperada = "versao" })
+            .ShouldHaveValidationErrorFor("DiasSemana[0]");
+    }
+
+    [Fact]
+    public void AceitaConfiguracaoMensalVersionadaSemDataFinal()
+    {
+        _validator.TestValidate(RequisicaoValida() with { Recorrencia = TipoRecorrencia.Mensal, DiaDoMes = 31, VersaoEsperada = "versao" })
+            .ShouldNotHaveAnyValidationErrors();
+    }
+
 }

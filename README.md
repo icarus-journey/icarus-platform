@@ -56,6 +56,24 @@ Sem conclusões, a série é ausente; zeros internos indicam datas sem conclusã
 registrada, sem afirmar ausência de atividade. É extensão apenas da leitura
 pessoal HTTP: a mensagem RF-10 e a lista permitida da IA permanecem 1.0.0.
 
+## Editar missão recorrente
+
+`GET /api/usuarios/{usuarioId}/missoes/{missaoId}` retorna configuração e versão
+HTTP 1.1.0. O `PATCH` existente permite editar a recorrente ativa, incluindo
+frequência, dias, dia mensal e fim opcional; exige `recorrencia` e `versaoEsperada`.
+As mudanças valem a partir de amanhã no fuso do perfil. Hoje, atrasos e
+conclusões ficam intactos; os créditos usam o planejamento da execução e, na
+repetição de uma conclusão, o valor efetivo do extrato. Sem alterar saldo ao editar.
+
+As migrations `20261031002406_PreservarPlanejamentoRecorrente` e
+`20261031003007_VersionarPlanejamentoRecorrente` acrescentam campos nulos de
+planejamento/versão; não reconstroem conclusões nem criam registros retroativos.
+Mudança de regra recalcula a janela futura com cancelamento lógico, reutiliza
+missão/data sem duplicar e respeita os limites da campanha. Conflito reverte a
+transação; parada/encerrada não é editável. Não há conversão entre única e
+recorrente nem mudança de vínculo. Contrato/limites na arquitetura 9.4; MVP-06
+continua pendente para as demais lacunas de recorrência/conclusão.
+
 ## Exclusão do planejamento
 
 `DELETE /api/usuarios/{usuarioId}/epicos/{id}`, `campanhas/{id}` e

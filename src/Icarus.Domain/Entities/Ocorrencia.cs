@@ -15,6 +15,9 @@ public class Ocorrencia : EntidadeBase
     public DateTimeOffset? RealizadaEm { get; set; }
     public DateTimeOffset? ConcluidaEm { get; set; }
 
+    /// <summary>Configuração planejada desta execução. Nula no legado sem versão preservada.</summary>
+    public string? Planejamento { get; set; }
+
     public Missao Missao { get; set; } = null!;
     public ICollection<MovimentacaoPontos> MovimentacoesPontos { get; set; } = new List<MovimentacaoPontos>();
 }
