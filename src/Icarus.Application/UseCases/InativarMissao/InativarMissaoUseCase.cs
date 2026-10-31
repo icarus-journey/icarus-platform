@@ -33,6 +33,7 @@ public sealed partial class InativarMissaoUseCase(
 
         var missao = await missaoRepository.BuscarPorIdAsync(command.MissaoId, command.UsuarioIdSolicitado, cancellationToken)
             ?? throw new MissaoNaoEncontradaException();
+        if (missao.Status == StatusMissao.Excluida) throw new MissaoNaoEncontradaException();
 
         if (missao.Recorrencia is null)
         {

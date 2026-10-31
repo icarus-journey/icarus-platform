@@ -1,3 +1,4 @@
+using Icarus.Application.UseCases.ExcluirMissao;
 using System.Security.Claims;
 using Icarus.Api.Contracts.Missoes;
 using Icarus.Application.UseCases.AtualizarMissao;
@@ -14,6 +15,7 @@ namespace Icarus.Api.Controllers;
 [ApiController]
 [Route("api/usuarios/{usuarioId:guid}/missoes")]
 public class MissoesController(
+    ExcluirMissaoUseCase excluirMissao,
     CriarMissaoUseCase criarMissao,
     AtualizarMissaoUseCase atualizarMissao,
     ListarMissoesAvulsasUseCase listarMissoesAvulsas,
@@ -123,6 +125,19 @@ public class MissoesController(
         var resultado = await inativarMissao.ExecuteAsync(command, cancellationToken);
 
         return Ok(new InativarMissaoResponse(resultado.Id, resultado.Status, resultado.OcorrenciasCanceladas));
+    }
+
+    /// <summary>Exclusão lógica com preservação do histórico e dos pontos. Repetição segura.</summary>
+    [Authorize]
+    [HttpDelete("{missaoId:long}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Excluir(Guid usuarioId, long missaoId, CancellationToken ct)
+    {
+        await excluirMissao.ExecuteAsync(new(ObterUsuarioIdAutenticado(), usuarioId, missaoId), ct);
+        return NoContent();
     }
 
     private Guid ObterUsuarioIdAutenticado() => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);

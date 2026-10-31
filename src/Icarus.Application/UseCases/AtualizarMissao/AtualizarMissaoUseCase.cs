@@ -1,3 +1,4 @@
+using Icarus.Domain.Enums;
 using Icarus.Application.Common;
 using Icarus.Application.Exceptions;
 using Icarus.Application.Interfaces;
@@ -25,6 +26,7 @@ public sealed partial class AtualizarMissaoUseCase(
 
         var missao = await missaoRepository.BuscarPorIdAsync(command.MissaoId, command.UsuarioIdSolicitado, cancellationToken)
             ?? throw new MissaoNaoEncontradaException();
+        if (missao.Status == StatusMissao.Excluida) throw new MissaoNaoEncontradaException();
 
         if (missao.Recorrencia is not null)
         {

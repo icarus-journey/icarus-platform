@@ -13,11 +13,12 @@ public class MissaoRepository(IcarusDbContext context) : IMissaoRepository
     public Task<Missao?> BuscarPorIdAsync(long missaoId, Guid usuarioId, CancellationToken cancellationToken)
         => context.Missoes
             .Include(m => m.Recorrencia)
-            .SingleOrDefaultAsync(m => m.Id == missaoId && m.UsuarioId == usuarioId, cancellationToken);
+            .SingleOrDefaultAsync(m => m.Id == missaoId && m.UsuarioId == usuarioId && m.Status != StatusMissao.Excluida
+                && (m.CampanhaId == null || (m.Campanha!.Estado != EstadoCampanha.Excluida && m.Campanha.Epico.Estado != EstadoEpico.Excluido)), cancellationToken);
 
     public async Task<List<Missao>> ListarAvulsasAsync(Guid usuarioId, CancellationToken cancellationToken)
-        => await context.Missoes
-            .Where(m => m.UsuarioId == usuarioId && m.CampanhaId == null)
+        => await context.Missoes.AsNoTracking()
+            .Where(m => m.UsuarioId == usuarioId && m.CampanhaId == null && m.Status != StatusMissao.Excluida)
             .Include(m => m.Recorrencia)
             .OrderByDescending(m => m.Id)
             .ToListAsync(cancellationToken);

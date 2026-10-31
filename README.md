@@ -56,6 +56,18 @@ Sem conclusões, a série é ausente; zeros internos indicam datas sem conclusã
 registrada, sem afirmar ausência de atividade. É extensão apenas da leitura
 pessoal HTTP: a mensagem RF-10 e a lista permitida da IA permanecem 1.0.0.
 
+## Exclusão do planejamento
+
+`DELETE /api/usuarios/{usuarioId}/epicos/{id}`, `campanhas/{id}` e
+`missoes/{id}` retornam `204`, inclusive na repetição pelo titular. Exclusão é
+lógica e atômica: retira a hierarquia das listas operacionais, preservando
+conclusões, medições, lançamentos e saldo. Missão não recorrente concluída
+retorna `409`; recorrente ativa/inativa pode ser excluída e cancela somente
+pendências de hoje em diante no fuso do perfil. Identificador alheio/ausente
+retorna `404`; sem autenticação, `401`. Conflito durante a gravação retorna
+`409` e reverte toda a operação. Não requer alteração de esquema.
+Contrato: [arquitetura, exclusão](../icarus-context/docs/implementation-design/platform/01-arquitetura-da-solucao.md#913-exclusão-lógica-do-planejamento).
+
 ## Ciclo e progresso das campanhas
 
 Campanhas iniciam automaticamente na data local do titular (rotina de um minuto

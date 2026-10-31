@@ -111,7 +111,7 @@ public sealed partial class GlobalExceptionHandler(
                 Status = StatusCodes.Status409Conflict,
                 Type = "https://tools.ietf.org/html/rfc9110#section-15.5.10",
                 Title = "Missão concluída",
-                Detail = "Missão concluída não pode ser editada."
+                Detail = "Missão concluída não pode ser editada nem excluída."
             },
             MissaoInativaException => new ProblemDetails
             {

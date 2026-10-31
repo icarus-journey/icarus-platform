@@ -78,8 +78,11 @@ public sealed partial class EstenderJanelaDeOcorrenciasUseCase(
                 await ocorrenciaRepository.AdicionarAsync(new Ocorrencia { MissaoId = missao.Id, DataPrevista = data }, cancellationToken);
             }
 
-            if (datasFaltantes.Count > 0 && missao.Campanha is not null)
-                missao.Campanha.AtualizadoEm = DateTimeOffset.UtcNow;
+            if (datasFaltantes.Count > 0)
+            {
+                missao.AtualizadoEm = DateTimeOffset.UtcNow;
+                if (missao.Campanha is not null) missao.Campanha.AtualizadoEm = DateTimeOffset.UtcNow;
+            }
             totalCriadas += datasFaltantes.Count;
         }
 

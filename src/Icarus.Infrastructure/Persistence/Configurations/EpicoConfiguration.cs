@@ -11,6 +11,7 @@ public class EpicoConfiguration : IEntityTypeConfiguration<Epico>
         builder.ToTable("epico", t => t.HasCheckConstraint("ck_epico_pontuacao_nao_negativa", "pontuacao >= 0"));
 
         builder.HasKey(e => e.Id);
+        builder.Property(e => e.AtualizadoEm).IsConcurrencyToken();
 
         builder.Property(e => e.Titulo)
             .IsRequired()

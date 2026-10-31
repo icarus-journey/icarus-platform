@@ -41,6 +41,7 @@ public sealed partial class ConcluirMissaoUseCase(
 
         var missao = await missaoRepository.BuscarPorIdAsync(command.MissaoId, command.UsuarioIdSolicitado, cancellationToken)
             ?? throw new MissaoNaoEncontradaException();
+        if (missao.Status == StatusMissao.Excluida) throw new MissaoNaoEncontradaException();
 
         if (missao.Status == StatusMissao.Inativa)
         {
@@ -72,6 +73,7 @@ public sealed partial class ConcluirMissaoUseCase(
             campanhaVinculada.AtualizadoEm = DateTimeOffset.UtcNow;
         }
         var agora = DateTimeOffset.UtcNow;
+        missao.AtualizadoEm = agora;
 
         if (ocorrencia is null)
         {
