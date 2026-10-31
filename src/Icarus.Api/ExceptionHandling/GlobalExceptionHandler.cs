@@ -106,26 +106,26 @@ public sealed partial class GlobalExceptionHandler(
                 Title = "Missão não encontrada",
                 Detail = "Missão não encontrada."
             },
+            EdicaoMissaoException edicao => new ProblemDetails
+            {
+                Status = edicao.Conflito ? StatusCodes.Status409Conflict : StatusCodes.Status400BadRequest,
+                Title = "Não foi possível alterar a missão",
+                Detail = edicao.Message,
+                Extensions = { ["codigo"] = edicao.Codigo }
+            },
             MissaoConcluidaException => new ProblemDetails
             {
                 Status = StatusCodes.Status409Conflict,
                 Type = "https://tools.ietf.org/html/rfc9110#section-15.5.10",
                 Title = "Missão concluída",
-                Detail = "Missão concluída não pode ser editada."
+                Detail = "Missão concluída não pode ser editada nem excluída."
             },
             MissaoInativaException => new ProblemDetails
             {
                 Status = StatusCodes.Status409Conflict,
                 Type = "https://tools.ietf.org/html/rfc9110#section-15.5.10",
                 Title = "Missão inativa",
-                Detail = "Missão inativa não pode ser concluída."
-            },
-            MissaoRecorrenteImutavelException => new ProblemDetails
-            {
-                Status = StatusCodes.Status409Conflict,
-                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.10",
-                Title = "Missão recorrente imutável",
-                Detail = "Missão recorrente não pode ser editada. Pare esta missão e crie uma nova para alterar algo."
+                Detail = "Missão parada não pode ser alterada nem concluída."
             },
             FotoPerfilInvalidaException fotoInvalida => new ProblemDetails
             {

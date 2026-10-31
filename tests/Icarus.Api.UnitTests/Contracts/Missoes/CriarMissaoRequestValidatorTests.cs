@@ -67,13 +67,13 @@ public class CriarMissaoRequestValidatorTests
         resultado.ShouldNotHaveAnyValidationErrors();
     }
 
-    [Fact(DisplayName = "DataFimRecorrencia no passado é rejeitada")]
+    [Fact(DisplayName = "Data civil é validada no caso de uso com o fuso do titular")]
     public void Validate_DeveRejeitarDataFimRecorrenciaNoPassado()
     {
         var ontem = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1);
         var resultado = _validator.TestValidate(RequisicaoValida() with { Recorrencia = TipoRecorrencia.Diaria, DataFimRecorrencia = ontem });
 
-        resultado.ShouldHaveValidationErrorFor(r => r.DataFimRecorrencia);
+        resultado.ShouldNotHaveValidationErrorFor(r => r.DataFimRecorrencia);
     }
 
     [Fact(DisplayName = "DataFimRecorrencia de hoje em diante não gera erro")]

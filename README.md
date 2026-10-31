@@ -56,6 +56,74 @@ Sem conclusões, a série é ausente; zeros internos indicam datas sem conclusã
 registrada, sem afirmar ausência de atividade. É extensão apenas da leitura
 pessoal HTTP: a mensagem RF-10 e a lista permitida da IA permanecem 1.0.0.
 
+## Editar missão recorrente
+
+`GET /api/usuarios/{usuarioId}/missoes/{missaoId}` retorna configuração e versão
+HTTP 1.3.0, com `execucao` calculada no fuso do perfil. O `PATCH` existente permite editar a recorrente ativa, incluindo
+frequência, dias, dia mensal e fim opcional; exige `recorrencia` e `versaoEsperada`.
+As mudanças valem a partir de amanhã no fuso do perfil. Hoje, atrasos e
+conclusões ficam intactos; os créditos usam o planejamento da execução e, na
+repetição de uma conclusão, o valor efetivo do extrato. Sem alterar saldo ao editar.
+
+As migrations `20261031002406_PreservarPlanejamentoRecorrente` e
+`20261031003007_VersionarPlanejamentoRecorrente` acrescentam campos nulos de
+planejamento/versão; não reconstroem conclusões nem criam registros retroativos.
+Mudança de regra recalcula a janela futura com cancelamento lógico, reutiliza
+missão/data sem duplicar e respeita os limites da campanha. Conflito reverte a
+transação; parada/encerrada não é editável. Não há conversão entre única e
+recorrente nem mudança de vínculo. Contrato na arquitetura 9.4/9.11.
+
+Criação, manutenção e parada usam o dia local do perfil (UTC para legado sem
+fuso válido). A janela inclusiva hoje–hoje+30 respeita recorrência e campanha;
+seu fim vencido inativa a recorrente sem apagar atrasos/conclusões. Consulta,
+edição e conclusão também sincronizam o encerramento, sem esperar a rotina.
+`execucao` informa `ocorrenciaId`, `podeConcluir`, `concluida`, `codigoBloqueio`,
+`hoje`, `fusoHorario`, `dataPrevista`, `proximaData`, `concluidaEm`, `atrasada` e
+`pontuacao`. O POST de conclusão aceita `{ "ocorrenciaId": 123 }` opcional para
+vincular o envio à execução mostrada; sem corpo, mantém compatibilidade. Nunca
+antecipa datas nem conclui campanha planejada. Repetição retorna `repetida: true`
+e o crédito efetivo, sem novo lançamento. `409` para execução indisponível;
+`404` para identificador alheio/ausente, `401` sem sessão e `400` para corpo
+inválido.
+
+RF-05.2: conclusão usa transação explícita e bloqueia o saldo antes de consultar
+a execução, na ordem da loja. Missões diferentes e resgates compartilham essa
+coordenação; mesma ocorrência confirmada retorna o resultado original com
+`repetida: true`. Crédito/saldo/contador e conclusão são confirmados ou revertidos
+juntos, inclusive após salvar e antes do commit. Versões dos pais preservam os
+conflitos com edição/exclusão/manutenção. A migration
+`20261031143311_GarantirCreditoUnicoPorOcorrencia` cria o índice parcial de um
+`GanhoMissao` por ocorrência não nula, sem alterar dados anteriores. Violação do
+índice retorna `409 dados_atualizados`. O alvo da idempotência é a ocorrência:
+use o identificador do GET para repetir a mesma execução; sem identificador,
+a seleção vigente pode apontar outra pendência. HTTP 1.3.0 e mobile inalterados.
+
+RF-05.1: omitir os campos de realização mantém **agora**, pelo relógio da API.
+Para outro momento, o POST aceita `dataRealizacao` (`YYYY-MM-DD`) e
+`horarioRealizacao` (`HH:mm:ss`) juntos, no fuso do perfil. Futuro e horário civil
+inexistente/ambíguo retornam `400`; `dataPrevistaEsperada` e `fusoHorarioEsperado`
+protegem mudanças durante a edição (`409`). A realização autodeclarada não muda
+a ocorrência planejada nem contorna os bloqueios anteriores. Atraso usa o dia da
+realização, enquanto `concluidaEm` permanece o registro automático.
+Resposta 1.3.0 acrescenta realização, fuso histórico, ocorrência e data prevista;
+retry devolve os valores originais na precisão do PostgreSQL. A persistência
+impede reescrever realização/registro/fuso depois da conclusão. Migration
+`20261031013518_PreservarFusoRealizacaoMissao` acrescenta somente fuso nullable,
+sem preencher legado. Sequência/reconciliação e relatório persistido permanecem
+nas respectivas entregas; contrato na arquitetura 9.11.
+
+## Exclusão do planejamento
+
+`DELETE /api/usuarios/{usuarioId}/epicos/{id}`, `campanhas/{id}` e
+`missoes/{id}` retornam `204`, inclusive na repetição pelo titular. Exclusão é
+lógica e atômica: retira a hierarquia das listas operacionais, preservando
+conclusões, medições, lançamentos e saldo. Missão não recorrente concluída
+retorna `409`; recorrente ativa/inativa pode ser excluída e cancela somente
+pendências de hoje em diante no fuso do perfil. Identificador alheio/ausente
+retorna `404`; sem autenticação, `401`. Conflito durante a gravação retorna
+`409` e reverte toda a operação. Não requer alteração de esquema.
+Contrato: [arquitetura, exclusão](../icarus-context/docs/implementation-design/platform/01-arquitetura-da-solucao.md#913-exclusão-lógica-do-planejamento).
+
 ## Ciclo e progresso das campanhas
 
 Campanhas iniciam automaticamente na data local do titular (rotina de um minuto

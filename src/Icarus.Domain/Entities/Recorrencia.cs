@@ -13,6 +13,8 @@ public class Recorrencia : EntidadeBase
     public string Tipo { get; set; } = string.Empty;
     public DateOnly DataInicio { get; set; }
     public DateOnly? DataFim { get; set; }
+    public DateOnly? AlteracoesAPartirDe { get; set; }
+    public string? HistoricoPlanejamentos { get; set; }
 
     /// <summary>Configuração da recorrência (ex.: dias da semana, hora). Armazenado como JSONB.</summary>
     public string Regra { get; set; } = "{}";

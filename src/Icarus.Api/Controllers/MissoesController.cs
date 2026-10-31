@@ -1,3 +1,5 @@
+using Icarus.Application.UseCases.ConsultarMissao;
+using Icarus.Application.UseCases.ExcluirMissao;
 using System.Security.Claims;
 using Icarus.Api.Contracts.Missoes;
 using Icarus.Application.UseCases.AtualizarMissao;
@@ -14,6 +16,8 @@ namespace Icarus.Api.Controllers;
 [ApiController]
 [Route("api/usuarios/{usuarioId:guid}/missoes")]
 public class MissoesController(
+    ConsultarMissaoUseCase consultarMissao,
+    ExcluirMissaoUseCase excluirMissao,
     CriarMissaoUseCase criarMissao,
     AtualizarMissaoUseCase atualizarMissao,
     ListarMissoesAvulsasUseCase listarMissoesAvulsas,
@@ -41,6 +45,15 @@ public class MissoesController(
             .ToList());
     }
 
+    /// <summary>Consulta a configuração vigente e sua versão para edição e execução elegível (HTTP 1.3.0).</summary>
+    [Authorize]
+    [HttpGet("{missaoId:long}")]
+    [ProducesResponseType<EdicaoMissaoResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Consultar(Guid usuarioId, long missaoId, CancellationToken ct)
+        => Ok(EdicaoMissaoResponse.DoResultado(await consultarMissao.ExecuteAsync(new(ObterUsuarioIdAutenticado(), usuarioId, missaoId), ct)));
+
     /// <summary>Cria uma missão manualmente (RF-01), com ou sem campanha (RF-03).</summary>
     [Authorize]
     [HttpPost]
@@ -67,7 +80,8 @@ public class MissoesController(
     /// <summary>Edita uma missão (RF-01) — não altera a campanha dona nem o status.</summary>
     [Authorize]
     [HttpPatch("{missaoId:long}")]
-    [ProducesResponseType<MissaoResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<EdicaoMissaoResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
@@ -76,32 +90,37 @@ public class MissoesController(
         var usuarioIdAutenticado = ObterUsuarioIdAutenticado();
         var command = new AtualizarMissaoCommand(
             usuarioIdAutenticado, usuarioId, missaoId, request.Titulo, request.Descricao,
-            request.Beneficio, request.Dificuldade, request.DataLimite, request.Horario);
+            request.Beneficio, request.Dificuldade, request.DataLimite, request.Horario,
+            request.Recorrencia, request.DiasSemana, request.DataFimRecorrencia, request.DiaDoMes, request.VersaoEsperada);
 
         var resultado = await atualizarMissao.ExecuteAsync(command, cancellationToken);
 
-        return Ok(ParaResponse(resultado));
+        return Ok(EdicaoMissaoResponse.DoResultado(resultado));
     }
 
     /// <summary>
     /// Conclui uma missão (RF-04.6). Credita pontos ao usuário e, se a missão pertencer a uma
-    /// campanha mensurável, soma à evolução do valor atual dela. Idempotente: concluir de novo
+    /// campanha na unidade pontos, soma ao contador dela. Idempotente: concluir de novo
     /// uma missão já concluída não credita pontos de novo.
     /// </summary>
     [Authorize]
     [HttpPost("{missaoId:long}/concluir")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     [ProducesResponseType<ConcluirMissaoResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Concluir(Guid usuarioId, long missaoId, CancellationToken cancellationToken)
+    public async Task<IActionResult> Concluir(Guid usuarioId, long missaoId, CancellationToken cancellationToken,
+        [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] ConcluirMissaoRequest? request = null)
     {
         var usuarioIdAutenticado = ObterUsuarioIdAutenticado();
-        var command = new ConcluirMissaoCommand(usuarioIdAutenticado, usuarioId, missaoId);
+        var command = new ConcluirMissaoCommand(usuarioIdAutenticado, usuarioId, missaoId, request?.OcorrenciaId,
+            request?.DataRealizacao, request?.HorarioRealizacao, request?.DataPrevistaEsperada, request?.FusoHorarioEsperado);
 
         var resultado = await concluirMissao.ExecuteAsync(command, cancellationToken);
 
         return Ok(new ConcluirMissaoResponse(
-            resultado.Id, resultado.ConcluidaEm, resultado.ConcluidaComAtraso, resultado.PontuacaoCreditada, resultado.SaldoPontosAtual));
+            resultado.Id, resultado.ConcluidaEm, resultado.ConcluidaComAtraso, resultado.PontuacaoCreditada, resultado.SaldoPontosAtual, resultado.Repetida,
+            resultado.RealizadaEm, resultado.FusoHorarioRealizacao, resultado.OcorrenciaId, resultado.DataPrevista, resultado.VersaoContrato));
     }
 
     /// <summary>
@@ -125,11 +144,22 @@ public class MissoesController(
         return Ok(new InativarMissaoResponse(resultado.Id, resultado.Status, resultado.OcorrenciasCanceladas));
     }
 
+    /// <summary>Exclusão lógica com preservação do histórico e dos pontos. Repetição segura.</summary>
+    [Authorize]
+    [HttpDelete("{missaoId:long}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Excluir(Guid usuarioId, long missaoId, CancellationToken ct)
+    {
+        await excluirMissao.ExecuteAsync(new(ObterUsuarioIdAutenticado(), usuarioId, missaoId), ct);
+        return NoContent();
+    }
+
     private Guid ObterUsuarioIdAutenticado() => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
     private static MissaoResponse ParaResponse(CriarMissaoResult r) => new(
         r.Id, r.CampanhaId, r.Titulo, r.Descricao, r.Beneficio, r.Dificuldade, r.Pontuacao, r.DataLimite, r.Horario, r.Status, r.ConcluidaEm, r.Recorrente);
 
-    private static MissaoResponse ParaResponse(AtualizarMissaoResult r) => new(
-        r.Id, r.CampanhaId, r.Titulo, r.Descricao, r.Beneficio, r.Dificuldade, r.Pontuacao, r.DataLimite, r.Horario, r.Status, r.ConcluidaEm, r.Recorrente);
 }

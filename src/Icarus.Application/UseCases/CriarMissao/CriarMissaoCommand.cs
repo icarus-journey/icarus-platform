@@ -8,7 +8,7 @@ namespace Icarus.Application.UseCases.CriarMissao;
 /// mês da referência (<see cref="CriarMissaoCommand.DataLimite"/> ou hoje) — "mês curto usa seu
 /// último dia" é tratado na geração, não aqui. <see cref="DataFim"/> nula repete
 /// indefinidamente (até parar manualmente, RF-04.6); preenchida limita a geração de novas
-/// ocorrências a essa data — depois dela, a missão continua ativa, só sem novas ocorrências.
+/// ocorrências a essa data — depois dela, a missão é inativada, preservando o histórico.
 /// </summary>
 public sealed record RecorrenciaCommandInfo(TipoRecorrencia Tipo, List<DayOfWeek>? DiasSemana, DateOnly? DataFim);
 

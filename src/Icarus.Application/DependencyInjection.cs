@@ -1,3 +1,7 @@
+using Icarus.Application.UseCases.ConsultarMissao;
+using Icarus.Application.UseCases.ExcluirMissao;
+using Icarus.Application.UseCases.ExcluirCampanha;
+using Icarus.Application.UseCases.ExcluirEpico;
 using Icarus.Application.Interfaces;
 using Icarus.Application.UseCases.IniciarCampanhas;
 using Icarus.Application.UseCases.ConsultarProgressoCampanha;
@@ -56,6 +60,9 @@ public static class DependencyInjection
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
         services.AddSingleton(TimeProvider.System);
+        services.AddScoped<ExcluirMissaoUseCase>();
+        services.AddScoped<ExcluirCampanhaUseCase>();
+        services.AddScoped<ExcluirEpicoUseCase>();
         services.AddScoped<IIniciadorCampanhas, IniciarCampanhasUseCase>();
         services.AddScoped<ConsultarProgressoCampanhaUseCase>();
         services.AddScoped<RegistrarProgressoCampanhaUseCase>();
@@ -96,6 +103,7 @@ public static class DependencyInjection
         services.AddScoped<AtualizarCampanhaUseCase>();
         services.AddScoped<CriarMissaoUseCase>();
         services.AddScoped<AtualizarMissaoUseCase>();
+        services.AddScoped<ConsultarMissaoUseCase>();
         services.AddScoped<ListarMissoesAvulsasUseCase>();
         services.AddScoped<ConcluirMissaoUseCase>();
         services.AddScoped<InativarMissaoUseCase>();

@@ -11,6 +11,7 @@ public class RecorrenciaConfiguration : IEntityTypeConfiguration<Recorrencia>
         builder.ToTable("recorrencia");
 
         builder.HasKey(r => r.Id);
+        builder.Property(r => r.HistoricoPlanejamentos).HasColumnType("jsonb");
 
         builder.Property(r => r.Tipo)
             .IsRequired()

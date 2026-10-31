@@ -12,5 +12,6 @@ public enum StatusMissao
 {
     Rascunho,
     Ativa,
-    Inativa
+    Inativa,
+    Excluida
 }

@@ -165,7 +165,7 @@ public sealed class CicloCampanhaPostgresTests(BancoLoja banco) : IClassFixture<
             await c.SaveChangesAsync();
             missaoId = missao.Id;
             var concluir = new ConcluirMissaoUseCase(new MissaoRepository(c), new OcorrenciaRepository(c), new MovimentacaoPontosRepository(c),
-                new CampanhaRepository(c), new UsuarioRepository(c), c, NullLogger<ConcluirMissaoUseCase>.Instance);
+                new CampanhaRepository(c), new UsuarioRepository(c), c, new TransacaoConclusaoMissao(c), NullLogger<ConcluirMissaoUseCase>.Instance);
             await concluir.ExecuteAsync(new(usuario, usuario, missaoId), default);
         }
         await using (var c = banco.NovoContexto())
