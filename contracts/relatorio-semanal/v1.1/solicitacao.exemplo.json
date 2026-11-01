@@ -1,0 +1,98 @@
+{
+  "idMensagem": "11111111-1111-4111-8111-111111111111",
+  "correlacaoId": "22222222-2222-4222-8222-222222222222",
+  "causalidadeId": null,
+  "tipo": "relatorio.semanal.solicitar",
+  "versaoContrato": "1.1.0",
+  "criadaEm": "2026-10-20T12:00:00Z",
+  "expiraEm": "2026-10-20T12:05:00Z",
+  "chaveIdempotencia": "22222222-2222-4222-8222-222222222222:1",
+  "periodo": {
+    "inicio": "2026-10-12",
+    "fim": "2026-10-18",
+    "fusoHorario": "America/Sao_Paulo"
+  },
+  "indicadores": {
+    "sequencia": null,
+    "pontosGanhos": null,
+    "pontosUtilizados": null,
+    "previstas": null,
+    "concluidas": 9,
+    "pendentes": null,
+    "atrasadas": null,
+    "concluidasComAtraso": 0,
+    "taxaConclusao": null,
+    "maiorAtividadeDeCampanha": null,
+    "progressoManualCampanhas": null,
+    "recompensasResgatadas": null,
+    "recompensasUtilizadas": null,
+    "distribuicaoPorArea": [],
+    "historicoInsuficienteComparacao": false
+  },
+  "comparacaoSemanal": {
+    "semana": {
+      "periodo": {
+        "inicio": "2026-10-12",
+        "fim": "2026-10-18",
+        "fusoHorario": "America/Sao_Paulo"
+      },
+      "estado": "disponivel",
+      "previstas": 10,
+      "concluidas": 8,
+      "taxaConclusao": 80.0
+    },
+    "semanasAnteriores": [
+      {
+        "periodo": {
+          "inicio": "2026-10-05",
+          "fim": "2026-10-11",
+          "fusoHorario": "America/Sao_Paulo"
+        },
+        "estado": "disponivel",
+        "previstas": 8,
+        "concluidas": 4,
+        "taxaConclusao": 50.0
+      },
+      {
+        "periodo": {
+          "inicio": "2026-09-28",
+          "fim": "2026-10-04",
+          "fusoHorario": "America/Sao_Paulo"
+        },
+        "estado": "disponivel",
+        "previstas": 4,
+        "concluidas": 2,
+        "taxaConclusao": 50.0
+      },
+      {
+        "periodo": {
+          "inicio": "2026-09-21",
+          "fim": "2026-09-27",
+          "fusoHorario": "America/Sao_Paulo"
+        },
+        "estado": "disponivel",
+        "previstas": 12,
+        "concluidas": 9,
+        "taxaConclusao": 75.0
+      },
+      {
+        "periodo": {
+          "inicio": "2026-09-14",
+          "fim": "2026-09-20",
+          "fusoHorario": "America/Sao_Paulo"
+        },
+        "estado": "disponivel",
+        "previstas": 10,
+        "concluidas": 5,
+        "taxaConclusao": 50.0
+      }
+    ],
+    "mediaQuatroSemanas": {
+      "previstas": 8.5,
+      "concluidas": 5,
+      "taxaConclusao": 56.2
+    },
+    "podeCompararSemanaAnterior": true,
+    "podeCompararMediaQuatroSemanas": true
+  }
+}

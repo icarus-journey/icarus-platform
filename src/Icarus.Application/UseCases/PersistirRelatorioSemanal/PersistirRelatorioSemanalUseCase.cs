@@ -27,12 +27,18 @@ public sealed partial class PersistirRelatorioSemanalUseCase(IRelatorioSemanalRe
             var vigente = trabalho.TentativaId == mensagem.CausalidadeId && trabalho.Estado == "processando"
                 && trabalho.ExpiraEm > agora && mensagem.ExpiraEm == trabalho.ExpiraEm
                 && mensagem.ChaveIdempotencia == chave && periodoValido;
-            var inbox = new InboxRelatorio { Id = mensagem.IdMensagem, TrabalhoId = trabalho.Id,
-                TentativaId = mensagem.CausalidadeId, Estado = "ignorada" };
+            var inbox = new InboxRelatorio
+            {
+                Id = mensagem.IdMensagem,
+                TrabalhoId = trabalho.Id,
+                TentativaId = mensagem.CausalidadeId,
+                Estado = "ignorada"
+            };
             await repositorio.AdicionarInboxAsync(inbox, token);
             if (vigente)
             {
-                var valido = mensagem.Tipo == "relatorio.semanal.resultado" && mensagem.VersaoContrato == ContratoRelatorioSemanal.Versao
+                var dados = ContratoRelatorioSemanal.LerIndicadores(trabalho.Indicadores);
+                var valido = mensagem.Tipo == "relatorio.semanal.resultado" && mensagem.VersaoContrato == dados.Versao
                     && mensagem.Estado == "concluido" && mensagem.FalhaCodigo is null
                     && ContratoRelatorioSemanal.ConteudoValido(mensagem.Conteudo)
                     && mensagem.Geracao is { Provedor: "openai" or "ollama", Modelo.Length: > 0 and <= 120 };
@@ -41,10 +47,15 @@ public sealed partial class PersistirRelatorioSemanalUseCase(IRelatorioSemanalRe
                     var existente = await repositorio.BuscarRelatorioAsync(trabalho.UsuarioId, trabalho.PeriodoInicio, trabalho.PeriodoFim, token);
                     if (existente is null)
                     {
-                        var dados = JsonSerializer.Deserialize<IndicadoresPessoais>(trabalho.Indicadores, ContratoRelatorioSemanal.Json)!;
-                        await repositorio.AdicionarRelatorioAsync(new() { UsuarioId = trabalho.UsuarioId, Tipo = TipoRelatorio.Semanal,
-                            PeriodoInicio = trabalho.PeriodoInicio, PeriodoFim = trabalho.PeriodoFim, Texto = mensagem.Conteudo!.Resumo,
-                            Conteudo = JsonSerializer.Serialize(new SnapshotRelatorioSemanal(mensagem.Conteudo, dados, mensagem.Geracao!), ContratoRelatorioSemanal.Json) }, token);
+                        await repositorio.AdicionarRelatorioAsync(new()
+                        {
+                            UsuarioId = trabalho.UsuarioId,
+                            Tipo = TipoRelatorio.Semanal,
+                            PeriodoInicio = trabalho.PeriodoInicio,
+                            PeriodoFim = trabalho.PeriodoFim,
+                            Texto = mensagem.Conteudo!.Resumo,
+                            Conteudo = JsonSerializer.Serialize(new SnapshotRelatorioSemanal(mensagem.Conteudo, dados.Indicadores, mensagem.Geracao!, dados.Comparacao, dados.Versao), ContratoRelatorioSemanal.Json)
+                        }, token);
                     }
                     trabalho.Estado = "concluido"; inbox.Estado = "aplicada";
                 }

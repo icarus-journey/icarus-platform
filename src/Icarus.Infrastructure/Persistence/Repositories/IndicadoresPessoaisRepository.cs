@@ -1,4 +1,5 @@
 using Icarus.Application.Common.Analise;
+using Icarus.Application.Common.Relatorios;
 using Icarus.Application.Interfaces;
 using Icarus.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -9,8 +10,39 @@ namespace Icarus.Infrastructure.Persistence.Repositories;
 public sealed class IndicadoresPessoaisRepository(IcarusDbContext contexto, TimeProvider? relogio = null) : IIndicadoresPessoaisRepository
 {
     public async Task<IndicadoresPessoais> CalcularAsync(Guid usuarioId, PeriodoAnalitico periodo, CancellationToken ct)
-        // O contrato consumidor RF-10 mantém sua base de atividade até a revisão do MVP-13.
         => (await CalcularAsync(usuarioId, periodo, false, ct)).Indicadores;
+
+    public async Task<DadosRelatorioSemanal> CalcularRelatorioAsync(Guid usuarioId, PeriodoAnalitico periodo, CancellationToken ct)
+    {
+        await using var leitura = contexto.Database.CurrentTransaction is null
+            ? await contexto.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, ct) : null;
+        var atividade = (await CalcularAsync(usuarioId, periodo, false, ct)).Indicadores;
+        var semanas = new List<SemanaPlanejada>();
+        var registros = new HashSet<long>();
+        for (var i = 0; i < 5; i++)
+        {
+            var semana = new PeriodoAnalitico(periodo.Inicio.AddDays(-7 * i), periodo.Fim.AddDays(-7 * i), periodo.FusoHorario);
+            var planejamento = await LeitorPlanejamentoAnalitico.LerAsync(contexto, usuarioId, semana, ct);
+            semanas.Add(CalculadorComparacaoSemanal.DaAdesao(semana, planejamento.Resumo));
+            if (i == 0) registros = planejamento.Registros;
+        }
+        var comparacao = CalculadorComparacaoSemanal.Calcular(semanas[0], semanas.Skip(1).ToArray());
+        var idsAtividade = await contexto.Ocorrencias.AsNoTracking().Where(o => o.Missao.UsuarioId == usuarioId
+            && o.RealizadaEm >= periodo.InicioUtc && o.RealizadaEm < periodo.FimExclusivoUtc
+            && (o.Status == StatusOcorrencia.Concluida || o.Status == StatusOcorrencia.ConcluidaComAtraso))
+            .Select(o => o.Id).ToListAsync(ct);
+        var limitacoes = atividade.Limitacoes.Where(l => !l.StartsWith("Histórico insuficiente", StringComparison.Ordinal)).ToList();
+        if (comparacao.HistoricoInsuficiente)
+            limitacoes.Add("Histórico insuficiente para a comparação completa com as semanas anteriores.");
+        var dados = atividade with
+        {
+            HistoricoInsuficienteComparacao = comparacao.HistoricoInsuficiente,
+            QuantidadeRegistros = atividade.QuantidadeRegistros + registros.Except(idsAtividade).Count(),
+            Limitacoes = limitacoes
+        };
+        if (leitura is not null) await leitura.CommitAsync(ct);
+        return new(dados, comparacao);
+    }
 
     public async Task<ProgressoCalculado> CalcularProgressoAsync(Guid usuarioId, PeriodoAnalitico periodo, CancellationToken ct)
         => await CalcularAsync(usuarioId, periodo, true, ct);

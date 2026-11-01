@@ -55,10 +55,14 @@ e [relatório](../icarus-context/docs/implementation-design/platform/07-relatori
 A migration `AdicionarRelatorioSemanalConfiavel` cria trabalho, inbox/outbox e
 unicidade por período. RabbitMQ e `icarus-ai` geram a síntese real; consultas
 reutilizam o resultado persistido. Sem fuso ou registros, não geram conteúdo.
-Previstas/taxa, sequência no relatório por período e comparação completa continuam dependentes de
-origens ainda não integradas aos indicadores; ausência não vira zero.
+Relatório 1.1.0 separa atividade por realização de planejamento/cumprimento por
+semana. Compara o conjunto previstas, concluídas do planejamento e taxa com a
+semana anterior e a média aritmética das quatro anteriores, no mesmo snapshot.
+Legado/lacunas mantêm ausência; semana sem planejamento não vira taxa zero.
+Sequência e medições manuais continuam fora desta entrada. Relatórios válidos
+e resultados 1.0.0 em trânsito permanecem legíveis, sem nova geração.
 
-[Contratos JSON e exemplos RF-10](contracts/relatorio-semanal/v1/) são versionados
+[Contratos JSON e exemplos RF-10](contracts/relatorio-semanal/v1.1/) são versionados
 em conjunto com a cópia independente do trabalhador. Os exemplos são massa de
 teste e não conteúdo demonstrativo do aplicativo. Rode `dotnet test`; para as
 integrações PostgreSQL, forneça `ICARUS_TESTES_POSTGRES` com uma conexão local
