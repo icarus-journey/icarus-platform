@@ -39,6 +39,7 @@ public static class DependencyInjection
         services.AddMemoryCache();
         services.AddSingleton<ILoginAttemptLimiter, LoginAttemptLimiter>();
 
+        services.AddScoped<IHistoricoMissoesRepository, HistoricoMissoesRepository>();
         services.AddScoped<IUsuarioRepository, UsuarioRepository>();
         services.AddScoped<IJornadaRepository, JornadaRepository>();
         services.AddScoped<IProtecaoSequencia, ProtecaoSequenciaRepository>();

@@ -1,3 +1,4 @@
+using Icarus.Application.UseCases.ConsultarHistoricoMissoes;
 using Icarus.Application.UseCases.ConsultarMissao;
 using Icarus.Application.UseCases.ConsultarJornada;
 using Icarus.Application.UseCases.ExcluirMissao;
@@ -61,6 +62,7 @@ public static class DependencyInjection
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
         services.AddSingleton(TimeProvider.System);
+        services.AddScoped<ConsultarHistoricoMissoesUseCase>();
         services.AddScoped<ConsultarJornadaUseCase>();
         services.AddScoped<ExcluirMissaoUseCase>();
         services.AddScoped<ExcluirCampanhaUseCase>();

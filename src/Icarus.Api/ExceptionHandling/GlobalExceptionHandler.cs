@@ -16,6 +16,13 @@ public sealed partial class GlobalExceptionHandler(
     {
         var problemDetails = exception switch
         {
+            ConsultaHistoricoInvalidaException => new ProblemDetails
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Consulta de histórico inválida",
+                Detail = "Atualize o histórico e confira os filtros informados.",
+                Extensions = { ["codigo"] = "consulta_historico_invalida" }
+            },
             OperacaoLojaException loja => new ProblemDetails
             {
                 Status = loja.NaoEncontrado ? StatusCodes.Status404NotFound : StatusCodes.Status409Conflict,

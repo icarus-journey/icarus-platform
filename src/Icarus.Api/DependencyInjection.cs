@@ -1,3 +1,5 @@
+using Icarus.Application.Interfaces;
+using Icarus.Api.Contracts.HistoricoMissoes;
 using Icarus.Api.Contracts.Diario;
 using Icarus.Api.Contracts.Analise;
 using Icarus.Api.Contracts.Loja;
@@ -51,6 +53,9 @@ public static class DependencyInjection
             options.AddOperationTransformer<BearerSecuritySchemeTransformer>();
         });
 
+        services.AddDataProtection();
+        services.AddScoped<ICursorHistoricoMissoes, CursorHistoricoMissoes>();
+        services.AddSingleton<IValidator<ConsultarHistoricoMissoesRequest>, ConsultarHistoricoMissoesRequestValidator>();
         services.AddProblemDetails();
         services.AddExceptionHandler<GlobalExceptionHandler>();
 

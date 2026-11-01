@@ -12,6 +12,15 @@ A consulta existente inclui estudo/trabalho opcionais; `PUT /api/usuarios/{id}/p
 atualiza esses quatro campos e `PUT /api/usuarios/{id}/fuso` mantém o fuso IANA.
 Cadastro e saldo permanecem protegidos por contratos separados.
 
+## Histórico de missões
+
+`GET /api/usuarios/{id}/historico/missoes` oferece filtro por data prevista,
+estado e campanha/avulsas, com paginação por cursor protegido. Detalhe por ID de
+ocorrência e opções de campanhas ficam nas rotas filhas. A consulta autenticada
+preserva exclusões, planejamento e crédito efetivo, sem escrever no banco nem
+fabricar metadados do legado. Contrato [HTTP 1.0.0](../icarus-context/docs/implementation-design/platform/11-historico-missoes.md).
+Sem migration ou alteração na lista RF-10. O extrato continua no MVP-15.
+
 ## Diário autenticado
 
 `/api/usuarios/{usuarioId}/diario` permite listar (`GET`), criar (`POST`),
