@@ -16,6 +16,20 @@ public sealed partial class GlobalExceptionHandler(
     {
         var problemDetails = exception switch
         {
+            ConsultaHistoricoRelatoriosInvalidaException => new ProblemDetails
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Consulta de histórico inválida",
+                Detail = "Atualize o histórico para continuar.",
+                Extensions = { ["codigo"] = "consulta_historico_relatorios_invalida" }
+            },
+            RelatorioSalvoIndisponivelException => new ProblemDetails
+            {
+                Status = StatusCodes.Status503ServiceUnavailable,
+                Title = "Relatório indisponível",
+                Detail = "Não foi possível abrir este relatório agora.",
+                Extensions = { ["codigo"] = "relatorio_salvo_indisponivel" }
+            },
             ConsultaExtratoInvalidaException => new ProblemDetails
             {
                 Status = StatusCodes.Status400BadRequest,

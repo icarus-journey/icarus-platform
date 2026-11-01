@@ -1,4 +1,5 @@
 using Icarus.Application.Interfaces;
+using Icarus.Api.Contracts.HistoricoRelatorios;
 using Icarus.Api.Contracts.ExtratoPontos;
 using Icarus.Api.Contracts.HistoricoMissoes;
 using Icarus.Api.Contracts.Diario;
@@ -55,6 +56,8 @@ public static class DependencyInjection
         });
 
         services.AddDataProtection();
+        services.AddScoped<ICursorHistoricoRelatorios, CursorHistoricoRelatorios>();
+        services.AddSingleton<IValidator<ConsultaHistoricoRelatoriosRequest>, ConsultaHistoricoRelatoriosRequestValidator>();
         services.AddScoped<ICursorExtratoPontos, CursorExtratoPontos>();
         services.AddSingleton<IValidator<ConsultarExtratoPontosRequest>, ConsultarExtratoPontosRequestValidator>();
         services.AddScoped<ICursorHistoricoMissoes, CursorHistoricoMissoes>();

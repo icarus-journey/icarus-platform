@@ -21,6 +21,15 @@ preserva exclusões, planejamento e crédito efetivo, sem escrever no banco nem
 fabricar metadados do legado. Contrato [HTTP 1.0.0](../icarus-context/docs/implementation-design/platform/11-historico-missoes.md).
 Sem migration própria ou alteração na lista RF-10.
 
+## Histórico dos relatórios
+
+`GET /api/usuarios/{id}/relatorios/semanais` lista resultados persistidos com
+cursor protegido; `/{relatorioId}` abre o resultado original. Não gera novamente,
+recalcula indicadores ou atribui referências atuais ao legado. Fuso ausente é
+explícito; origem e configuração preservadas ficam no detalhe. Contrato
+[HTTP 1.0.0](../icarus-context/docs/implementation-design/platform/13-historico-relatorios.md).
+Sem migration ou mudança no consumidor da IA.
+
 ## Extrato de pontos
 
 `GET /api/usuarios/{id}/extrato` e `/{movimentoId}` leem o histórico do titular,
