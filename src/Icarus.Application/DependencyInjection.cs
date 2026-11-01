@@ -63,6 +63,7 @@ public static class DependencyInjection
     {
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<ConsultarHistoricoMissoesUseCase>();
+        services.AddScoped<Icarus.Application.UseCases.ConsultarExtratoPontos.ConsultarExtratoPontosUseCase>();
         services.AddScoped<ConsultarJornadaUseCase>();
         services.AddScoped<ExcluirMissaoUseCase>();
         services.AddScoped<ExcluirCampanhaUseCase>();

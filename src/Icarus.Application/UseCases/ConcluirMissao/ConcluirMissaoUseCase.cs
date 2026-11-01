@@ -112,17 +112,18 @@ public sealed partial class ConcluirMissaoUseCase(
             missao.ConcluidaEm = agora;
         }
 
+        usuario.SaldoPontos += pontuacao;
         await movimentacaoRepository.AdicionarAsync(new MovimentacaoPontos
         {
             UsuarioId = missao.UsuarioId,
             Ocorrencia = ocorrencia,
             Tipo = TipoMovimentacaoPontos.GanhoMissao,
             Quantidade = pontuacao,
+            SaldoResultante = usuario.SaldoPontos,
+            TituloOrigem = titulo,
             Descricao = $"Conclusão da missão \"{titulo}\"",
             CriadoEm = agora
         }, cancellationToken);
-
-        usuario.SaldoPontos += pontuacao;
 
         if (campanhaVinculada is { } campanha)
         {

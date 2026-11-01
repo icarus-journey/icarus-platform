@@ -749,11 +749,20 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("quantidade");
 
+                    b.Property<long?>("SaldoResultante")
+                        .HasColumnType("bigint")
+                        .HasColumnName("saldo_resultante");
+
                     b.Property<string>("Tipo")
                         .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)")
                         .HasColumnName("tipo");
+
+                    b.Property<string>("TituloOrigem")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("titulo_origem");
 
                     b.Property<Guid>("UsuarioId")
                         .HasColumnType("uuid")
@@ -768,11 +777,12 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                     b.HasIndex("OcorrenciaId")
                         .HasDatabaseName("ix_movimentacao_pontos_ocorrencia_id");
 
-                    b.HasIndex("UsuarioId", "CriadoEm")
-                        .HasDatabaseName("ix_movimentacao_pontos_usuario_id_criado_em");
-
                     b.HasIndex("UsuarioId", "Tipo")
                         .HasDatabaseName("ix_movimentacao_pontos_usuario_id_tipo");
+
+                    b.HasIndex("UsuarioId", "CriadoEm", "Id")
+                        .IsDescending(false, true, true)
+                        .HasDatabaseName("ix_movimentacao_pontos_usuario_id_criado_em_id");
 
                     b.HasIndex(new[] { "OcorrenciaId" }, "credito_missao_unico")
                         .IsUnique()

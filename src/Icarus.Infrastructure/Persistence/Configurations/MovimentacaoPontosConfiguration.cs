@@ -11,6 +11,7 @@ public class MovimentacaoPontosConfiguration : IEntityTypeConfiguration<Moviment
         builder.ToTable("movimentacao_pontos");
 
         builder.HasKey(m => m.Id);
+        builder.Property(m => m.TituloOrigem).HasMaxLength(500);
 
         builder.Property(m => m.Tipo)
             .IsRequired()
@@ -38,7 +39,7 @@ public class MovimentacaoPontosConfiguration : IEntityTypeConfiguration<Moviment
             .IsRequired(false)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasIndex(m => new { m.UsuarioId, m.CriadoEm });
+        builder.HasIndex(m => new { m.UsuarioId, m.CriadoEm, m.Id }).IsDescending(false, true, true);
         builder.HasIndex(m => new { m.UsuarioId, m.Tipo });
         builder.HasIndex(m => m.OcorrenciaId);
         builder.HasIndex(m => m.OcorrenciaId, "credito_missao_unico")

@@ -143,6 +143,9 @@ public sealed class ConclusaoConcorrentePostgresTests(BancoLoja banco) : IClassF
         Assert.All(resultados, r => Assert.False(r.Repetida));
         await using var leitura = banco.NovoContexto();
         Assert.Equal(580, (await leitura.Usuarios.SingleAsync(u => u.Id == p.Usuario)).SaldoPontos);
+        var movimentos = await leitura.MovimentacoesPontos.Where(m => m.UsuarioId == p.Usuario).ToArrayAsync();
+        Assert.Equal(Enumerable.Range(1, 16).Select(i => (long?)(100 + 30 * i)), movimentos.Select(m => m.SaldoResultante).Order());
+        Assert.All(movimentos, m => Assert.False(string.IsNullOrWhiteSpace(m.TituloOrigem)));
         Assert.Equal(480, (await leitura.Campanhas.SingleAsync(c => c.Id == p.Campanha)).ValorAtual);
         Assert.Equal(16, await leitura.MovimentacoesPontos.CountAsync(m => m.UsuarioId == p.Usuario));
         Assert.Equal(16, await leitura.Ocorrencias.CountAsync(o => o.Missao.UsuarioId == p.Usuario && o.ConcluidaEm != null));

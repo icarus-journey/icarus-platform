@@ -16,6 +16,13 @@ public sealed partial class GlobalExceptionHandler(
     {
         var problemDetails = exception switch
         {
+            ConsultaExtratoInvalidaException => new ProblemDetails
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Consulta de extrato inválida",
+                Detail = "Atualize o extrato e confira o período informado.",
+                Extensions = { ["codigo"] = "consulta_extrato_invalida" }
+            },
             ConsultaHistoricoInvalidaException => new ProblemDetails
             {
                 Status = StatusCodes.Status400BadRequest,

@@ -19,7 +19,15 @@ estado e campanha/avulsas, com paginação por cursor protegido. Detalhe por ID 
 ocorrência e opções de campanhas ficam nas rotas filhas. A consulta autenticada
 preserva exclusões, planejamento e crédito efetivo, sem escrever no banco nem
 fabricar metadados do legado. Contrato [HTTP 1.0.0](../icarus-context/docs/implementation-design/platform/11-historico-missoes.md).
-Sem migration ou alteração na lista RF-10. O extrato continua no MVP-15.
+Sem migration própria ou alteração na lista RF-10.
+
+## Extrato de pontos
+
+`GET /api/usuarios/{id}/extrato` e `/{movimentoId}` leem o histórico do titular,
+com período/natureza, cursor protegido e saldo disponível agora. Novos créditos,
+resgates e estornos guardam saldo/título na transação; legado permanece nullable.
+Aplicar migration `20261101194820_PreservarSaldoEOrigemMovimentos` antes de subir
+esta revisão. Contrato [HTTP 1.0.0](../icarus-context/docs/implementation-design/platform/12-extrato-pontos.md).
 
 ## Diário autenticado
 
