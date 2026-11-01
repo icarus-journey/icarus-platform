@@ -6,7 +6,7 @@ using System.Data;
 
 namespace Icarus.Infrastructure.Persistence.Repositories;
 
-public sealed class IndicadoresPessoaisRepository(IcarusDbContext contexto) : IIndicadoresPessoaisRepository
+public sealed class IndicadoresPessoaisRepository(IcarusDbContext contexto, TimeProvider? relogio = null) : IIndicadoresPessoaisRepository
 {
     public async Task<IndicadoresPessoais> CalcularAsync(Guid usuarioId, PeriodoAnalitico periodo, CancellationToken ct)
         // O contrato consumidor RF-10 mantém sua base de atividade até a revisão do MVP-13.
@@ -19,6 +19,7 @@ public sealed class IndicadoresPessoaisRepository(IcarusDbContext contexto) : II
     {
         await using var leitura = contexto.Database.CurrentTransaction is null
             ? await contexto.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, ct) : null;
+        var agora = (relogio ?? TimeProvider.System).GetUtcNow();
         var inicio = periodo.InicioUtc; var fim = periodo.FimExclusivoUtc;
         var conclusoes = await contexto.Ocorrencias.AsNoTracking()
             .Where(o => o.Missao.UsuarioId == usuarioId && o.RealizadaEm >= inicio && o.RealizadaEm < fim
@@ -72,7 +73,9 @@ public sealed class IndicadoresPessoaisRepository(IcarusDbContext contexto) : II
             "A ausência de registro não significa ausência da atividade.",
             "Conclusões usam a data de realização registrada no aplicativo e o fuso do período.",
             "A adesão considera o planejamento vigente ao fechar o período e o que foi realizado até esse fechamento; o total de atividades feitas usa a data da realização.",
-            "Sequência e histórico manual de resultados ainda não estão disponíveis para esta análise.",
+            incluirPlanejamento
+                ? "Objetivos e metas mostram a situação atual; atividade e avanço mensurado respeitam o período."
+                : "Sequência e histórico manual de resultados ainda não estão disponíveis para esta análise.",
             "Histórico insuficiente para comparação conjunta de previstas, concluídas e taxa."
         };
         if (adesao?.Estado == "historico_parcial")
@@ -86,7 +89,8 @@ public sealed class IndicadoresPessoaisRepository(IcarusDbContext contexto) : II
             conclusoes.Count == 0 ? null : conclusoes.Count(o => o.Area is null), maiorAtividade, null,
             datas.Distinct().Count(),
             conclusoes.Count + registrosPlanejamento + movimentos.Count + registrosLoja, true, limitacoes);
+        var objetivos = incluirPlanejamento ? await LeitorPanoramaObjetivos.LerAsync(contexto, usuarioId, periodo, agora, ct) : null;
         if (leitura is not null) await leitura.CommitAsync(ct);
-        return new(indicadores, SerieConclusoes.DasDatas(periodo, datas), adesao);
+        return new(indicadores, SerieConclusoes.DasDatas(periodo, datas), adesao, objetivos);
     }
 }

@@ -36,7 +36,7 @@ PostgreSQL, sem alterar dados ou consumir proteção. Contrato:
 
 Referências públicas Gold 2.0.0 são lidas somente do snapshot PostgreSQL vigente
 em `dados_publicos`; a API não executa ETL. HTTP autenticado e isolado por titular (referências/relatório 1.0.0,
-progresso 1.2.0): `GET /api/usuarios/{id}/referencias-publicas` (área e tipo de dia),
+progresso 1.3.0): `GET /api/usuarios/{id}/referencias-publicas` (área e tipo de dia),
 `GET /api/usuarios/{id}/progresso` (períodos completos) e relatório semanal
 `GET /api/usuarios/{id}/relatorios/semanais/atual`, `POST .../semanais` e
 `POST .../semanais/tentar-novamente`. Consulte os contratos
@@ -72,7 +72,7 @@ passado. Legado, janela incompleta e realização sem data deixam a taxa ausente
 com registros observados disponíveis. Consulta não cria planejamento.
 A integração dessas métricas ao contrato consumidor RF-10 permanece no MVP-13;
 `CalcularAsync` conserva sua base anterior. Detalhes e fórmulas no contrato
-[analítico 1.2.0](../icarus-context/docs/implementation-design/platform/06-consumo-analitico-mobile-api.md).
+[analítico 1.3.0](../icarus-context/docs/implementation-design/platform/06-consumo-analitico-mobile-api.md).
 
 ## Editar missão recorrente
 
@@ -142,6 +142,13 @@ pendências de hoje em diante no fuso do perfil. Identificador alheio/ausente
 retorna `404`; sem autenticação, `401`. Conflito durante a gravação retorna
 `409` e reverte toda a operação. Não requer alteração de esquema.
 Contrato: [arquitetura, exclusão](../icarus-context/docs/implementation-design/platform/01-arquitetura-da-solucao.md#913-exclusão-lógica-do-planejamento).
+
+O progresso 1.3.0 acrescenta `objetivos`: campanhas/épicos atuais e atividade
+no período, lidos no mesmo snapshot. Destaque deriva das realizações dos últimos
+sete dias locais; empate por título pt-BR e ID. Medições mantêm a unidade e
+separam avanço no período de valor/faltante/cenário atuais; épicos usam contagens.
+Legado sem data não gera falsa inatividade ou destaque. A lista RF-10 permanece
+inalterada; nenhum título é enviado ao trabalhador por esta extensão.
 
 ## Ciclo e progresso das campanhas
 
