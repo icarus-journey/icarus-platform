@@ -33,7 +33,7 @@ public sealed class DatasRecorrenciaPostgresTests(BancoLoja banco) : IClassFixtu
         new RecorrenciaRepository(c), new OcorrenciaRepository(c), c, NullLogger<CriarMissaoUseCase>.Instance,
         new Relogio(), new UsuarioRepository(c));
     private static CriarMissaoCommand Comando(Guid u, long? campanha = null, DateOnly? fim = null, bool recorrente = true, DateOnly? data = null)
-        => new(u, u, campanha, "Praticar uma aula", null, null, Dificuldade.Facil, data, null,
+        => new(u, u, campanha, "Praticar uma aula", null, null, Dificuldade.Facil, 30, data, null,
             recorrente ? new(TipoRecorrencia.Diaria, null, fim) : null);
 
     private async Task<Guid> Usuario(string fuso = "America/Sao_Paulo")

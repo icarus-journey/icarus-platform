@@ -15,6 +15,9 @@ public sealed partial class AtualizarMissaoUseCase(
     public async Task<EdicaoMissaoResult> ExecuteAsync(AtualizarMissaoCommand command, CancellationToken ct)
     {
         if (command.UsuarioIdAutenticado != command.UsuarioIdSolicitado) throw new PerfilNaoEncontradoException();
+        if (command.Pontuacao is < 1 or > 1_000_000)
+            throw new EdicaoMissaoException("pontuacao_invalida", "Informe uma recompensa inteira entre 1 e 1.000.000.");
+
         var missao = await repositorio.BuscarAsync(command.MissaoId, command.UsuarioIdSolicitado, ct) ?? throw new MissaoNaoEncontradaException();
         if (missao.Status == StatusMissao.Excluida) throw new MissaoNaoEncontradaException();
         if (missao.Status != StatusMissao.Ativa) throw new MissaoInativaException();
@@ -44,7 +47,7 @@ public sealed partial class AtualizarMissaoUseCase(
         missao.Descricao = command.Descricao;
         missao.Beneficio = command.Beneficio;
         missao.Dificuldade = command.Dificuldade;
-        missao.Pontuacao = MapeadorPontuacao.ParaPontuacao(command.Dificuldade);
+        missao.Pontuacao = command.Pontuacao;
         missao.DataLimite = command.DataLimite;
         var hora = command.Horario is not null && TimeOnly.TryParse(command.Horario, out var parsed) ? parsed : new TimeOnly(9, 0);
         missao.Horario = new DateTimeOffset((command.DataLimite ?? hoje).ToDateTime(hora), TimeSpan.Zero);

@@ -27,6 +27,7 @@ public sealed record CriarMissaoCommand(
     string? Descricao,
     string? Beneficio,
     Dificuldade Dificuldade,
+    int Pontuacao,
     DateOnly? DataLimite,
     string? Horario,
     RecorrenciaCommandInfo? Recorrencia);

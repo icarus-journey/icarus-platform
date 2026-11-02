@@ -14,6 +14,8 @@ public sealed class CriarMissaoRequestValidator : AbstractValidator<CriarMissaoR
             .MaximumLength(200);
 
         RuleFor(r => r.Dificuldade).IsInEnum();
+        RuleFor(r => r.Pontuacao).InclusiveBetween(1, 1_000_000)
+            .WithMessage("Informe uma recompensa inteira entre 1 e 1.000.000.");
 
         RuleFor(r => r.Horario)
             .Must(h => TimeOnly.TryParse(h, out _))

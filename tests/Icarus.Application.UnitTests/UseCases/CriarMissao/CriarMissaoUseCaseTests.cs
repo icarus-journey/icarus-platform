@@ -93,16 +93,16 @@ public class CriarMissaoUseCaseTests
             _missaoRepositorio, NullLogger<CriarMissaoUseCase>.Instance);
     }
 
-    [Fact(DisplayName = "Cria missão avulsa (sem campanha) calculando a pontuação e usando 09:00 como horário padrão")]
+    [Fact(DisplayName = "Cria missão avulsa (sem campanha) preservando a recompensa escolhida e usando 09:00 como horário padrão")]
     public async Task ExecuteAsync_DeveCriarMissaoAvulsaComHorarioPadrao()
     {
         var usuarioId = Guid.NewGuid();
-        var command = new CriarMissaoCommand(usuarioId, usuarioId, null, "Beber água", null, null, Dificuldade.Trivial, null, null, null);
+        var command = new CriarMissaoCommand(usuarioId, usuarioId, null, "Beber água", null, null, Dificuldade.Trivial, 137, null, null, null);
 
         var resultado = await _useCase.ExecuteAsync(command, CancellationToken.None);
 
         Assert.Null(resultado.CampanhaId);
-        Assert.Equal(15, resultado.Pontuacao); // Trivial
+        Assert.Equal(137, resultado.Pontuacao);
         Assert.Equal(new TimeOnly(9, 0), TimeOnly.FromDateTime(resultado.Horario.DateTime));
         Assert.False(resultado.Recorrente);
     }
@@ -115,7 +115,7 @@ public class CriarMissaoUseCaseTests
         _campanhaRepositorio.Campanhas.Add(campanha);
 
         var command = new CriarMissaoCommand(
-            usuarioId, usuarioId, campanha.Id, "Caminhada", "descrição", "benefício", Dificuldade.Facil, null, "07:30", null);
+            usuarioId, usuarioId, campanha.Id, "Caminhada", "descrição", "benefício", Dificuldade.Facil, 30, null, "07:30", null);
 
         var resultado = await _useCase.ExecuteAsync(command, CancellationToken.None);
 
@@ -128,7 +128,7 @@ public class CriarMissaoUseCaseTests
     public async Task ExecuteAsync_DeveLancarExcecaoQuandoCampanhaNaoExiste()
     {
         var usuarioId = Guid.NewGuid();
-        var command = new CriarMissaoCommand(usuarioId, usuarioId, 999, "Missão", null, null, Dificuldade.Facil, null, null, null);
+        var command = new CriarMissaoCommand(usuarioId, usuarioId, 999, "Missão", null, null, Dificuldade.Facil, 30, null, null, null);
 
         await Assert.ThrowsAsync<CampanhaNaoEncontradaException>(() => _useCase.ExecuteAsync(command, CancellationToken.None));
     }
@@ -150,7 +150,7 @@ public class CriarMissaoUseCaseTests
         };
         _campanhaRepositorio.Campanhas.Add(campanha);
 
-        var command = new CriarMissaoCommand(usuarioId, usuarioId, campanha.Id, "Missão", null, null, Dificuldade.Facil, null, null, null);
+        var command = new CriarMissaoCommand(usuarioId, usuarioId, campanha.Id, "Missão", null, null, Dificuldade.Facil, 30, null, null, null);
 
         await Assert.ThrowsAsync<CampanhaConcluidaException>(() => _useCase.ExecuteAsync(command, CancellationToken.None));
     }
@@ -160,7 +160,7 @@ public class CriarMissaoUseCaseTests
     {
         var meuId = Guid.NewGuid();
         var idDeOutroUsuario = Guid.NewGuid();
-        var command = new CriarMissaoCommand(meuId, idDeOutroUsuario, null, "Missão", null, null, Dificuldade.Facil, null, null, null);
+        var command = new CriarMissaoCommand(meuId, idDeOutroUsuario, null, "Missão", null, null, Dificuldade.Facil, 30, null, null, null);
 
         await Assert.ThrowsAsync<PerfilNaoEncontradoException>(() => _useCase.ExecuteAsync(command, CancellationToken.None));
     }
@@ -170,7 +170,7 @@ public class CriarMissaoUseCaseTests
     {
         var usuarioId = Guid.NewGuid();
         var dataLimite = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(5);
-        var command = new CriarMissaoCommand(usuarioId, usuarioId, null, "Missão", null, null, Dificuldade.Facil, dataLimite, null, null);
+        var command = new CriarMissaoCommand(usuarioId, usuarioId, null, "Missão", null, null, Dificuldade.Facil, 30, dataLimite, null, null);
 
         var resultado = await _useCase.ExecuteAsync(command, CancellationToken.None);
 
@@ -185,7 +185,7 @@ public class CriarMissaoUseCaseTests
     {
         var usuarioId = Guid.NewGuid();
         var recorrencia = new RecorrenciaCommandInfo(TipoRecorrencia.Diaria, null, null);
-        var command = new CriarMissaoCommand(usuarioId, usuarioId, null, "Beber água", null, null, Dificuldade.Trivial, null, null, recorrencia);
+        var command = new CriarMissaoCommand(usuarioId, usuarioId, null, "Beber água", null, null, Dificuldade.Trivial, 15, null, null, recorrencia);
 
         var resultado = await _useCase.ExecuteAsync(command, CancellationToken.None);
 
@@ -200,7 +200,7 @@ public class CriarMissaoUseCaseTests
     {
         var usuarioId = Guid.NewGuid();
         var recorrencia = new RecorrenciaCommandInfo(TipoRecorrencia.Semanal, [DayOfWeek.Monday, DayOfWeek.Wednesday, DayOfWeek.Friday], null);
-        var command = new CriarMissaoCommand(usuarioId, usuarioId, null, "Treino", null, null, Dificuldade.Media, null, null, recorrencia);
+        var command = new CriarMissaoCommand(usuarioId, usuarioId, null, "Treino", null, null, Dificuldade.Media, 45, null, null, recorrencia);
 
         var resultado = await _useCase.ExecuteAsync(command, CancellationToken.None);
 
@@ -216,7 +216,7 @@ public class CriarMissaoUseCaseTests
         var hoje = DateOnly.FromDateTime(DateTime.UtcNow);
         var dataFim = hoje.AddDays(4);
         var recorrencia = new RecorrenciaCommandInfo(TipoRecorrencia.Diaria, null, dataFim);
-        var command = new CriarMissaoCommand(usuarioId, usuarioId, null, "Beber água", null, null, Dificuldade.Trivial, null, null, recorrencia);
+        var command = new CriarMissaoCommand(usuarioId, usuarioId, null, "Beber água", null, null, Dificuldade.Trivial, 15, null, null, recorrencia);
 
         var resultado = await _useCase.ExecuteAsync(command, CancellationToken.None);
 
@@ -225,4 +225,18 @@ public class CriarMissaoUseCaseTests
         Assert.All(ocorrencias, o => Assert.True(o.DataPrevista <= dataFim));
         Assert.Equal(dataFim, _recorrenciaRepositorio.Recorrencias.Single().DataFim);
     }
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(1_000_001)]
+    public async Task RecompensaInvalidaNaoCriaMissaoOuOcorrencias(int pontuacao)
+    {
+        var usuario = Guid.NewGuid();
+        var comando = new CriarMissaoCommand(usuario, usuario, null, "Missão", null, null, Dificuldade.Facil, pontuacao, null, null, null);
+        var erro = await Assert.ThrowsAsync<EdicaoMissaoException>(() => _useCase.ExecuteAsync(comando, default));
+        Assert.Equal("pontuacao_invalida", erro.Codigo);
+        Assert.Empty(_missaoRepositorio.Missoes);
+        Assert.Empty(_ocorrenciaRepositorio.Ocorrencias);
+    }
+
 }

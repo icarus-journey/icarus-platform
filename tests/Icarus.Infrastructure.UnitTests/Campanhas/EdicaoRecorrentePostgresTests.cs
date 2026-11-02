@@ -70,7 +70,7 @@ public sealed class EdicaoRecorrentePostgresTests(BancoLoja banco) : IClassFixtu
 
     private static AtualizarMissaoCommand Dados(Guid usuario, long id, string versao, TipoRecorrencia tipo = TipoRecorrencia.Diaria,
         List<DayOfWeek>? dias = null, DateOnly? fim = null, int? dia = null)
-        => new(usuario, usuario, id, "Ler duas aulas", "Nova descrição", "Aprender mais", Dificuldade.Dificil,
+        => new(usuario, usuario, id, "Ler duas aulas", "Nova descrição", "Aprender mais", Dificuldade.Dificil, 60,
             null, "20:30", tipo, dias, fim, dia, versao);
 
     [FatoPostgres]
@@ -84,8 +84,8 @@ public sealed class EdicaoRecorrentePostgresTests(BancoLoja banco) : IClassFixtu
             concluidaId = concluida.Id; concluidaAtualizada = concluida.AtualizadoEm;
             var dados = await Consulta(c).ExecuteAsync(new(usuario, usuario, id), default);
             Assert.True(dados.PodeEditar); Assert.Equal(TipoRecorrencia.Diaria, dados.ConfiguracaoRecorrencia!.Tipo);
-            var atualizada = await Edicao(c).ExecuteAsync(Dados(usuario, id, dados.Versao), default);
-            Assert.Equal(60, atualizada.Pontuacao); Assert.Equal(Hoje.AddDays(1), atualizada.ConfiguracaoRecorrencia!.AlteracoesAPartirDe);
+            var atualizada = await Edicao(c).ExecuteAsync(Dados(usuario, id, dados.Versao) with { Pontuacao = 177 }, default);
+            Assert.Equal(177, atualizada.Pontuacao); Assert.Equal(Hoje.AddDays(1), atualizada.ConfiguracaoRecorrencia!.AlteracoesAPartirDe);
         }
         await using var leitura = banco.NovoContexto();
         var antiga = await leitura.Ocorrencias.SingleAsync(o => o.Id == concluidaId);
@@ -98,7 +98,7 @@ public sealed class EdicaoRecorrentePostgresTests(BancoLoja banco) : IClassFixtu
             Assert.Equal(30, PlanejamentoOcorrencia.DaExecucao(missao, ocorrencia)!.Pontuacao);
             Assert.Equal("Ler uma aula", PlanejamentoOcorrencia.DaExecucao(missao, ocorrencia)!.Titulo);
         }
-        Assert.Equal(60, PlanejamentoOcorrencia.Ler(await leitura.Ocorrencias.SingleAsync(o => o.MissaoId == id && o.DataPrevista == Hoje.AddDays(1)))!.Pontuacao);
+        Assert.Equal(177, PlanejamentoOcorrencia.Ler(await leitura.Ocorrencias.SingleAsync(o => o.MissaoId == id && o.DataPrevista == Hoje.AddDays(1)))!.Pontuacao);
         Assert.Equal(500, (await leitura.Usuarios.SingleAsync(u => u.Id == usuario)).SaldoPontos);
         Assert.Single(await leitura.MovimentacoesPontos.Where(m => m.UsuarioId == usuario).ToListAsync());
         Assert.Equal(2, (await leitura.Campanhas.SingleAsync(x => x.Epico.UsuarioId == usuario)).ValorAtual);

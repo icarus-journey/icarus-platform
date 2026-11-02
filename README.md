@@ -12,6 +12,20 @@ A consulta existente inclui estudo/trabalho opcionais; `PUT /api/usuarios/{id}/p
 atualiza esses quatro campos e `PUT /api/usuarios/{id}/fuso` mantém o fuso IANA.
 Cadastro e saldo permanecem protegidos por contratos separados.
 
+## Recompensa manual das missões
+
+Criação (`POST /api/usuarios/{id}/missoes`) e edição (`PATCH .../{missaoId}`)
+exigem `pontuacao`, inteiro de 1 a 1.000.000 escolhido pela pessoa, independente
+da dificuldade. Campo omitido/inválido retorna `400`; não há valor automático.
+Em recorrentes, a alteração vale a partir de amanhã, preservando hoje, atrasos,
+conclusões e extrato. Crédito continua único e ocorre somente ao concluir.
+Contrato de escrita [2.0.0, arquitetura 9.10](../icarus-context/docs/implementation-design/platform/01-arquitetura-da-solucao.md#escrita-manual-de-missão--contrato-200-em-revisão):
+publicar junto ao mobile compatível. Leituras/conclusão, onboarding legado e
+consumidor da IA permanecem em seus contratos existentes. Sem migration.
+
+A entidade/tabela histórica `Rotina` é preservada, sem CRUD/tela definida nos
+requisitos atuais. Ela é distinta da manutenção diária das recorrências.
+
 ## Histórico de missões
 
 `GET /api/usuarios/{id}/historico/missoes` oferece filtro por data prevista,

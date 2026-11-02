@@ -69,7 +69,7 @@ public class MissoesController(
             : null;
         var command = new CriarMissaoCommand(
             usuarioIdAutenticado, usuarioId, request.CampanhaId, request.Titulo, request.Descricao,
-            request.Beneficio, request.Dificuldade, request.DataLimite, request.Horario, recorrencia);
+            request.Beneficio, request.Dificuldade, request.Pontuacao, request.DataLimite, request.Horario, recorrencia);
 
         var resultado = await criarMissao.ExecuteAsync(command, cancellationToken);
         var response = ParaResponse(resultado);
@@ -90,7 +90,7 @@ public class MissoesController(
         var usuarioIdAutenticado = ObterUsuarioIdAutenticado();
         var command = new AtualizarMissaoCommand(
             usuarioIdAutenticado, usuarioId, missaoId, request.Titulo, request.Descricao,
-            request.Beneficio, request.Dificuldade, request.DataLimite, request.Horario,
+            request.Beneficio, request.Dificuldade, request.Pontuacao, request.DataLimite, request.Horario,
             request.Recorrencia, request.DiasSemana, request.DataFimRecorrencia, request.DiaDoMes, request.VersaoEsperada);
 
         var resultado = await atualizarMissao.ExecuteAsync(command, cancellationToken);

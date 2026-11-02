@@ -29,6 +29,9 @@ public sealed partial class CriarMissaoUseCase(
             throw new PerfilNaoEncontradoException();
         }
 
+        if (command.Pontuacao is < 1 or > 1_000_000)
+            throw new EdicaoMissaoException("pontuacao_invalida", "Informe uma recompensa inteira entre 1 e 1.000.000.");
+
         var agora = (relogio ?? TimeProvider.System).GetUtcNow();
         var usuario = usuarios is null ? null : await usuarios.BuscarPorIdAsync(command.UsuarioIdSolicitado, cancellationToken)
             ?? throw new PerfilNaoEncontradoException();
@@ -61,7 +64,7 @@ public sealed partial class CriarMissaoUseCase(
             Descricao = command.Descricao,
             Beneficio = command.Beneficio,
             Dificuldade = command.Dificuldade,
-            Pontuacao = MapeadorPontuacao.ParaPontuacao(command.Dificuldade),
+            Pontuacao = command.Pontuacao,
             DataLimite = command.DataLimite,
             Horario = ParaHorario(dataReferencia, command.Horario)
         };

@@ -241,7 +241,7 @@ public sealed class CicloCampanhaPostgresTests(BancoLoja banco) : IClassFixture<
         var criar = new CriarMissaoUseCase(new CampanhaRepository(concorrente), new MissaoRepository(concorrente),
             new RecorrenciaRepository(concorrente), ocorrencias, concorrente, NullLogger<CriarMissaoUseCase>.Instance);
         await Assert.ThrowsAsync<DadosAtualizadosException>(() => criar.ExecuteAsync(new(usuario, usuario, id, "Tardia", null, null,
-            Dificuldade.Facil, null, null, new(TipoRecorrencia.Diaria, null, null)), default));
+            Dificuldade.Facil, 30, null, null, new(TipoRecorrencia.Diaria, null, null)), default));
         await using var leitura = banco.NovoContexto();
         Assert.Empty(await leitura.Missoes.Where(m => m.CampanhaId == id).ToListAsync());
     }
