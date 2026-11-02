@@ -29,8 +29,13 @@ public sealed class ProgressoVisualPostgresTests(BancoLoja banco) : IClassFixtur
         {
             var missao = new Missao { UsuarioId = id, Titulo = "Não entra no gráfico", Dificuldade = Dificuldade.Facil, Pontuacao = 30, Horario = DateTimeOffset.UtcNow };
             contexto.Missoes.Add(missao);
-            contexto.Ocorrencias.Add(new() { Missao = missao, DataPrevista = new(2026, 10, 12), Status = StatusOcorrencia.Concluida,
-                RealizadaEm = DateTimeOffset.Parse(instante, CultureInfo.InvariantCulture) });
+            contexto.Ocorrencias.Add(new()
+            {
+                Missao = missao,
+                DataPrevista = new(2026, 10, 12),
+                Status = StatusOcorrencia.Concluida,
+                RealizadaEm = DateTimeOffset.Parse(instante, CultureInfo.InvariantCulture)
+            });
         }
         Concluir(titular, "2026-10-12T02:59:59Z"); // Ainda domingo no fuso do titular.
         Concluir(titular, "2026-10-12T03:00:00Z");
@@ -40,7 +45,8 @@ public sealed class ProgressoVisualPostgresTests(BancoLoja banco) : IClassFixtur
         await contexto.SaveChangesAsync();
         var caso = new ConsultarProgressoUseCase(new UsuarioRepository(contexto), new IndicadoresPessoaisRepository(contexto), new Relogio());
         var resultado = await caso.ExecuteAsync(new(titular, titular), default);
-        Assert.Equal("1.1.0", resultado.VersaoContrato);
+        Assert.Equal("1.3.0", resultado.VersaoContrato);
+        Assert.Equal("por_campanha", resultado.SituacaoCenarios);
         Assert.Equal(2, resultado.Indicadores!.Concluidas);
         Assert.Equal(resultado.Indicadores.Concluidas, resultado.Evolucao!.Pontos.Sum(p => p.Concluidas));
         Assert.Equal([1, 0, 0, 0, 0, 0, 1], resultado.Evolucao.Pontos.Select(p => p.Concluidas));

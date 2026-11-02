@@ -39,7 +39,12 @@ public static class DependencyInjection
         services.AddMemoryCache();
         services.AddSingleton<ILoginAttemptLimiter, LoginAttemptLimiter>();
 
+        services.AddScoped<IHistoricoMissoesRepository, HistoricoMissoesRepository>();
+        services.AddScoped<IHistoricoRelatoriosRepository, HistoricoRelatoriosRepository>();
+        services.AddScoped<IExtratoPontosRepository, ExtratoPontosRepository>();
         services.AddScoped<IUsuarioRepository, UsuarioRepository>();
+        services.AddScoped<IJornadaRepository, JornadaRepository>();
+        services.AddScoped<IProtecaoSequencia, ProtecaoSequenciaRepository>();
         services.AddScoped<IDiarioRepository, DiarioRepository>();
         services.AddScoped<IReferenciasPublicasRepository, ReferenciasPublicasRepository>();
         services.AddScoped<IIndicadoresPessoaisRepository, IndicadoresPessoaisRepository>();
@@ -53,11 +58,14 @@ public static class DependencyInjection
         services.AddScoped<IEpicoRepository, EpicoRepository>();
         services.AddScoped<ICampanhaRepository, CampanhaRepository>();
         services.AddScoped<ICicloCampanhaRepository, CicloCampanhaRepository>();
+        services.AddScoped<IExclusaoPlanejamentoRepository, ExclusaoPlanejamentoRepository>();
         services.AddScoped<IMedicaoCampanhaRepository, MedicaoCampanhaRepository>();
         services.AddScoped<IMissaoRepository, MissaoRepository>();
+        services.AddScoped<IPlanejamentoMissaoRepository, PlanejamentoMissaoRepository>();
         services.AddScoped<IOcorrenciaRepository, OcorrenciaRepository>();
         services.AddScoped<IRecorrenciaRepository, RecorrenciaRepository>();
         services.AddScoped<IMovimentacaoPontosRepository, MovimentacaoPontosRepository>();
+        services.AddScoped<ITransacaoConclusaoMissao, TransacaoConclusaoMissao>();
         services.AddScoped<ITrabalhoOnboardingRepository, TrabalhoOnboardingRepository>();
 
         // Mesma instância de IcarusDbContext do escopo (não uma nova) — repositório e
@@ -73,6 +81,9 @@ public static class DependencyInjection
         services.AddHostedService<OnboardingResultConsumer>();
         services.AddHostedService<PublicadorOutboxRelatorio>();
         services.AddHostedService<ConsumidorResultadoRelatorio>();
+        services.AddScoped<ProcessadorJornada>();
+        services.AddHostedService<PublicadorOutboxJornada>();
+        services.AddHostedService<ConsumidorJornada>();
 
         // RF-04.5: mantém a janela de ocorrências das missões recorrentes ativas.
         services.AddHostedService<RecorrenciaMaintenanceService>();

@@ -11,6 +11,8 @@ public class OcorrenciaConfiguration : IEntityTypeConfiguration<Ocorrencia>
         builder.ToTable("ocorrencia");
 
         builder.HasKey(o => o.Id);
+        builder.Property(o => o.Planejamento).HasColumnType("jsonb");
+        builder.Property(o => o.FusoHorarioRealizacao).HasMaxLength(100);
 
         builder.Property(o => o.Status)
             .IsRequired()

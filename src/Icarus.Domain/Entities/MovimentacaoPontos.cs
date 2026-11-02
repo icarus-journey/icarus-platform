@@ -21,6 +21,10 @@ public class MovimentacaoPontos
     /// <summary>Positivo para crédito, negativo para débito.</summary>
     public long Quantidade { get; set; }
 
+    /// <summary>Saldo capturado na transação do lançamento; ausente no legado.</summary>
+    public long? SaldoResultante { get; set; }
+    public string? TituloOrigem { get; set; }
+
     public string? Descricao { get; set; }
     public DateTimeOffset CriadoEm { get; set; }
 

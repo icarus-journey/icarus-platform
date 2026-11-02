@@ -18,10 +18,11 @@ public interface IOcorrenciaRepository
 
     /// <summary>
     /// Resolve qual ocorrência concluir agora (RF-04.6): a de hoje (se existir, qualquer
-    /// status — cobre tanto "concluir hoje" quanto a idempotência de concluir de novo no mesmo
+    /// status elegível — cobre tanto "concluir hoje" quanto a idempotência de concluir de novo no mesmo
     /// dia); senão a pendente/atrasada mais antiga (recupera um dia perdido); senão, pra missão
     /// não recorrente cuja única ocorrência não é hoje, a mais recente já concluída
-    /// (idempotência); senão nulo (nenhuma ocorrência ainda — o chamador decide o que fazer).
+    /// (idempotência); senão nulo. Consulta legada: não decide elegibilidade de campanha/regra;
+    /// a conclusão usa RegrasRecorrencia com o planejamento completo.
     /// </summary>
     Task<Ocorrencia?> BuscarParaConcluirAsync(long missaoId, DateOnly hoje, CancellationToken cancellationToken);
 

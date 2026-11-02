@@ -3,6 +3,8 @@ using Icarus.Application.Interfaces;
 using Icarus.Domain.Entities;
 using Icarus.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using System.Data;
 
 namespace Icarus.Infrastructure.Persistence.Repositories;
 
@@ -10,12 +12,28 @@ public sealed class RelatorioSemanalRepository(IcarusDbContext contexto) : IRela
 {
     public async Task ExecutarAsync(Guid usuarioId, Func<Usuario, CancellationToken, Task> operacao, CancellationToken ct)
     {
-        await using var transacao = await contexto.Database.BeginTransactionAsync(ct);
-        var usuario = await contexto.Usuarios.FromSqlInterpolated($"SELECT * FROM usuario WHERE id={usuarioId} FOR UPDATE").SingleOrDefaultAsync(ct)
-            ?? throw new PerfilNaoEncontradoException();
-        await operacao(usuario, ct);
-        await transacao.CommitAsync(ct);
+        for (var tentativa = 0; ; tentativa++)
+        {
+            await using var transacao = await contexto.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, ct);
+            try
+            {
+                var usuario = await contexto.Usuarios.FromSqlInterpolated($"SELECT * FROM usuario WHERE id={usuarioId} FOR UPDATE").SingleOrDefaultAsync(ct)
+                    ?? throw new PerfilNaoEncontradoException();
+                await operacao(usuario, ct);
+                await transacao.CommitAsync(ct);
+                return;
+            }
+            catch (Exception erro) when (tentativa < 2 && ConflitoDeSnapshot(erro))
+            {
+                await transacao.RollbackAsync(ct);
+                contexto.ChangeTracker.Clear();
+            }
+        }
     }
+    private static bool ConflitoDeSnapshot(Exception erro)
+        => erro is PostgresException { SqlState: PostgresErrorCodes.SerializationFailure }
+        || erro is DbUpdateException { InnerException: PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } pg }
+            && (pg.TableName is "trabalho_relatorio_semanal" or "relatorio" or "inbox_relatorio");
     public Task<TrabalhoRelatorioSemanal?> BuscarTrabalhoAsync(Guid usuarioId, DateOnly inicio, DateOnly fim, CancellationToken ct)
         => contexto.Set<TrabalhoRelatorioSemanal>().SingleOrDefaultAsync(t => t.UsuarioId == usuarioId && t.PeriodoInicio == inicio && t.PeriodoFim == fim, ct);
     public Task<TrabalhoRelatorioSemanal?> BuscarPorIdAsync(Guid id, CancellationToken ct)

@@ -20,7 +20,8 @@ public sealed record IndicadoresRelatorioSemanal(int? Sequencia, long? PontosGan
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record SolicitacaoRelatorioSemanal(Guid IdMensagem, Guid CorrelacaoId, Guid? CausalidadeId,
     string Tipo, string VersaoContrato, DateTimeOffset CriadaEm, DateTimeOffset ExpiraEm,
-    string ChaveIdempotencia, PeriodoAnalitico Periodo, IndicadoresRelatorioSemanal Indicadores);
+    string ChaveIdempotencia, PeriodoAnalitico Periodo, IndicadoresRelatorioSemanal Indicadores,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ComparacaoSemanal? ComparacaoSemanal = null);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record TextoRelatorioSemanal(string Titulo, string Resumo, string ProximoAjuste, string Reflexao);
@@ -32,11 +33,21 @@ public sealed record ResultadoRelatorioSemanal(Guid IdMensagem, Guid CorrelacaoI
     string ChaveIdempotencia, PeriodoAnalitico Periodo, string Estado,
     TextoRelatorioSemanal? Conteudo, string? FalhaCodigo, ConfiguracaoGeracaoRelatorio? Geracao);
 public sealed record SnapshotRelatorioSemanal(TextoRelatorioSemanal Texto, IndicadoresPessoais Indicadores,
-    ConfiguracaoGeracaoRelatorio Geracao);
+    ConfiguracaoGeracaoRelatorio Geracao, ComparacaoSemanal? ComparacaoSemanal = null, string VersaoIndicadores = "1.0.0");
 
 public static partial class ContratoRelatorioSemanal
 {
-    public const string Versao = "1.0.0";
+    public const string Versao = "1.1.0";
+    public static bool VersaoSuportada(string versao) => versao is "1.0.0" or Versao;
+    public static (IndicadoresPessoais Indicadores, ComparacaoSemanal? Comparacao, string Versao) LerIndicadores(string carga)
+    {
+        using var documento = JsonDocument.Parse(carga);
+        if (!documento.RootElement.TryGetProperty("indicadores", out _))
+            return (JsonSerializer.Deserialize<IndicadoresPessoais>(carga, Json)!, null, "1.0.0");
+        var dados = JsonSerializer.Deserialize<DadosRelatorioSemanal>(carga, Json)!;
+        if (!VersaoSuportada(dados.VersaoContrato)) throw new JsonException("Versão de indicadores incompatível.");
+        return (dados.Indicadores, dados.ComparacaoSemanal, dados.VersaoContrato);
+    }
     public const int MaxTentativas = 3;
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow };
     public static bool ConteudoValido(TextoRelatorioSemanal? texto) => texto is not null

@@ -8,5 +8,11 @@ public sealed record AtualizarMissaoRequest(
     string? Descricao,
     string? Beneficio,
     Dificuldade Dificuldade,
+    int Pontuacao,
     DateOnly? DataLimite,
-    string? Horario);
+    string? Horario,
+    TipoRecorrencia? Recorrencia = null,
+    List<DayOfWeek>? DiasSemana = null,
+    DateOnly? DataFimRecorrencia = null,
+    int? DiaDoMes = null,
+    string? VersaoEsperada = null);
