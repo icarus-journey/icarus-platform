@@ -141,6 +141,29 @@ public sealed class ComparacaoSemanalPostgresTests(BancoLoja banco) : IClassFixt
         Assert.Equal(9, r.Indicadores.Concluidas);
     }
 
+    [FatoPostgres]
+    public async Task RecorrenteCriadaNaUltimaSemanaNaoInvalidaAsSemanasAnteriores()
+    {
+        var id = await Pessoa(); await Preencher(id);
+        _relogio.Agora = Periodo.InicioUtc.AddDays(2);
+        await using (var c = Contexto())
+        {
+            c.Missoes.Add(new()
+            {
+                UsuarioId = id,
+                Titulo = "Recorrente recente",
+                Pontuacao = 30,
+                Status = StatusMissao.Ativa,
+                Recorrencia = new() { Tipo = "Diaria", Regra = "{}", DataInicio = Periodo.Inicio.AddDays(-35) }
+            });
+            await c.SaveChangesAsync();
+        }
+        await using var leitura = Contexto();
+        var resultado = await new IndicadoresPessoaisRepository(leitura).CalcularRelatorioAsync(id, Periodo, default);
+        Assert.Equal("historico_parcial", resultado.ComparacaoSemanal.Semana.Estado);
+        Assert.All(resultado.ComparacaoSemanal.SemanasAnteriores, semana => Assert.Equal("disponivel", semana.Estado));
+    }
+
     private sealed class Intercalar(Func<Task> alterar) : DbCommandInterceptor
     {
         private int _executado;

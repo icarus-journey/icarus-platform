@@ -219,6 +219,47 @@ public sealed class AdesaoPostgresTests(BancoLoja banco) : IClassFixture<BancoLo
         Assert.Equal(1, segunda.Indicadores.Concluidas); Assert.Equal(100, segunda.Adesao!.TaxaConclusao);
     }
 
+    [FatoPostgres]
+    public async Task ReagendamentoParaForaDaJanelaAntesDoCorteRemoveOPlanejamentoOriginal()
+    {
+        var relogio = new Relogio(); var id = await Pessoa(relogio); long ocorrencia;
+        await using (var c = Contexto(relogio))
+        {
+            var o = Planejar(c, id, 6); await c.SaveChangesAsync(); ocorrencia = o.Id;
+        }
+        relogio.Agora = Instante(8);
+        await using (var c = Contexto(relogio))
+        {
+            (await c.Ocorrencias.FindAsync(ocorrencia))!.DataPrevista = new(2027, 1, 20);
+            await c.SaveChangesAsync();
+        }
+        relogio.Agora = Instante(21);
+        await using var leitura = Contexto(relogio);
+        var resultado = await new IndicadoresPessoaisRepository(leitura).CalcularProgressoAsync(id, Semana, default);
+        Assert.Equal("sem_planejamento", resultado.Adesao!.Estado);
+        Assert.Equal(0, resultado.Adesao.PrevistasRegistradas);
+        Assert.Null(resultado.Adesao.TaxaConclusao);
+    }
+
+    [FatoPostgres]
+    public async Task LegadoAnteriorAJanelaAindaImpedeAfirmarCompletude()
+    {
+        var relogio = new Relogio(); var id = await Pessoa(relogio);
+        await using (var c = Contexto(relogio))
+        {
+            var antiga = Planejar(c, id, 2); Concluir(antiga, 2);
+            Planejar(c, id, 6); await c.SaveChangesAsync();
+            await c.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM registro_planejamento_ocorrencia WHERE ocorrencia_id={antiga.Id}");
+        }
+        await using var leitura = Contexto(relogio);
+        var resultado = await new IndicadoresPessoaisRepository(leitura).CalcularProgressoAsync(id, Semana, default);
+        Assert.Equal("historico_parcial", resultado.Adesao!.Estado);
+        Assert.Equal("planejamento_legado", resultado.Adesao.Motivo);
+        Assert.Equal(1, resultado.Adesao.PrevistasRegistradas);
+        Assert.Null(resultado.Adesao.TaxaConclusao);
+        Assert.Null(resultado.Indicadores.Concluidas);
+    }
+
     private sealed class ConclusaoDuranteLeitura(Func<Task> alterar) : DbCommandInterceptor
     {
         private bool _executada;

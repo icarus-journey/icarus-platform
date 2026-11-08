@@ -17,15 +17,11 @@ public sealed class IndicadoresPessoaisRepository(IcarusDbContext contexto, Time
         await using var leitura = contexto.Database.CurrentTransaction is null
             ? await contexto.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, ct) : null;
         var atividade = (await CalcularAsync(usuarioId, periodo, false, ct)).Indicadores;
-        var semanas = new List<SemanaPlanejada>();
-        var registros = new HashSet<long>();
-        for (var i = 0; i < 5; i++)
-        {
-            var semana = new PeriodoAnalitico(periodo.Inicio.AddDays(-7 * i), periodo.Fim.AddDays(-7 * i), periodo.FusoHorario);
-            var planejamento = await LeitorPlanejamentoAnalitico.LerAsync(contexto, usuarioId, semana, ct);
-            semanas.Add(CalculadorComparacaoSemanal.DaAdesao(semana, planejamento.Resumo));
-            if (i == 0) registros = planejamento.Registros;
-        }
+        var periodos = Enumerable.Range(0, 5)
+            .Select(i => new PeriodoAnalitico(periodo.Inicio.AddDays(-7 * i), periodo.Fim.AddDays(-7 * i), periodo.FusoHorario)).ToArray();
+        var planejamentos = await LeitorPlanejamentoAnalitico.LerPeriodosAsync(contexto, usuarioId, periodos, ct);
+        var semanas = periodos.Select((semana, i) => CalculadorComparacaoSemanal.DaAdesao(semana, planejamentos[i].Resumo)).ToArray();
+        var registros = planejamentos[0].Registros;
         var comparacao = CalculadorComparacaoSemanal.Calcular(semanas[0], semanas.Skip(1).ToArray());
         var idsAtividade = await contexto.Ocorrencias.AsNoTracking().Where(o => o.Missao.UsuarioId == usuarioId
             && o.RealizadaEm >= periodo.InicioUtc && o.RealizadaEm < periodo.FimExclusivoUtc

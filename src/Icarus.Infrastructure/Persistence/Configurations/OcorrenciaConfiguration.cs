@@ -28,5 +28,7 @@ public class OcorrenciaConfiguration : IEntityTypeConfiguration<Ocorrencia>
             .IsUnique();
 
         builder.HasIndex(o => o.Status);
+        builder.HasIndex(o => new { o.MissaoId, o.RealizadaEm })
+            .HasFilter("realizada_em IS NOT NULL");
     }
 }

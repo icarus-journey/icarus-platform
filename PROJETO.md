@@ -1649,6 +1649,20 @@ real difere do default documentado no `compose.yaml` se alguém tiver
 customizado o `.env` local — checar `docker exec <container> env | grep
 RABBITMQ_DEFAULT` se a autenticação falhar).
 
+### 6.4 Desempenho de API e banco — MVP-26
+
+As leituras analíticas limitam o histórico ao período e compartilham as cinco
+semanas do relatório, preservando cortes, legado e isolamento. A consulta da loja
+evita conciliação duplicada; escritas mantêm bloqueio e conciliação transacionais.
+Migration `20261108025630_OtimizarLeiturasAnaliticas` cria somente o índice
+parcial de realização por missão. O planejamento aproveita o índice existente
+por ocorrência. Aplique pelo fluxo EF existente; não altera contratos HTTP.
+
+Os testes PostgreSQL incluem orçamentos de consultas/leituras e regressões dos
+cortes históricos. Procedimento JMeter e resultados estão no
+[contexto de desempenho](../icarus-context/docs/implementation-design/platform/14-desempenho-api.md)
+e em [scripts/desempenho da infraestrutura](../icarus-infrastructure/scripts/desempenho/README.md).
+
 ## 7. Lacunas conhecidas / próximos passos naturais
 
 - Modelo de dados criado (seção 4.3), mas só `Usuario` é usado por um caso de uso (cadastro); as demais entidades ainda não têm nenhum caso de uso em `Icarus.Application`.

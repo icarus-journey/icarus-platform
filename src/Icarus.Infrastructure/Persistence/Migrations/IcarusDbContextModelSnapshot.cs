@@ -850,6 +850,10 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_ocorrencia_missao_id_data_prevista");
 
+                    b.HasIndex("MissaoId", "RealizadaEm")
+                        .HasDatabaseName("ix_ocorrencia_missao_id_realizada_em")
+                        .HasFilter("realizada_em IS NOT NULL");
+
                     b.ToTable("ocorrencia", (string)null);
                 });
 
