@@ -72,6 +72,6 @@ public static class CalculadorPanoramaObjetivos
         var estado = pontos.Length > 0 ? "disponivel" : periodoObservado.Length > 0 ? "medicoes_nao_comparaveis" : "sem_registros_no_periodo";
         return new(estado, campanha.ValorAtual, campanha.ValorMensurado, campanha.Unidade, periodoObservado.Length,
             periodoObservado.Select(m => FusoHorario.DataLocal(m.RegistradaEm, periodo.FusoHorario)).Distinct().Count(), baseAvanco,
-            new(estado, avanco, faltante, periodo.FusoHorario, pontos), analiseAtual.Cenario);
+            new(estado, avanco, faltante, periodo.FusoHorario, pontos), analiseAtual.Cenario, analiseAtual.Evolucao);
     }
 }

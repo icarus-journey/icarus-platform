@@ -39,7 +39,7 @@ public static class ApresentacaoHistoricoRelatorios
                 || s.Indicadores.Concluidas < 0 || s.Indicadores.DiasComConclusao < 0
                 || (s.ComparacaoSemanal is not null && (s.ComparacaoSemanal.Semana?.Periodo is null || s.ComparacaoSemanal.SemanasAnteriores is null || s.ComparacaoSemanal.MediaQuatroSemanas is null
                     || s.ComparacaoSemanal.Semana.Periodo.Inicio != r.PeriodoInicio || s.ComparacaoSemanal.Semana.Periodo.Fim != r.PeriodoFim))
-                || !ContratoRelatorioSemanal.ConteudoValido(s.Texto) || !ContratoRelatorioSemanal.VersaoSuportada(s.VersaoIndicadores)
+                || !ContratoRelatorioSemanal.ConteudoValido(s.Texto, s.VersaoIndicadores) || !ContratoRelatorioSemanal.VersaoSuportada(s.VersaoIndicadores)
                 || r.PeriodoFim.DayNumber - r.PeriodoInicio.DayNumber != 6) return null;
             return s;
         }

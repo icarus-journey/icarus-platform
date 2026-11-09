@@ -19,6 +19,8 @@ public sealed class ConsultarProgressoUseCase(IUsuarioRepository usuarios, IIndi
             calculado.Objetivos is null ? "historico_mensurado_indisponivel" : "por_campanha", dados.QuantidadeRegistros == 0
                 ? "Ainda não há registros neste período. Isso não significa que você não realizou atividades."
                 : "Estes indicadores resumem apenas os registros do aplicativo, não sua rotina inteira.",
-            Evolucao: calculado.Evolucao, Adesao: calculado.Adesao, Objetivos: calculado.Objetivos);
+            Evolucao: calculado.Evolucao, Adesao: calculado.Adesao, Objetivos: calculado.Objetivos, ComparacaoSemanal: calculado.ComparacaoSemanal,
+            DiferencaFeitasSemanaAnterior: calculado.ComparacaoSemanal is { PodeCompararSemanaAnterior: true } comparacao
+                ? comparacao.Semana.Concluidas - comparacao.SemanasAnteriores[0].Concluidas : null);
     }
 }

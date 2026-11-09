@@ -1458,6 +1458,10 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("fuso_inicio_protecao");
 
+                    b.Property<int?>("MetaSonoMinutos")
+                        .HasColumnType("integer")
+                        .HasColumnName("meta_sono_minutos");
+
                     b.Property<string>("Nome")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -1489,9 +1493,24 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(255)")
                         .HasColumnName("senha_hash");
 
+                    b.Property<int?>("SonoHabitualMinutos")
+                        .HasColumnType("integer")
+                        .HasColumnName("sono_habitual_minutos");
+
+                    b.Property<DateTimeOffset?>("SonoInformadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sono_informado_em");
+
                     b.Property<bool?>("Trabalha")
                         .HasColumnType("boolean")
                         .HasColumnName("trabalha");
+
+                    b.Property<Guid>("VersaoRelatoSono")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValue(new Guid("00000000-0000-0000-0000-000000000000"))
+                        .HasColumnName("versao_relato_sono");
 
                     b.HasKey("Id")
                         .HasName("pk_usuario");
@@ -1505,6 +1524,8 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_usuario_carga_estudo", "carga_horaria_estudo_semanal IS NULL OR (estuda IS TRUE AND carga_horaria_estudo_semanal BETWEEN 0 AND 168)");
 
                             t.HasCheckConstraint("ck_usuario_carga_trabalho", "carga_horaria_trabalho_semanal IS NULL OR (trabalha IS TRUE AND carga_horaria_trabalho_semanal BETWEEN 0 AND 168)");
+
+                            t.HasCheckConstraint("ck_usuario_relato_sono", "(sono_habitual_minutos IS NULL AND meta_sono_minutos IS NULL AND sono_informado_em IS NULL) OR (sono_habitual_minutos IS NOT NULL AND sono_habitual_minutos BETWEEN 0 AND 1440 AND sono_informado_em IS NOT NULL AND (meta_sono_minutos IS NULL OR meta_sono_minutos BETWEEN 1 AND 1440))");
 
                             t.HasCheckConstraint("ck_usuario_saldo_pontos_nao_negativo", "saldo_pontos >= 0");
                         });

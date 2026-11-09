@@ -35,4 +35,4 @@ public static class CalculadorComparacaoSemanal
 }
 
 public sealed record DadosRelatorioSemanal(IndicadoresPessoais Indicadores, ComparacaoSemanal ComparacaoSemanal,
-    string VersaoContrato = "1.1.0");
+    string VersaoContrato = "1.2.0");

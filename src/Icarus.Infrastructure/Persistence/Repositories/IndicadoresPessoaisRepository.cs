@@ -88,10 +88,20 @@ public sealed class IndicadoresPessoaisRepository(IcarusDbContext contexto, Time
             .Select(g => (int?)g.Count()).OrderDescending().FirstOrDefault();
         var datas = conclusoes.Select(o => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(o.RealizadaEm!.Value, fuso).DateTime)).ToArray();
         ResumoAdesao? adesao = null;
+        ComparacaoSemanal? comparacao = null;
         var registrosPlanejamento = 0;
         if (incluirPlanejamento)
         {
-            var planejamento = await LeitorPlanejamentoAnalitico.LerAsync(contexto, usuarioId, periodo, ct);
+            var semanal = periodo.Fim.DayNumber - periodo.Inicio.DayNumber == 6 && periodo.Inicio.DayOfWeek == DayOfWeek.Monday;
+            var periodos = Enumerable.Range(0, semanal ? 5 : 1).Select(i => new PeriodoAnalitico(
+                periodo.Inicio.AddDays(-7 * i), periodo.Fim.AddDays(-7 * i), periodo.FusoHorario)).ToArray();
+            var planejamentos = await LeitorPlanejamentoAnalitico.LerPeriodosAsync(contexto, usuarioId, periodos, ct);
+            var planejamento = planejamentos[0];
+            if (semanal)
+            {
+                var semanas = periodos.Select((p, i) => CalculadorComparacaoSemanal.DaAdesao(p, planejamentos[i].Resumo)).ToArray();
+                comparacao = CalculadorComparacaoSemanal.Calcular(semanas[0], semanas.Skip(1).ToArray());
+            }
             adesao = planejamento.Resumo;
             registrosPlanejamento = planejamento.Registros.Except(conclusoes.Select(o => o.Id)).Count();
         }
@@ -119,6 +129,6 @@ public sealed class IndicadoresPessoaisRepository(IcarusDbContext contexto, Time
             conclusoes.Count + registrosPlanejamento + movimentos.Count + registrosLoja, true, limitacoes);
         var objetivos = incluirPlanejamento ? await LeitorPanoramaObjetivos.LerAsync(contexto, usuarioId, periodo, agora, ct) : null;
         if (leitura is not null) await leitura.CommitAsync(ct);
-        return new(indicadores, SerieConclusoes.DasDatas(periodo, datas), adesao, objetivos);
+        return new(indicadores, SerieConclusoes.DasDatas(periodo, datas), adesao, objetivos, comparacao);
     }
 }

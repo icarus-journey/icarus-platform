@@ -17,6 +17,10 @@ public class Usuario : EntidadeBase
     public decimal? CargaHorariaEstudoSemanal { get; set; }
     public bool? Trabalha { get; set; }
     public decimal? CargaHorariaTrabalhoSemanal { get; set; }
+    public int? SonoHabitualMinutos { get; set; }
+    public int? MetaSonoMinutos { get; set; }
+    public Guid VersaoRelatoSono { get; set; }
+    public DateTimeOffset? SonoInformadoEm { get; set; }
     public string? FusoHorario { get; set; }
     public DateTimeOffset ProtecaoAtivadaEm { get; set; }
     public string? FusoInicioProtecao { get; set; }

@@ -8,7 +8,7 @@ public sealed record AtividadeNoObjetivo(int? ConcluidasNoPeriodo, int Registros
     int DiasComRegistrosNoPeriodo, int? ConcluidasNosUltimosSeteDias, DateTimeOffset? UltimaRealizacao);
 public sealed record ResultadoNoObjetivo(string Estado, decimal? ValorAtual, decimal? ValorMensurado,
     string? Unidade, int RegistrosNoPeriodo, int DiasComRegistrosNoPeriodo, string? BaseDoAvanco,
-    EvolucaoMeta EvolucaoNoPeriodo, CenarioConquista CenarioAtual);
+    EvolucaoMeta EvolucaoNoPeriodo, CenarioConquista CenarioAtual, EvolucaoMeta? EvolucaoAtual = null);
 public sealed record CampanhaNoPanorama(long Id, long EpicoId, string Titulo, AreaDaVida AreaDaVida,
     EstadoCampanha Estado, DateOnly PrazoFim, AtividadeNoObjetivo Atividade, ResultadoNoObjetivo Resultado);
 public sealed record CampanhasPorEstado(int Planejadas, int EmAndamento, int Concluidas);

@@ -40,7 +40,8 @@ public sealed partial class PersistirRelatorioSemanalUseCase(IRelatorioSemanalRe
                 var dados = ContratoRelatorioSemanal.LerIndicadores(trabalho.Indicadores);
                 var valido = mensagem.Tipo == "relatorio.semanal.resultado" && mensagem.VersaoContrato == dados.Versao
                     && mensagem.Estado == "concluido" && mensagem.FalhaCodigo is null
-                    && ContratoRelatorioSemanal.ConteudoValido(mensagem.Conteudo)
+                    && ContratoRelatorioSemanal.ConteudoValido(mensagem.Conteudo, mensagem.VersaoContrato)
+                    && (mensagem.VersaoContrato != "1.2.0" || ContratoRelatorioSemanal.NumerosSustentados(mensagem.Conteudo!, dados.Indicadores, dados.Comparacao))
                     && mensagem.Geracao is { Provedor: "openai" or "ollama", Modelo.Length: > 0 and <= 120 };
                 if (valido)
                 {

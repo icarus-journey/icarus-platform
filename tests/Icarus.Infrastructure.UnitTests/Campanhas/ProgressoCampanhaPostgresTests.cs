@@ -73,7 +73,7 @@ public sealed class ProgressoCampanhaPostgresTests(BancoLoja banco) : IClassFixt
         foreach (var _ in Enumerable.Range(0, 2))
         {
             var resposta = await caso.ExecuteAsync(new(usuario, usuario, id), default);
-            Assert.Equal("1.1.0", resposta.VersaoContrato);
+            Assert.Equal("1.2.0", resposta.VersaoContrato);
             Assert.Equal(8m, resposta.Evolucao.AvancoRegistrado);
             Assert.Equal(6m, resposta.Evolucao.Faltante);
             Assert.Equal(2m, resposta.Cenario.RitmoSemanal);

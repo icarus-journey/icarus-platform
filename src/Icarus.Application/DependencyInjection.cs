@@ -96,6 +96,7 @@ public static class DependencyInjection
         services.AddScoped<LogoutUseCase>();
         services.AddScoped<ObterPerfilUseCase>();
         services.AddScoped<AtualizarPerfilUseCase>();
+        services.AddScoped<Icarus.Application.UseCases.RelatoSono.RelatoSonoUseCase>();
         services.AddScoped<AtualizarFusoUseCase>();
         services.AddScoped<AtualizarFotoPerfilUseCase>();
         services.AddScoped<ObterFotoPerfilUseCase>();

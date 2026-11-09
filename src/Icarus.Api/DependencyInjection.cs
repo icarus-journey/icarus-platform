@@ -76,6 +76,7 @@ public static class DependencyInjection
         services.AddSingleton<IValidator<RefreshRequest>, RefreshRequestValidator>();
         services.AddSingleton<IValidator<IniciarOnboardingRequest>, IniciarOnboardingRequestValidator>();
         services.AddSingleton<IValidator<AtualizarPerfilRequest>, AtualizarPerfilRequestValidator>();
+        services.AddSingleton<IValidator<AtualizarRelatoSonoRequest>, AtualizarRelatoSonoRequestValidator>();
         services.AddSingleton<IValidator<AtualizarFusoRequest>, AtualizarFusoRequestValidator>();
         services.AddSingleton<IValidator<CriarEpicoRequest>, CriarEpicoRequestValidator>();
         services.AddSingleton<IValidator<AtualizarEpicoRequest>, AtualizarEpicoRequestValidator>();
