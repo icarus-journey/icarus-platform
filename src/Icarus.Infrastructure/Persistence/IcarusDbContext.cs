@@ -12,8 +12,11 @@ namespace Icarus.Infrastructure.Persistence;
 /// </summary>
 public class IcarusDbContext : DbContext, IUnitOfWork
 {
-    public IcarusDbContext(DbContextOptions<IcarusDbContext> options) : base(options)
+    private readonly TimeProvider _relogio;
+
+    public IcarusDbContext(DbContextOptions<IcarusDbContext> options, TimeProvider? relogio = null) : base(options)
     {
+        _relogio = relogio ?? TimeProvider.System;
     }
 
     public DbSet<Usuario> Usuarios => Set<Usuario>();
@@ -57,7 +60,7 @@ public class IcarusDbContext : DbContext, IUnitOfWork
         {
             await SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException erro) when (erro.InnerException is PostgresException { SqlState: "23505", ConstraintName: "uq_medicao_campanha_operacao" })
+        catch (DbUpdateException erro) when (erro.InnerException is PostgresException { SqlState: "23505", ConstraintName: "uq_medicao_campanha_operacao" or "ix_ocorrencia_missao_id_data_prevista" or "uq_movimentacao_ganho_missao_ocorrencia" })
         {
             throw new DadosAtualizadosException(erro);
         }
@@ -71,7 +74,56 @@ public class IcarusDbContext : DbContext, IUnitOfWork
     {
         if (ChangeTracker.Entries<MedicaoCampanha>().Any(e => e.State is EntityState.Modified or EntityState.Deleted))
             throw new InvalidOperationException("O histórico de medições é imutável.");
-        var agora = DateTimeOffset.UtcNow;
+        foreach (var ocorrencia in ChangeTracker.Entries<Ocorrencia>().Where(e => e.State == EntityState.Modified))
+        {
+            var concluida = ocorrencia.Property(o => o.ConcluidaEm).OriginalValue is not null
+                || ocorrencia.Property(o => o.Status).OriginalValue is Domain.Enums.StatusOcorrencia.Concluida or Domain.Enums.StatusOcorrencia.ConcluidaComAtraso;
+            if (concluida && new[] { nameof(Ocorrencia.RealizadaEm), nameof(Ocorrencia.ConcluidaEm), nameof(Ocorrencia.FusoHorarioRealizacao) }
+                .Any(nome => !Equals(ocorrencia.Property(nome).OriginalValue, ocorrencia.Property(nome).CurrentValue)))
+                throw new InvalidOperationException("Realização, registro e fuso de uma conclusão são imutáveis.");
+        }
+        foreach (var consumo in ChangeTracker.Entries<ConsumoProtecao>().Where(e => e.State == EntityState.Modified))
+        {
+            if (new[] { nameof(ConsumoProtecao.UsuarioId), nameof(ConsumoProtecao.Data), nameof(ConsumoProtecao.FusoHorario),
+                    nameof(ConsumoProtecao.ResgateId), nameof(ConsumoProtecao.ConsumidoEm) }
+                .Any(nome => !Equals(consumo.Property(nome).OriginalValue, consumo.Property(nome).CurrentValue))
+                || (consumo.Property(x => x.CompensadoEm).OriginalValue is not null && consumo.Property(x => x.CompensadoEm).IsModified)
+                || (consumo.Property(x => x.DevolucaoId).OriginalValue is not null && consumo.Property(x => x.DevolucaoId).IsModified))
+                throw new InvalidOperationException("O consumo e sua compensação preservam o histórico original.");
+        }
+        foreach (var resgate in ChangeTracker.Entries<ResgateItem>().Where(e => e.State == EntityState.Modified))
+        {
+            if (resgate.Property(x => x.Estado).OriginalValue == Domain.Enums.EstadoResgate.Utilizado
+                && (resgate.Property(x => x.Estado).IsModified || resgate.Property(x => x.UtilizadoEm).IsModified))
+                throw new InvalidOperationException("O uso de uma recompensa é irreversível.");
+        }
+        if (ChangeTracker.Entries<RegistroPlanejamentoOcorrencia>().Any(e => e.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("O histórico do planejamento é imutável.");
+        var agora = _relogio.GetUtcNow();
+        foreach (var entry in ChangeTracker.Entries<Ocorrencia>().ToArray())
+        {
+            var alterada = entry.State == EntityState.Modified &&
+                (entry.Property(o => o.DataPrevista).IsModified ||
+                 (entry.Property(o => o.Status).OriginalValue == Domain.Enums.StatusOcorrencia.Excluida)
+                    != (entry.Entity.Status == Domain.Enums.StatusOcorrencia.Excluida));
+            if (entry.State != EntityState.Added && !alterada) continue;
+            var ativa = entry.Entity.Status != Domain.Enums.StatusOcorrencia.Excluida;
+            if (ChangeTracker.Entries<RegistroPlanejamentoOcorrencia>().Any(r => r.State == EntityState.Added
+                && ReferenceEquals(r.Entity.Ocorrencia, entry.Entity) && r.Entity.DataPrevista == entry.Entity.DataPrevista && r.Entity.Ativa == ativa)) continue;
+            Add(new RegistroPlanejamentoOcorrencia
+            {
+                Ocorrencia = entry.Entity,
+                DataPrevista = entry.Entity.DataPrevista,
+                Ativa = ativa,
+                RegistradoEm = agora
+            });
+        }
+        foreach (var entry in ChangeTracker.Entries<Missao>().Where(e => e.State == EntityState.Modified))
+            if (entry.Property(m => m.Status).OriginalValue == Domain.Enums.StatusMissao.Ativa
+                && entry.Entity.Status != Domain.Enums.StatusMissao.Ativa)
+                entry.Entity.PlanejamentoEncerradoEm ??= agora;
+        foreach (var entry in ChangeTracker.Entries<Usuario>().Where(e => e.State == EntityState.Added))
+            if (entry.Entity.PlanejamentoVersionadoDesde == default) entry.Entity.PlanejamentoVersionadoDesde = agora;
 
         foreach (var entry in ChangeTracker.Entries<EntidadeBase>())
         {

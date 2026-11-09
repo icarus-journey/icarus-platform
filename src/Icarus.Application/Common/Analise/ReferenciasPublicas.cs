@@ -46,8 +46,23 @@ public sealed class ReferenciaPublica
 }
 
 public sealed record SnapshotReferenciasPublicas(string Hash, MetadadosPublicos Metadados,
-    IReadOnlyList<ReferenciaPublica> Referencias);
+    IReadOnlyList<ReferenciaPublica> Referencias, IReadOnlyList<EvidenciaPesquisa>? Evidencias = null);
 public sealed record RecorteReferencia(string FaixaSolicitada, string FaixaEfetiva, string TipoDiaSolicitado,
     string TipoDiaEfetivo, FiltrosReferencia FiltrosEfetivos, bool Ampliado, IReadOnlyList<string> Avisos);
 public sealed record ReferenciaSelecionada(ReferenciaPublica Dados, RecorteReferencia Recorte,
     string Pais, IReadOnlyList<OrigemPublica> Origens);
+
+public sealed record EvidenciaPesquisa(string Id, string AreaDaVida, int Ano, string Doi, string Url,
+    string Titulo, string Populacao, string Desenho, string Intervencao, string Desfecho, string Achado,
+    string Reflexao, string Limites, IReadOnlyList<string> UsosPermitidos);
+public sealed record MetaPesquisa(long Id, string Titulo, decimal? ValorAtual, decimal? ValorMensurado, string? Unidade);
+public sealed record ContextoSono(decimal InicioFaixaMinutos, decimal FimFaixaMinutos, string PosicaoNaFaixa,
+    string ReferenciaId);
+
+public sealed record GrupoDaPesquisa(string Rotulo, decimal Percentual);
+public sealed record RecomendacaoDaPesquisa(string Titulo, string Texto);
+public sealed record LeituraQuantitativa(string Id, string Titulo, string Medida, string Atalho,
+    IReadOnlyList<GrupoDaPesquisa> Grupos, string Leitura, RecomendacaoDaPesquisa Recomendacao,
+    string DadosDaPesquisa, string Fonte, string UrlFonte, string FaixaEtaria, string TipoDia,
+    IReadOnlyList<string> ReferenciasIds, IReadOnlyList<OrigemPublica> Origens,
+    IReadOnlyList<string> Limitacoes);

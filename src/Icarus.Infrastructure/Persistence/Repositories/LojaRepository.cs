@@ -5,10 +5,18 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Icarus.Infrastructure.Persistence.Repositories;
 
-public sealed class LojaRepository(IcarusDbContext contexto) : ILojaRepository
+public sealed class LojaRepository(IcarusDbContext contexto, IProtecaoSequencia? protecoes = null) : ILojaRepository
 {
-    public async Task ExecutarAsync(Guid usuarioId, Func<Usuario, CancellationToken, Task> operacao, CancellationToken cancelamento)
+    public Task ExecutarAsync(Guid usuarioId, Func<Usuario, CancellationToken, Task> operacao, CancellationToken cancelamento)
+        => ExecutarComBloqueioAsync(usuarioId, operacao, true, cancelamento);
+
+    public Task ExecutarConsultaAsync(Guid usuarioId, Func<Usuario, CancellationToken, Task> consulta, CancellationToken cancelamento)
+        => ExecutarComBloqueioAsync(usuarioId, consulta, false, cancelamento);
+
+    private async Task ExecutarComBloqueioAsync(Guid usuarioId, Func<Usuario, CancellationToken, Task> operacao,
+        bool conciliarDepois, CancellationToken cancelamento)
     {
+        contexto.ChangeTracker.Clear();
         await using var transacao = await contexto.Database.BeginTransactionAsync(cancelamento);
         try
         {
@@ -16,7 +24,9 @@ public sealed class LojaRepository(IcarusDbContext contexto) : ILojaRepository
             var usuario = await contexto.Usuarios.FromSqlInterpolated(
                 $"SELECT * FROM usuario WHERE id = {usuarioId} FOR UPDATE").SingleOrDefaultAsync(cancelamento)
                 ?? throw new PerfilNaoEncontradoException();
+            if (protecoes is not null) await protecoes.ReconciliarAsync(usuario, cancelamento);
             await operacao(usuario, cancelamento);
+            if (conciliarDepois && protecoes is not null) await protecoes.ReconciliarAsync(usuario, cancelamento);
             await transacao.CommitAsync(cancelamento);
         }
         catch

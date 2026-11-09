@@ -48,6 +48,7 @@ public static class AnalisadorEvolucaoMeta
         // O gráfico resume o dia; o cenário mantém todos os cinco registros recentes, sem ocultar revisões/duplicatas.
         var cenario = CalculadorCenarioConquista.Calcular(medicoes.TakeLast(5),
             DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(agora, fuso).DateTime));
-        return (evolucao, cenario);
+        return (evolucao, CalculadorCenarioConquista.RelacionarPrazo(cenario,
+            DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(agora, fuso).DateTime), campanha.PrazoFim));
     }
 }

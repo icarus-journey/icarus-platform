@@ -46,4 +46,27 @@ public sealed class CalculadorCenarioConquistaTests
         historico[2] = historico[2] with { Data = historico[2].Data.AddDays(1) };
         Assert.False(CalculadorCenarioConquista.Calcular(historico, new DateOnly(2026, 10, 19)).Disponivel);
     }
+
+    [Theory]
+    [InlineData(35, 7, "antes_do_prazo", 1.6)]
+    [InlineData(28, 0, "no_prazo", 2d)]
+    [InlineData(21, -7, "depois_do_prazo", 2.67)]
+    [InlineData(0, -28, "depois_do_prazo", null)]
+    [InlineData(-1, -29, "depois_do_prazo", null)]
+    public void RelacionaPrazoSemInferirProbabilidade(int dias, int margem, string situacao, double? necessario)
+    {
+        var hoje = new DateOnly(2026, 11, 8);
+        var resultado = CalculadorCenarioConquista.RelacionarPrazo(new(true, "condicional", 2, 8, 4), hoje, hoje.AddDays(dias));
+        Assert.Equal(new DateOnly(2026, 12, 6), resultado.Prazo!.ConclusaoEstimada);
+        Assert.Equal(margem, resultado.Prazo.MargemDias);
+        Assert.Equal(situacao, resultado.Prazo.Situacao);
+        Assert.Equal((decimal?)necessario, resultado.Prazo.RitmoSemanalNecessario);
+    }
+    [Fact]
+    public void ProjecaoInvalidaNaoGanhaPrazoENaoEstouraCalendario()
+    {
+        var hoje = DateOnly.MaxValue;
+        Assert.Null(CalculadorCenarioConquista.RelacionarPrazo(new(false, "historico_insuficiente"), hoje, hoje).Prazo);
+        Assert.False(CalculadorCenarioConquista.RelacionarPrazo(new(true, "condicional", 1, 1, int.MaxValue), hoje, hoje).Disponivel);
+    }
 }

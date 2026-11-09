@@ -17,7 +17,14 @@ public class Usuario : EntidadeBase
     public decimal? CargaHorariaEstudoSemanal { get; set; }
     public bool? Trabalha { get; set; }
     public decimal? CargaHorariaTrabalhoSemanal { get; set; }
+    public int? SonoHabitualMinutos { get; set; }
+    public int? MetaSonoMinutos { get; set; }
+    public Guid VersaoRelatoSono { get; set; }
+    public DateTimeOffset? SonoInformadoEm { get; set; }
     public string? FusoHorario { get; set; }
+    public DateTimeOffset ProtecaoAtivadaEm { get; set; }
+    public string? FusoInicioProtecao { get; set; }
+    public DateTimeOffset PlanejamentoVersionadoDesde { get; set; }
 
     /// <summary>Chave do objeto no MinIO (bucket de fotos de perfil); nula quando o usuário não tem foto.</summary>
     public string? FotoChave { get; set; }

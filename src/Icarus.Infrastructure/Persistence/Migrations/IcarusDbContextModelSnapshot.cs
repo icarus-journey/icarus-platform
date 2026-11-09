@@ -109,6 +109,61 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Icarus.Domain.Entities.ConsumoProtecao", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("CompensadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("compensado_em");
+
+                    b.Property<DateTimeOffset>("ConsumidoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("consumido_em");
+
+                    b.Property<DateOnly>("Data")
+                        .HasColumnType("date")
+                        .HasColumnName("data");
+
+                    b.Property<long?>("DevolucaoId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("devolucao_id");
+
+                    b.Property<string>("FusoHorario")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("fuso_horario");
+
+                    b.Property<long>("ResgateId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("resgate_id");
+
+                    b.Property<Guid>("UsuarioId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("usuario_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_consumo_protecao");
+
+                    b.HasIndex("DevolucaoId")
+                        .HasDatabaseName("ix_consumo_protecao_devolucao_id");
+
+                    b.HasIndex("ResgateId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_consumo_protecao_resgate_id");
+
+                    b.HasIndex("UsuarioId", "Data")
+                        .IsUnique()
+                        .HasDatabaseName("ix_consumo_protecao_usuario_id_data")
+                        .HasFilter("compensado_em IS NULL");
+
+                    b.ToTable("consumo_protecao", (string)null);
+                });
+
             modelBuilder.Entity("Icarus.Domain.Entities.Diario", b =>
                 {
                     b.Property<long>("Id")
@@ -177,6 +232,7 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         .HasColumnName("area_da_vida");
 
                     b.Property<DateTimeOffset>("AtualizadoEm")
+                        .IsConcurrencyToken()
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("atualizado_em");
 
@@ -235,6 +291,38 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_epico_pontuacao_nao_negativa", "pontuacao >= 0");
                         });
+                });
+
+            modelBuilder.Entity("Icarus.Domain.Entities.FechamentoJornada", b =>
+                {
+                    b.Property<Guid>("UsuarioId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("usuario_id");
+
+                    b.Property<DateOnly>("Data")
+                        .HasColumnType("date")
+                        .HasColumnName("data");
+
+                    b.Property<DateTimeOffset>("AtualizadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("atualizado_em");
+
+                    b.Property<string>("Estado")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("estado");
+
+                    b.Property<string>("FusoHorario")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("fuso_horario");
+
+                    b.HasKey("UsuarioId", "Data")
+                        .HasName("pk_fechamento_jornada");
+
+                    b.ToTable("fechamento_jornada", (string)null);
                 });
 
             modelBuilder.Entity("Icarus.Domain.Entities.InboxRelatorio", b =>
@@ -457,6 +545,7 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
                     b.Property<DateTimeOffset>("AtualizadoEm")
+                        .IsConcurrencyToken()
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("atualizado_em");
 
@@ -493,6 +582,10 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("Horario")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("horario");
+
+                    b.Property<DateTimeOffset?>("PlanejamentoEncerradoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("planejamento_encerrado_em");
 
                     b.Property<int>("Pontuacao")
                         .HasColumnType("integer")
@@ -656,11 +749,20 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("quantidade");
 
+                    b.Property<long?>("SaldoResultante")
+                        .HasColumnType("bigint")
+                        .HasColumnName("saldo_resultante");
+
                     b.Property<string>("Tipo")
                         .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)")
                         .HasColumnName("tipo");
+
+                    b.Property<string>("TituloOrigem")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("titulo_origem");
 
                     b.Property<Guid>("UsuarioId")
                         .HasColumnType("uuid")
@@ -675,11 +777,17 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                     b.HasIndex("OcorrenciaId")
                         .HasDatabaseName("ix_movimentacao_pontos_ocorrencia_id");
 
-                    b.HasIndex("UsuarioId", "CriadoEm")
-                        .HasDatabaseName("ix_movimentacao_pontos_usuario_id_criado_em");
-
                     b.HasIndex("UsuarioId", "Tipo")
                         .HasDatabaseName("ix_movimentacao_pontos_usuario_id_tipo");
+
+                    b.HasIndex("UsuarioId", "CriadoEm", "Id")
+                        .IsDescending(false, true, true)
+                        .HasDatabaseName("ix_movimentacao_pontos_usuario_id_criado_em_id");
+
+                    b.HasIndex(new[] { "OcorrenciaId" }, "credito_missao_unico")
+                        .IsUnique()
+                        .HasDatabaseName("uq_movimentacao_ganho_missao_ocorrencia")
+                        .HasFilter("tipo = 'GanhoMissao' AND ocorrencia_id IS NOT NULL");
 
                     b.ToTable("movimentacao_pontos", (string)null);
                 });
@@ -709,9 +817,18 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         .HasColumnType("date")
                         .HasColumnName("data_prevista");
 
+                    b.Property<string>("FusoHorarioRealizacao")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("fuso_horario_realizacao");
+
                     b.Property<long>("MissaoId")
                         .HasColumnType("bigint")
                         .HasColumnName("missao_id");
+
+                    b.Property<string>("Planejamento")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("planejamento");
 
                     b.Property<DateTimeOffset?>("RealizadaEm")
                         .HasColumnType("timestamp with time zone")
@@ -733,7 +850,46 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_ocorrencia_missao_id_data_prevista");
 
+                    b.HasIndex("MissaoId", "RealizadaEm")
+                        .HasDatabaseName("ix_ocorrencia_missao_id_realizada_em")
+                        .HasFilter("realizada_em IS NOT NULL");
+
                     b.ToTable("ocorrencia", (string)null);
+                });
+
+            modelBuilder.Entity("Icarus.Domain.Entities.OutboxJornada", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("ConcluidaEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("concluida_em");
+
+                    b.Property<DateTimeOffset>("CriadaEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("criada_em");
+
+                    b.Property<DateTimeOffset?>("ProximaTentativaEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("proxima_tentativa_em");
+
+                    b.Property<Guid>("UsuarioId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("usuario_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_outbox_jornada");
+
+                    b.HasIndex("UsuarioId")
+                        .HasDatabaseName("ix_outbox_jornada_usuario_id");
+
+                    b.HasIndex("ConcluidaEm", "ProximaTentativaEm")
+                        .HasDatabaseName("ix_outbox_jornada_concluida_em_proxima_tentativa_em");
+
+                    b.ToTable("outbox_jornada", (string)null);
                 });
 
             modelBuilder.Entity("Icarus.Domain.Entities.OutboxRelatorio", b =>
@@ -792,6 +948,10 @@ namespace Icarus.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<DateOnly?>("AlteracoesAPartirDe")
+                        .HasColumnType("date")
+                        .HasColumnName("alteracoes_a_partir_de");
+
                     b.Property<DateTimeOffset>("AtualizadoEm")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("atualizado_em");
@@ -807,6 +967,10 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                     b.Property<DateOnly>("DataInicio")
                         .HasColumnType("date")
                         .HasColumnName("data_inicio");
+
+                    b.Property<string>("HistoricoPlanejamentos")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("historico_planejamentos");
 
                     b.Property<long>("MissaoId")
                         .HasColumnType("bigint")
@@ -831,6 +995,40 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_recorrencia_missao_id");
 
                     b.ToTable("recorrencia", (string)null);
+                });
+
+            modelBuilder.Entity("Icarus.Domain.Entities.RegistroPlanejamentoOcorrencia", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<bool>("Ativa")
+                        .HasColumnType("boolean")
+                        .HasColumnName("ativa");
+
+                    b.Property<DateOnly>("DataPrevista")
+                        .HasColumnType("date")
+                        .HasColumnName("data_prevista");
+
+                    b.Property<long>("OcorrenciaId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("ocorrencia_id");
+
+                    b.Property<DateTimeOffset>("RegistradoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("registrado_em");
+
+                    b.HasKey("Id")
+                        .HasName("pk_registro_planejamento_ocorrencia");
+
+                    b.HasIndex("OcorrenciaId", "RegistradoEm", "Id")
+                        .HasDatabaseName("ix_registro_planejamento_ocorrencia_ocorrencia_id_registrado_e");
+
+                    b.ToTable("registro_planejamento_ocorrencia", (string)null);
                 });
 
             modelBuilder.Entity("Icarus.Domain.Entities.Relatorio", b =>
@@ -896,6 +1094,10 @@ namespace Icarus.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<Guid?>("CompensacaoOrigemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("compensacao_origem_id");
+
                     b.Property<int>("Custo")
                         .HasColumnType("integer")
                         .HasColumnName("custo");
@@ -904,6 +1106,10 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("descricao");
+
+                    b.Property<DateTimeOffset?>("DisponivelProtecaoDesde")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("disponivel_protecao_desde");
 
                     b.Property<string>("Estado")
                         .IsRequired()
@@ -947,6 +1153,10 @@ namespace Icarus.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_resgate_item");
+
+                    b.HasIndex("CompensacaoOrigemId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_resgate_item_compensacao_origem_id");
 
                     b.HasIndex("ItemId")
                         .HasDatabaseName("ix_resgate_item_item_id");
@@ -1243,11 +1453,32 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("fuso_horario");
 
+                    b.Property<string>("FusoInicioProtecao")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("fuso_inicio_protecao");
+
+                    b.Property<int?>("MetaSonoMinutos")
+                        .HasColumnType("integer")
+                        .HasColumnName("meta_sono_minutos");
+
                     b.Property<string>("Nome")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("nome");
+
+                    b.Property<DateTimeOffset>("PlanejamentoVersionadoDesde")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("planejamento_versionado_desde")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<DateTimeOffset>("ProtecaoAtivadaEm")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("protecao_ativada_em")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<long>("SaldoPontos")
                         .IsConcurrencyToken()
@@ -1262,9 +1493,24 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(255)")
                         .HasColumnName("senha_hash");
 
+                    b.Property<int?>("SonoHabitualMinutos")
+                        .HasColumnType("integer")
+                        .HasColumnName("sono_habitual_minutos");
+
+                    b.Property<DateTimeOffset?>("SonoInformadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sono_informado_em");
+
                     b.Property<bool?>("Trabalha")
                         .HasColumnType("boolean")
                         .HasColumnName("trabalha");
+
+                    b.Property<Guid>("VersaoRelatoSono")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValue(new Guid("00000000-0000-0000-0000-000000000000"))
+                        .HasColumnName("versao_relato_sono");
 
                     b.HasKey("Id")
                         .HasName("pk_usuario");
@@ -1278,6 +1524,8 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_usuario_carga_estudo", "carga_horaria_estudo_semanal IS NULL OR (estuda IS TRUE AND carga_horaria_estudo_semanal BETWEEN 0 AND 168)");
 
                             t.HasCheckConstraint("ck_usuario_carga_trabalho", "carga_horaria_trabalho_semanal IS NULL OR (trabalha IS TRUE AND carga_horaria_trabalho_semanal BETWEEN 0 AND 168)");
+
+                            t.HasCheckConstraint("ck_usuario_relato_sono", "(sono_habitual_minutos IS NULL AND meta_sono_minutos IS NULL AND sono_informado_em IS NULL) OR (sono_habitual_minutos IS NOT NULL AND sono_habitual_minutos BETWEEN 0 AND 1440 AND sono_informado_em IS NOT NULL AND (meta_sono_minutos IS NULL OR meta_sono_minutos BETWEEN 1 AND 1440))");
 
                             t.HasCheckConstraint("ck_usuario_saldo_pontos_nao_negativo", "saldo_pontos >= 0");
                         });
@@ -1293,6 +1541,33 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_campanha_epicos_epico_id");
 
                     b.Navigation("Epico");
+                });
+
+            modelBuilder.Entity("Icarus.Domain.Entities.ConsumoProtecao", b =>
+                {
+                    b.HasOne("Icarus.Domain.Entities.ResgateItem", "Devolucao")
+                        .WithMany()
+                        .HasForeignKey("DevolucaoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_consumo_protecao_resgate_item_devolucao_id");
+
+                    b.HasOne("Icarus.Domain.Entities.ResgateItem", "Resgate")
+                        .WithMany()
+                        .HasForeignKey("ResgateId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_consumo_protecao_resgate_item_resgate_id");
+
+                    b.HasOne("Icarus.Domain.Entities.Usuario", null)
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_consumo_protecao_usuarios_usuario_id");
+
+                    b.Navigation("Devolucao");
+
+                    b.Navigation("Resgate");
                 });
 
             modelBuilder.Entity("Icarus.Domain.Entities.Diario", b =>
@@ -1317,6 +1592,16 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_epico_usuarios_usuario_id");
 
                     b.Navigation("Usuario");
+                });
+
+            modelBuilder.Entity("Icarus.Domain.Entities.FechamentoJornada", b =>
+                {
+                    b.HasOne("Icarus.Domain.Entities.Usuario", null)
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_fechamento_jornada_usuarios_usuario_id");
                 });
 
             modelBuilder.Entity("Icarus.Domain.Entities.InboxRelatorio", b =>
@@ -1462,6 +1747,16 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                     b.Navigation("Missao");
                 });
 
+            modelBuilder.Entity("Icarus.Domain.Entities.OutboxJornada", b =>
+                {
+                    b.HasOne("Icarus.Domain.Entities.Usuario", null)
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_outbox_jornada_usuarios_usuario_id");
+                });
+
             modelBuilder.Entity("Icarus.Domain.Entities.OutboxRelatorio", b =>
                 {
                     b.HasOne("Icarus.Domain.Entities.TrabalhoRelatorioSemanal", null)
@@ -1482,6 +1777,18 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_recorrencia_missao_missao_id");
 
                     b.Navigation("Missao");
+                });
+
+            modelBuilder.Entity("Icarus.Domain.Entities.RegistroPlanejamentoOcorrencia", b =>
+                {
+                    b.HasOne("Icarus.Domain.Entities.Ocorrencia", "Ocorrencia")
+                        .WithMany()
+                        .HasForeignKey("OcorrenciaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_registro_planejamento_ocorrencia_ocorrencia_ocorrencia_id");
+
+                    b.Navigation("Ocorrencia");
                 });
 
             modelBuilder.Entity("Icarus.Domain.Entities.Relatorio", b =>

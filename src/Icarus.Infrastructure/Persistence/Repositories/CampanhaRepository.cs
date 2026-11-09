@@ -1,5 +1,6 @@
 using Icarus.Application.Interfaces;
 using Icarus.Domain.Entities;
+using Icarus.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace Icarus.Infrastructure.Persistence.Repositories;
@@ -12,5 +13,5 @@ public class CampanhaRepository(IcarusDbContext context) : ICampanhaRepository
     public Task<Campanha?> BuscarPorIdAsync(long campanhaId, Guid usuarioId, CancellationToken cancellationToken)
         => context.Campanhas
             .Include(c => c.Epico).ThenInclude(e => e.Usuario)
-            .SingleOrDefaultAsync(c => c.Id == campanhaId && c.Epico.UsuarioId == usuarioId, cancellationToken);
+            .SingleOrDefaultAsync(c => c.Id == campanhaId && c.Epico.UsuarioId == usuarioId && c.Estado != EstadoCampanha.Excluida && c.Epico.Estado != EstadoEpico.Excluido, cancellationToken);
 }

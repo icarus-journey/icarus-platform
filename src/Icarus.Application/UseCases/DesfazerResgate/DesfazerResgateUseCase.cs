@@ -33,6 +33,8 @@ public sealed partial class DesfazerResgateUseCase(
                 UsuarioId = usuarioId,
                 ItemId = resgate.ItemId,
                 Quantidade = resgate.Custo,
+                SaldoResultante = usuario.SaldoPontos,
+                TituloOrigem = resgate.Titulo,
                 Tipo = TipoMovimentacaoPontos.EstornoResgate,
                 Descricao = $"Estorno: {resgate.Titulo}"
             }, token);

@@ -21,7 +21,11 @@ public sealed class ReferenciasPublicasRepository(IcarusDbContext contexto) : IR
             SELECT s.checksum, s.metadados::text,
                 COALESCE((SELECT jsonb_agg(r.conteudo ORDER BY r.id)
                     FROM dados_publicos.referencias r WHERE r.versao_gold=s.versao_gold
-                    AND r.conteudo->>'area_da_vida'=@area), '[]'::jsonb)::text
+                    AND (r.conteudo->>'area_da_vida'=@area OR (@area='CORPO_E_SAUDE'
+                        AND r.conteudo->>'indicador' IN ('vigitel_atividade_sintomas_sono', 'vigitel_atividade_deseja_mais_sono')))), '[]'::jsonb)::text,
+                COALESCE((SELECT jsonb_agg(e.conteudo ORDER BY e.id)
+                    FROM dados_publicos.evidencias_pesquisa e WHERE e.versao_gold=s.versao_gold
+                    AND e.conteudo->>'area_da_vida'=@area), '[]'::jsonb)::text
             FROM dados_publicos.snapshot_vigente v
             JOIN dados_publicos.snapshots s ON s.versao_gold=v.versao_gold WHERE v.chave=true
             """;
@@ -35,7 +39,9 @@ public sealed class ReferenciasPublicasRepository(IcarusDbContext contexto) : IR
                 ?? throw new JsonException("Metadados ausentes.");
             var dados = JsonSerializer.Deserialize<List<ReferenciaPublica>>(leitor.GetString(2), Opcoes)
                 ?? throw new JsonException("Referências ausentes.");
-            return new(leitor.GetString(0), metadados, dados);
+            var evidencias = JsonSerializer.Deserialize<List<EvidenciaPesquisa>>(leitor.GetString(3), Opcoes) ?? [];
+            return new(leitor.GetString(0), metadados, dados,
+                evidencias.Where(e => e.UsosPermitidos.Contains("contexto_educativo")).ToArray());
         }
         catch (PostgresException erro) when (erro.SqlState is "42P01" or "3F000") { return null; }
     }
