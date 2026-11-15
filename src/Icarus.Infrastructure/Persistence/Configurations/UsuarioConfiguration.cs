@@ -10,6 +10,7 @@ public class UsuarioConfiguration : IEntityTypeConfiguration<Usuario>
     {
         builder.ToTable("usuario", t =>
         {
+            t.HasCheckConstraint("ck_usuario_relato_sono", "(sono_habitual_minutos IS NULL AND meta_sono_minutos IS NULL AND sono_informado_em IS NULL) OR (sono_habitual_minutos IS NOT NULL AND sono_habitual_minutos BETWEEN 0 AND 1440 AND sono_informado_em IS NOT NULL AND (meta_sono_minutos IS NULL OR meta_sono_minutos BETWEEN 1 AND 1440))");
             t.HasCheckConstraint("ck_usuario_saldo_pontos_nao_negativo", "saldo_pontos >= 0");
             t.HasCheckConstraint("ck_usuario_carga_estudo",
                 "carga_horaria_estudo_semanal IS NULL OR (estuda IS TRUE AND carga_horaria_estudo_semanal BETWEEN 0 AND 168)");
@@ -41,7 +42,11 @@ public class UsuarioConfiguration : IEntityTypeConfiguration<Usuario>
 
         builder.Property(u => u.CargaHorariaEstudoSemanal).HasPrecision(5, 2);
         builder.Property(u => u.CargaHorariaTrabalhoSemanal).HasPrecision(5, 2);
+        builder.Property(u => u.VersaoRelatoSono).IsConcurrencyToken().HasDefaultValue(Guid.Empty);
         builder.Property(u => u.FusoHorario).HasMaxLength(100);
+        builder.Property(u => u.ProtecaoAtivadaEm).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        builder.Property(u => u.FusoInicioProtecao).HasMaxLength(100);
+        builder.Property(u => u.PlanejamentoVersionadoDesde).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
         builder.Property(u => u.FotoChave)
             .HasMaxLength(100);

@@ -13,6 +13,7 @@ public sealed class RabbitMqOptions
 
     public string Host { get; set; } = "localhost";
     public int Porta { get; set; } = 5672;
+    public string Vhost { get; set; } = "/";
     public string Usuario { get; set; } = "guest";
     public string Senha { get; set; } = "guest";
     public string ExchangeEntrada { get; set; } = "icarus.input";

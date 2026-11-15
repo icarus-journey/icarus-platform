@@ -75,6 +75,8 @@ public sealed partial class ResgatarRecompensaUseCase(
                 UsuarioId = usuarioId,
                 Item = item,
                 Quantidade = -custo,
+                SaldoResultante = usuario.SaldoPontos,
+                TituloOrigem = item.Nome,
                 Tipo = TipoMovimentacaoPontos.CompraItem,
                 Descricao = $"Resgate: {item.Nome}"
             }, token);

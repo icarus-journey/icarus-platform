@@ -7,7 +7,7 @@ namespace Icarus.Application.UnitTests.Common;
 public sealed class AnalisadorEvolucaoMetaTests
 {
     private static readonly DateTimeOffset Agora = new(2026, 10, 25, 1, 0, 0, TimeSpan.Zero);
-    private static Campanha Meta() => new() { ValorAtual = 8, ValorMensurado = 16, Unidade = "módulos", Estado = EstadoCampanha.EmAndamento };
+    private static Campanha Meta() => new() { ValorAtual = 8, ValorMensurado = 16, Unidade = "módulos", PrazoFim = new DateOnly(2026, 11, 28), Estado = EstadoCampanha.EmAndamento };
     private static MedicaoCampanha[] Historico() => Enumerable.Range(0, 5).Select(i => new MedicaoCampanha
     {
         Id = i + 1,
@@ -27,7 +27,9 @@ public sealed class AnalisadorEvolucaoMetaTests
         Assert.Equal(8m, resultado.Evolucao.Faltante);
         Assert.Equal(new DateOnly(2026, 9, 26), resultado.Evolucao.Pontos[0].Data);
         Assert.Equal(new DateOnly(2026, 10, 24), resultado.Evolucao.Pontos[^1].Data);
-        Assert.Equal(new CenarioConquista(true, "cenario_condicional_se_mantiver_o_ritmo", 2m, 8m, 4), resultado.Cenario);
+        Assert.Equal(new CenarioConquista(true, "cenario_condicional_se_mantiver_o_ritmo", 2m, 8m, 4), resultado.Cenario with { Prazo = null });
+        Assert.Equal(new DateOnly(2026, 10, 24), resultado.Cenario.Prazo!.Referencia);
+        Assert.Equal(7, resultado.Cenario.Prazo.MargemDias);
         var unica = AnalisadorEvolucaoMeta.Analisar(Meta(), [Historico()[^1]], Agora);
         Assert.Null(unica.Evolucao.AvancoRegistrado);
         Assert.Single(unica.Evolucao.Pontos);

@@ -33,8 +33,8 @@ public sealed partial class SolicitarRelatorioSemanalUseCase(IRelatorioSemanalRe
             {
                 resultado = ApresentacaoRelatorioSemanal.Criar(periodo, relatorio, trabalho, agora); return;
             }
-            var dados = await indicadores.CalcularAsync(usuario.Id, periodo, token);
-            if (dados.QuantidadeRegistros == 0)
+            var dados = await indicadores.CalcularRelatorioAsync(usuario.Id, periodo, token);
+            if (dados.Indicadores.QuantidadeRegistros == 0)
             {
                 resultado = new("historico_insuficiente", periodo,
                     "Ainda não há registros suficientes dessa semana para preparar uma síntese pessoal. As referências públicas continuam disponíveis."); return;
@@ -52,9 +52,14 @@ public sealed partial class SolicitarRelatorioSemanalUseCase(IRelatorioSemanalRe
             var mensagem = new SolicitacaoRelatorioSemanal(trabalho.TentativaId, trabalho.Id, anterior,
                 "relatorio.semanal.solicitar", ContratoRelatorioSemanal.Versao, agora, trabalho.ExpiraEm,
                 trabalho.Id.ToString("N") + ":" + trabalho.Tentativas.ToString(CultureInfo.InvariantCulture),
-                periodo, IndicadoresRelatorioSemanal.DosIndicadores(dados));
-            await repositorio.AdicionarOutboxAsync(new() { Id = mensagem.IdMensagem, TrabalhoId = trabalho.Id,
-                Carga = JsonSerializer.Serialize(mensagem, ContratoRelatorioSemanal.Json), ProximaTentativaEm = agora }, token);
+                periodo, IndicadoresRelatorioSemanal.DosIndicadores(dados.Indicadores), dados.ComparacaoSemanal);
+            await repositorio.AdicionarOutboxAsync(new()
+            {
+                Id = mensagem.IdMensagem,
+                TrabalhoId = trabalho.Id,
+                Carga = JsonSerializer.Serialize(mensagem, ContratoRelatorioSemanal.Json),
+                ProximaTentativaEm = agora
+            }, token);
             await unidade.SalvarAlteracoesAsync(token);
             LogSolicitado();
             resultado = ApresentacaoRelatorioSemanal.Criar(periodo, null, trabalho, agora);

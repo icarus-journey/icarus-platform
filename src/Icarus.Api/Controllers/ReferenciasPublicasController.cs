@@ -19,6 +19,6 @@ public sealed class ReferenciasPublicasController(ConsultarReferenciasPublicasUs
     public async Task<IActionResult> Consultar(Guid id, [FromQuery] ConsultarReferenciasPublicasRequest request, CancellationToken ct)
     {
         var autenticado = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        return Ok(await consultar.ExecuteAsync(new(autenticado, id, request.AreaDaVida, request.TipoDia), ct));
+        return Ok(await consultar.ExecuteAsync(new(autenticado, id, request.AreaDaVida, request.TipoDia, request.CampanhaId), ct));
     }
 }

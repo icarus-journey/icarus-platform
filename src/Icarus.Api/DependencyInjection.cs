@@ -1,3 +1,7 @@
+using Icarus.Application.Interfaces;
+using Icarus.Api.Contracts.HistoricoRelatorios;
+using Icarus.Api.Contracts.ExtratoPontos;
+using Icarus.Api.Contracts.HistoricoMissoes;
 using Icarus.Api.Contracts.Diario;
 using Icarus.Api.Contracts.Analise;
 using Icarus.Api.Contracts.Loja;
@@ -51,6 +55,13 @@ public static class DependencyInjection
             options.AddOperationTransformer<BearerSecuritySchemeTransformer>();
         });
 
+        services.AddDataProtection();
+        services.AddScoped<ICursorHistoricoRelatorios, CursorHistoricoRelatorios>();
+        services.AddSingleton<IValidator<ConsultaHistoricoRelatoriosRequest>, ConsultaHistoricoRelatoriosRequestValidator>();
+        services.AddScoped<ICursorExtratoPontos, CursorExtratoPontos>();
+        services.AddSingleton<IValidator<ConsultarExtratoPontosRequest>, ConsultarExtratoPontosRequestValidator>();
+        services.AddScoped<ICursorHistoricoMissoes, CursorHistoricoMissoes>();
+        services.AddSingleton<IValidator<ConsultarHistoricoMissoesRequest>, ConsultarHistoricoMissoesRequestValidator>();
         services.AddProblemDetails();
         services.AddExceptionHandler<GlobalExceptionHandler>();
 
@@ -65,6 +76,7 @@ public static class DependencyInjection
         services.AddSingleton<IValidator<RefreshRequest>, RefreshRequestValidator>();
         services.AddSingleton<IValidator<IniciarOnboardingRequest>, IniciarOnboardingRequestValidator>();
         services.AddSingleton<IValidator<AtualizarPerfilRequest>, AtualizarPerfilRequestValidator>();
+        services.AddSingleton<IValidator<AtualizarRelatoSonoRequest>, AtualizarRelatoSonoRequestValidator>();
         services.AddSingleton<IValidator<AtualizarFusoRequest>, AtualizarFusoRequestValidator>();
         services.AddSingleton<IValidator<CriarEpicoRequest>, CriarEpicoRequestValidator>();
         services.AddSingleton<IValidator<AtualizarEpicoRequest>, AtualizarEpicoRequestValidator>();
@@ -72,6 +84,7 @@ public static class DependencyInjection
         services.AddSingleton<IValidator<RegistrarProgressoCampanhaRequest>, RegistrarProgressoCampanhaRequestValidator>();
         services.AddSingleton<IValidator<AtualizarCampanhaRequest>, AtualizarCampanhaRequestValidator>();
         services.AddSingleton<IValidator<CriarMissaoRequest>, CriarMissaoRequestValidator>();
+        services.AddSingleton<IValidator<ConcluirMissaoRequest>, ConcluirMissaoRequestValidator>();
         services.AddSingleton<IValidator<AtualizarMissaoRequest>, AtualizarMissaoRequestValidator>();
 
         // "Saúde da API" (seção 11 do icarus-context): /health responde 200 só se também

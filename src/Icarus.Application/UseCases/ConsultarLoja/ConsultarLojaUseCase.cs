@@ -15,7 +15,7 @@ public sealed class ConsultarLojaUseCase(ILojaRepository repositorio, LojaOption
         var usuarioId = command.UsuarioIdSolicitado;
         ValidarTitular(command.UsuarioIdAutenticado, usuarioId);
         LojaResult? resultado = null;
-        await repositorio.ExecutarAsync(usuarioId, async (usuario, token) =>
+        await repositorio.ExecutarConsultaAsync(usuarioId, async (usuario, token) =>
         {
             var itens = await repositorio.ListarItensAsync(usuarioId, token);
             var resgates = await repositorio.ListarResgatesAsync(usuarioId, token);

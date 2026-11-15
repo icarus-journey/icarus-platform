@@ -16,7 +16,7 @@ public class Missao : EntidadeBase
     public string? Descricao { get; set; }
     public Dificuldade Dificuldade { get; set; }
 
-    /// <summary>Calculada a partir de <see cref="Dificuldade"/> (ver MapeadorPontuacao) — nunca atribuída diretamente.</summary>
+    /// <summary>Recompensa planejada, definida pela pessoa na criação/edição manual (1 a 1.000.000). O onboarding legado mantém seu mapeamento por dificuldade.</summary>
     public int Pontuacao { get; set; }
 
     public string? Beneficio { get; set; }
@@ -31,6 +31,7 @@ public class Missao : EntidadeBase
     /// para consulta operacional (RF-04); não é a fonte de verdade.
     /// </summary>
     public DateTimeOffset? ConcluidaEm { get; set; }
+    public DateTimeOffset? PlanejamentoEncerradoEm { get; set; }
 
     public Usuario Usuario { get; set; } = null!;
     public Campanha? Campanha { get; set; }

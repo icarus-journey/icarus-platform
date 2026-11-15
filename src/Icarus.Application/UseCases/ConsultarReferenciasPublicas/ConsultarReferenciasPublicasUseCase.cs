@@ -12,10 +12,14 @@ public sealed class ConsultarReferenciasPublicasUseCase(IUsuarioRepository usuar
     {
         if (command.UsuarioIdAutenticado != command.UsuarioIdSolicitado) throw new PerfilNaoEncontradoException();
         var usuario = await usuarios.BuscarPorIdAsync(command.UsuarioIdSolicitado, ct) ?? throw new PerfilNaoEncontradoException();
-        var codigo = command.AreaDaVida;
+        var lista = await epicos.ListarComCampanhasEMissoesAsync(usuario.Id, ct);
+        var campanhaEscolhida = command.CampanhaId is { } id
+            ? lista.SelectMany(e => e.Campanhas).SingleOrDefault(c => c.Id == id)
+                ?? throw new CampanhaNaoEncontradaException() : null;
+        var codigo = campanhaEscolhida is null ? command.AreaDaVida
+            : CatalogoAreasAnaliticas.Areas.Single(a => a.Area == campanhaEscolhida.AreaDaVida).Codigo;
         if (codigo is null)
         {
-            var lista = await epicos.ListarComCampanhasEMissoesAsync(usuario.Id, ct);
             var area = lista.FirstOrDefault(e => e.Estado == EstadoEpico.EmAndamento)?.AreaDaVida;
             codigo = CatalogoAreasAnaliticas.Areas.FirstOrDefault(a => a.Area == area)?.Codigo;
         }
@@ -55,13 +59,30 @@ public sealed class ConsultarReferenciasPublicasUseCase(IUsuarioRepository usuar
                 referencia.Filtros, avisos.Count > 0, avisos), referencia.Fonte == "ATUS" ? "Estados Unidos" : "Brasil", origens));
             if (selecionadas.Count == 4) break;
         }
+        var areaSelecionada = CatalogoAreasAnaliticas.Areas.Single(a => a.Codigo == codigo).Area;
+        var campanha = campanhaEscolhida ?? lista.Where(e => e.Estado == EstadoEpico.EmAndamento).SelectMany(e => e.Campanhas)
+            .Where(c => c.AreaDaVida == areaSelecionada && c.Estado == EstadoCampanha.EmAndamento)
+            .OrderBy(c => c.PrazoFim).ThenBy(c => c.Id).FirstOrDefault();
+        var meta = campanha is null ? null : new MetaPesquisa(campanha.Id, campanha.Titulo,
+            campanha.ValorAtual, campanha.ValorMensurado, campanha.Unidade);
+        var leituras = ConstrutorLeiturasQuantitativas.Construir(snapshot, codigo, idade, command.TipoDia, meta);
+        var relato = codigo == "SONO_E_RECUPERACAO" ? RelatoSono.RelatoSonoUseCase.Apresentar(usuario) : null;
+        var sono = selecionadas.FirstOrDefault(r => r.Dados.Indicador == "vigitel_duracao_sono_habitual"
+            && r.Dados.Medida == "duracao_habitual");
+        ContextoSono? contextoSono = null;
+        // Apenas a pergunta noturna habitual R701 é compatível; ATUS inclui cochilos.
+        if (relato?.HabitualMinutos is { } minutos && sono?.Dados.Valores is { P25: { } p25, P75: { } p75, Unidade: "minutos" })
+            contextoSono = new(p25, p75, minutos < p25 ? "abaixo" : minutos > p75 ? "acima"
+                : minutos == p25 ? "inicio" : minutos == p75 ? "fim" : "dentro", sono.Dados.Id);
         return new(selecionadas.Count > 0 ? "disponivel" : "sem_referencia_compativel", codigo,
             selecionadas.Count > 0 ? "Contexto público de 2024; não é uma avaliação da sua rotina." : "Ainda não temos uma referência pública compatível para este recorte.",
-            snapshot.Metadados.VersaoGold, snapshot.Hash, selecionadas, VersaoCatalogo: snapshot.Metadados.VersaoCatalogo);
+            snapshot.Metadados.VersaoGold, snapshot.Hash, selecionadas, VersaoCatalogo: snapshot.Metadados.VersaoCatalogo,
+            Evidencias: snapshot.Evidencias ?? [], Meta: meta, RelatoSono: relato, ContextoSono: contextoSono,
+            Leituras: leituras);
     }
 
     private static ConsultarReferenciasPublicasResult Vazio(string estado, string? area, string mensagem)
-        => new(estado, area, mensagem, null, null, []);
+        => new(estado, area, mensagem, null, null, [], Leituras: []);
 
     private static int Prioridade(string indicador, string medida) => (indicador, medida) switch
     {

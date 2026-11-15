@@ -139,6 +139,9 @@ public sealed class LojaPostgresTests(BancoLoja banco) : IClassFixture<BancoLoja
         Assert.Equal("recompensa_imutavel", erro.Codigo);
         Assert.Equal(120, Assert.Single(estornoRepetido.Resgates).Custo);
         Assert.Equal(2, await contexto.MovimentacoesPontos.CountAsync(m => m.UsuarioId == usuario));
+        var movimentos = await contexto.MovimentacoesPontos.Where(m => m.UsuarioId == usuario).OrderBy(m => m.Id).ToArrayAsync();
+        Assert.Equal(new long?[] { 180, 300 }, movimentos.Select(m => m.SaldoResultante));
+        Assert.All(movimentos, m => Assert.Equal("Pausa sem culpa", m.TituloOrigem));
         Assert.Equal(0, await contexto.MovimentacoesPontos.Where(m => m.UsuarioId == usuario).SumAsync(m => m.Quantidade));
     }
 

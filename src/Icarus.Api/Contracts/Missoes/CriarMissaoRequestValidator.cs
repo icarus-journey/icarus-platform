@@ -14,6 +14,8 @@ public sealed class CriarMissaoRequestValidator : AbstractValidator<CriarMissaoR
             .MaximumLength(200);
 
         RuleFor(r => r.Dificuldade).IsInEnum();
+        RuleFor(r => r.Pontuacao).InclusiveBetween(1, 1_000_000)
+            .WithMessage("Informe uma recompensa inteira entre 1 e 1.000.000.");
 
         RuleFor(r => r.Horario)
             .Must(h => TimeOnly.TryParse(h, out _))
@@ -28,9 +30,7 @@ public sealed class CriarMissaoRequestValidator : AbstractValidator<CriarMissaoR
             .When(r => r.Recorrencia == TipoRecorrencia.Semanal)
             .WithMessage("Informe ao menos um dia da semana para recorrência semanal.");
 
-        RuleFor(r => r.DataFimRecorrencia)
-            .GreaterThanOrEqualTo(_ => DateOnly.FromDateTime(DateTime.UtcNow))
-            .When(r => r.Recorrencia is not null && r.DataFimRecorrencia is not null)
-            .WithMessage("A data limite da recorrência não pode estar no passado.");
+        RuleForEach(r => r.DiasSemana).IsInEnum();
+        // Datas civis dependem do fuso do titular e são validadas no caso de uso.
     }
 }

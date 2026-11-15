@@ -33,6 +33,7 @@ public sealed class RabbitMqConnectionProvider(IOptions<RabbitMqOptions> options
             {
                 HostName = options.Host,
                 Port = options.Porta,
+                VirtualHost = options.Vhost,
                 UserName = options.Usuario,
                 Password = options.Senha,
                 AutomaticRecoveryEnabled = true

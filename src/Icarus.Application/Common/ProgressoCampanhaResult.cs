@@ -19,7 +19,7 @@ public sealed record ProgressoCampanhaResult(string VersaoContrato, long Campanh
     {
         var analise = AnalisadorEvolucaoMeta.Analisar(c, medicoes, agora);
         return new(
-            "1.1.0", c.Id, c.ValorAtual, c.ValorMensurado, c.Unidade, c.Estado,
+            "1.2.0", c.Id, c.ValorAtual, c.ValorMensurado, c.Unidade, c.Estado,
             (c.Estado is EstadoCampanha.Planejada or EstadoCampanha.EmAndamento) && c.ValorMensurado > 0 && !string.IsNullOrWhiteSpace(c.Unidade),
             c.ValorMensurado > 0 && c.ValorAtual >= c.ValorMensurado, VersaoDaCampanha(c),
             medicoes.Select(m => new MedicaoCampanhaResult(m.Id, m.ValorAnterior, m.ValorAtual, m.ValorMensurado, m.Unidade, m.RegistradaEm, m.FusoHorario)).ToArray(),

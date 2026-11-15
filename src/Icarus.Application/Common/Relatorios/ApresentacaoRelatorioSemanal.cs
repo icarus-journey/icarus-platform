@@ -15,7 +15,8 @@ public static class ApresentacaoRelatorioSemanal
             var conteudo = JsonSerializer.Deserialize<SnapshotRelatorioSemanal>(relatorio.Conteudo, ContratoRelatorioSemanal.Json)!;
             var periodoSalvo = trabalho is null ? periodo : new PeriodoAnalitico(trabalho.PeriodoInicio, trabalho.PeriodoFim, trabalho.FusoHorario);
             return new("disponivel", periodoSalvo, "Uma síntese por IA dos registros disponíveis; você pode ignorar a reflexão.",
-                Relatorio: new(relatorio.Id, relatorio.CriadoEm, conteudo.Texto, conteudo.Indicadores, conteudo.Geracao));
+                Relatorio: new(relatorio.Id, relatorio.CriadoEm, conteudo.Texto, conteudo.Indicadores, conteudo.Geracao,
+                    conteudo.ComparacaoSemanal, conteudo.VersaoIndicadores));
         }
         if (trabalho is null) return new("ausente", periodo, "Seu relatório da semana ainda não foi solicitado.");
         if (trabalho.Estado == "processando" && trabalho.ExpiraEm > agora)

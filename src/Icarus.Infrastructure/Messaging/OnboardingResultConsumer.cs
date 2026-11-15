@@ -30,7 +30,8 @@ public sealed partial class OnboardingResultConsumer(
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var conexao = await connectionProvider.ObterConexaoAsync(stoppingToken);
-        var canal = await conexao.CreateChannelAsync(cancellationToken: stoppingToken);
+        var canal = await conexao.CreateChannelAsync(new CreateChannelOptions(
+            publisherConfirmationsEnabled: true, publisherConfirmationTrackingEnabled: true), stoppingToken);
 
         await canal.ExchangeDeclareAsync(options.ExchangeSaida, ExchangeType.Direct, durable: true, cancellationToken: stoppingToken);
         await canal.QueueDeclareAsync(options.FilaResultadoOnboarding, durable: true, exclusive: false, autoDelete: false, cancellationToken: stoppingToken);
@@ -52,12 +53,17 @@ public sealed partial class OnboardingResultConsumer(
     private async Task ProcessarMensagemAsync(IChannel canal, BasicDeliverEventArgs ea, CancellationToken stoppingToken)
     {
         OnboardingResultMessage? mensagem;
+        Guid jobId;
         try
         {
             mensagem = JsonSerializer.Deserialize<OnboardingResultMessage>(ea.Body.Span);
             if (mensagem is null)
             {
                 throw new JsonException("Corpo da mensagem é nulo.");
+            }
+            if (!Guid.TryParse(mensagem.JobId, out jobId) || jobId == Guid.Empty)
+            {
+                throw new JsonException("Identificador do trabalho de onboarding inválido.");
             }
         }
         catch (Exception ex)
@@ -74,7 +80,7 @@ public sealed partial class OnboardingResultConsumer(
             var persistir = escopo.ServiceProvider.GetRequiredService<PersistirResultadoOnboardingUseCase>();
 
             var comando = new PersistirResultadoOnboardingCommand(
-                Guid.Parse(mensagem.JobId),
+                jobId,
                 new EpicoResultadoOnboarding(
                     mensagem.Epic.Titulo,
                     mensagem.Epic.Descricao,
@@ -102,11 +108,11 @@ public sealed partial class OnboardingResultConsumer(
         }
         catch (Exception ex)
         {
-            await TratarFalhaAsync(canal, ea, mensagem.JobId, ex, stoppingToken);
+            await TratarFalhaAsync(canal, ea, jobId, ex, stoppingToken);
         }
     }
 
-    private async Task TratarFalhaAsync(IChannel canal, BasicDeliverEventArgs ea, string jobId, Exception erro, CancellationToken stoppingToken)
+    private async Task TratarFalhaAsync(IChannel canal, BasicDeliverEventArgs ea, Guid jobId, Exception erro, CancellationToken stoppingToken)
     {
         var tentativas = ObterTentativas(ea);
 
@@ -132,7 +138,7 @@ public sealed partial class OnboardingResultConsumer(
 
         using var escopo = scopeFactory.CreateScope();
         var marcarFalho = escopo.ServiceProvider.GetRequiredService<MarcarOnboardingComoFalhoUseCase>();
-        await marcarFalho.ExecuteAsync(new MarcarOnboardingComoFalhoCommand(Guid.Parse(jobId), erro.Message), stoppingToken);
+        await marcarFalho.ExecuteAsync(new MarcarOnboardingComoFalhoCommand(jobId, erro.Message), stoppingToken);
 
         await EnviarParaDlqAsync(canal, ea, stoppingToken);
         await canal.BasicAckAsync(ea.DeliveryTag, multiple: false, stoppingToken);
@@ -169,8 +175,8 @@ public sealed partial class OnboardingResultConsumer(
     private partial void LogMensagemInvalida(Exception ex);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Falha transiente ao persistir onboarding {JobId}, tentativa {Tentativa}")]
-    private partial void LogFalhaTransiente(string jobId, int tentativa, Exception ex);
+    private partial void LogFalhaTransiente(Guid jobId, int tentativa, Exception ex);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Onboarding {JobId} esgotou as tentativas — enviado para a DLQ")]
-    private partial void LogTentativasEsgotadas(string jobId, Exception ex);
+    private partial void LogTentativasEsgotadas(Guid jobId, Exception ex);
 }

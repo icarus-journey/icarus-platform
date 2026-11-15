@@ -17,6 +17,7 @@ public sealed record CriarMissaoRequest(
     string? Descricao,
     string? Beneficio,
     Dificuldade Dificuldade,
+    int Pontuacao,
     DateOnly? DataLimite,
     string? Horario,
     TipoRecorrencia? Recorrencia,

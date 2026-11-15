@@ -22,6 +22,7 @@ public sealed partial class AtualizarEpicoUseCase(
 
         var epico = await epicoRepository.BuscarPorIdAsync(command.EpicoId, command.UsuarioIdSolicitado, cancellationToken)
             ?? throw new EpicoNaoEncontradoException();
+        if (epico.Estado == EstadoEpico.Excluido) throw new EpicoNaoEncontradoException();
 
         if (epico.Estado == EstadoEpico.Concluido)
         {

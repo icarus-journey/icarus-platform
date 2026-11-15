@@ -1,3 +1,4 @@
+using Icarus.Application.UseCases.ExcluirCampanha;
 using Icarus.Application.UseCases.ConsultarProgressoCampanha;
 using Icarus.Application.UseCases.RegistrarProgressoCampanha;
 using System.Security.Claims;
@@ -14,6 +15,7 @@ namespace Icarus.Api.Controllers;
 [ApiController]
 [Route("api/usuarios/{usuarioId:guid}/campanhas")]
 public class CampanhasController(
+    ExcluirCampanhaUseCase excluirCampanha,
     CriarCampanhaUseCase criarCampanha,
     AtualizarCampanhaUseCase atualizarCampanha,
     ConcluirCampanhaUseCase concluirCampanha,
@@ -93,6 +95,19 @@ public class CampanhasController(
     public async Task<IActionResult> RegistrarProgresso(Guid usuarioId, long campanhaId, RegistrarProgressoCampanhaRequest dados, CancellationToken ct)
         => Ok(ProgressoCampanhaResponse.DoResultado(await registrarProgresso.ExecuteAsync(new(ObterUsuarioIdAutenticado(), usuarioId, campanhaId,
             dados.ValorAtual!.Value, dados.VersaoEsperada, dados.OperacaoId), ct)));
+
+    /// <summary>Exclusão lógica com preservação do histórico e dos pontos. Repetição segura.</summary>
+    [Authorize]
+    [HttpDelete("{campanhaId:long}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Excluir(Guid usuarioId, long campanhaId, CancellationToken ct)
+    {
+        await excluirCampanha.ExecuteAsync(new(ObterUsuarioIdAutenticado(), usuarioId, campanhaId), ct);
+        return NoContent();
+    }
 
     private Guid ObterUsuarioIdAutenticado() => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 

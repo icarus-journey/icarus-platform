@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Icarus.Application.UnitTests.UseCases.AtualizarMissao;
 
-internal sealed class MissaoRepositorioEmMemoriaParaAtualizar : IMissaoRepository, IUnitOfWork
+internal sealed class MissaoRepositorioEmMemoriaParaAtualizar : IMissaoRepository, IPlanejamentoMissaoRepository, IUnitOfWork
 {
     public List<Missao> Missoes { get; } = [];
 
@@ -26,6 +26,8 @@ internal sealed class MissaoRepositorioEmMemoriaParaAtualizar : IMissaoRepositor
     public Task<List<Missao>> ListarRecorrentesAtivasAsync(CancellationToken cancellationToken)
         => Task.FromResult(Missoes.Where(m => m.Status == StatusMissao.Ativa && m.Recorrencia is not null).ToList());
 
+    public Task<Missao?> BuscarAsync(long id, Guid usuario, CancellationToken ct) => BuscarPorIdAsync(id, usuario, ct);
+
     public Task SalvarAlteracoesAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
@@ -36,22 +38,22 @@ public class AtualizarMissaoUseCaseTests
 
     public AtualizarMissaoUseCaseTests()
     {
-        _useCase = new AtualizarMissaoUseCase(_repositorio, _repositorio, NullLogger<AtualizarMissaoUseCase>.Instance);
+        _useCase = new AtualizarMissaoUseCase(_repositorio, _repositorio, NullLogger<AtualizarMissaoUseCase>.Instance, TimeProvider.System);
     }
 
-    [Fact(DisplayName = "Atualiza missão recalculando a pontuação a partir da nova dificuldade")]
-    public async Task ExecuteAsync_DeveAtualizarRecalculandoPontuacao()
+    [Fact(DisplayName = "Atualiza a missão com a recompensa escolhida, independente da dificuldade")]
+    public async Task ExecuteAsync_DevePreservarRecompensaEscolhida()
     {
         var missao = new Missao { Id = 1, UsuarioId = Guid.NewGuid(), Titulo = "Antiga", Dificuldade = Dificuldade.Trivial, Pontuacao = 15 };
         _repositorio.Missoes.Add(missao);
 
         var command = new AtualizarMissaoCommand(
-            missao.UsuarioId, missao.UsuarioId, missao.Id, "Nova", "descrição", "benefício", Dificuldade.Media, null, "20:00");
+            missao.UsuarioId, missao.UsuarioId, missao.Id, "Nova", "descrição", "benefício", Dificuldade.Media, 211, null, "20:00");
 
         var resultado = await _useCase.ExecuteAsync(command, CancellationToken.None);
 
         Assert.Equal("Nova", resultado.Titulo);
-        Assert.Equal(45, resultado.Pontuacao); // Media
+        Assert.Equal(211, resultado.Pontuacao);
         Assert.Equal(new TimeOnly(20, 0), TimeOnly.FromDateTime(resultado.Horario.DateTime));
     }
 
@@ -60,32 +62,40 @@ public class AtualizarMissaoUseCaseTests
     {
         var missao = new Missao
         {
-            Id = 1, UsuarioId = Guid.NewGuid(), Titulo = "Concluída", Dificuldade = Dificuldade.Facil,
-            Pontuacao = 30, ConcluidaEm = DateTimeOffset.UtcNow
+            Id = 1,
+            UsuarioId = Guid.NewGuid(),
+            Titulo = "Concluída",
+            Dificuldade = Dificuldade.Facil,
+            Pontuacao = 30,
+            ConcluidaEm = DateTimeOffset.UtcNow
         };
         _repositorio.Missoes.Add(missao);
 
         var command = new AtualizarMissaoCommand(
-            missao.UsuarioId, missao.UsuarioId, missao.Id, "Novo título", null, null, Dificuldade.Media, null, null);
+            missao.UsuarioId, missao.UsuarioId, missao.Id, "Novo título", null, null, Dificuldade.Media, 45, null, null);
 
         await Assert.ThrowsAsync<MissaoConcluidaException>(() => _useCase.ExecuteAsync(command, CancellationToken.None));
         Assert.Equal("Concluída", missao.Titulo); // não foi alterada
     }
 
-    [Fact(DisplayName = "Missão recorrente nunca é editável, concluída ou não — edição lança MissaoRecorrenteImutavelException")]
+    [Fact(DisplayName = "Missão recorrente exige configuração explícita e versão para editar")]
     public async Task ExecuteAsync_DeveLancarExcecaoQuandoMissaoRecorrente()
     {
         var missao = new Missao
         {
-            Id = 1, UsuarioId = Guid.NewGuid(), Titulo = "Beber água", Dificuldade = Dificuldade.Trivial, Pontuacao = 15,
+            Id = 1,
+            UsuarioId = Guid.NewGuid(),
+            Titulo = "Beber água",
+            Dificuldade = Dificuldade.Trivial,
+            Pontuacao = 15,
             Recorrencia = new Recorrencia { MissaoId = 1, Tipo = "DIARIA", DataInicio = DateOnly.FromDateTime(DateTime.UtcNow) }
         };
         _repositorio.Missoes.Add(missao);
 
         var command = new AtualizarMissaoCommand(
-            missao.UsuarioId, missao.UsuarioId, missao.Id, "Novo título", null, null, Dificuldade.Media, null, null);
+            missao.UsuarioId, missao.UsuarioId, missao.Id, "Novo título", null, null, Dificuldade.Media, 45, null, null);
 
-        await Assert.ThrowsAsync<MissaoRecorrenteImutavelException>(() => _useCase.ExecuteAsync(command, CancellationToken.None));
+        await Assert.ThrowsAsync<EdicaoMissaoException>(() => _useCase.ExecuteAsync(command, CancellationToken.None));
         Assert.Equal("Beber água", missao.Titulo); // não foi alterada
     }
 
@@ -93,7 +103,7 @@ public class AtualizarMissaoUseCaseTests
     public async Task ExecuteAsync_DeveLancarExcecaoQuandoMissaoNaoExiste()
     {
         var usuarioId = Guid.NewGuid();
-        var command = new AtualizarMissaoCommand(usuarioId, usuarioId, 999, "Título", null, null, Dificuldade.Facil, null, null);
+        var command = new AtualizarMissaoCommand(usuarioId, usuarioId, 999, "Título", null, null, Dificuldade.Facil, 30, null, null);
 
         await Assert.ThrowsAsync<MissaoNaoEncontradaException>(() => _useCase.ExecuteAsync(command, CancellationToken.None));
     }
@@ -103,8 +113,24 @@ public class AtualizarMissaoUseCaseTests
     {
         var meuId = Guid.NewGuid();
         var idDeOutroUsuario = Guid.NewGuid();
-        var command = new AtualizarMissaoCommand(meuId, idDeOutroUsuario, 1, "Título", null, null, Dificuldade.Facil, null, null);
+        var command = new AtualizarMissaoCommand(meuId, idDeOutroUsuario, 1, "Título", null, null, Dificuldade.Facil, 30, null, null);
 
         await Assert.ThrowsAsync<PerfilNaoEncontradoException>(() => _useCase.ExecuteAsync(command, CancellationToken.None));
     }
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(1_000_001)]
+    public async Task RecompensaInvalidaNaoAlteraMissao(int pontuacao)
+    {
+        var usuario = Guid.NewGuid();
+        var missao = new Missao { Id = 7, UsuarioId = usuario, Titulo = "Título original", Pontuacao = 137 };
+        _repositorio.Missoes.Add(missao);
+        var comando = new AtualizarMissaoCommand(usuario, usuario, 7, "Outro título", null, null, Dificuldade.Dificil, pontuacao, null, null);
+        var erro = await Assert.ThrowsAsync<EdicaoMissaoException>(() => _useCase.ExecuteAsync(comando, default));
+        Assert.Equal("pontuacao_invalida", erro.Codigo);
+        Assert.Equal("Título original", missao.Titulo);
+        Assert.Equal(137, missao.Pontuacao);
+    }
+
 }

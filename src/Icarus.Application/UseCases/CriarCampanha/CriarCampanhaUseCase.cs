@@ -24,6 +24,7 @@ public sealed partial class CriarCampanhaUseCase(
 
         var epico = await epicoRepository.BuscarPorIdAsync(command.EpicoId, command.UsuarioIdSolicitado, cancellationToken)
             ?? throw new EpicoNaoEncontradoException();
+        if (epico.Estado == EstadoEpico.Excluido) throw new EpicoNaoEncontradoException();
 
         if (epico.Estado == EstadoEpico.Concluido)
         {
@@ -51,6 +52,7 @@ public sealed partial class CriarCampanhaUseCase(
             ValorAtual = command.ValorMensurado is null ? null : 0
         };
 
+        epico.AtualizadoEm = relogio.GetUtcNow();
         await campanhaRepository.AdicionarAsync(campanha, cancellationToken);
         await unitOfWork.SalvarAlteracoesAsync(cancellationToken);
 

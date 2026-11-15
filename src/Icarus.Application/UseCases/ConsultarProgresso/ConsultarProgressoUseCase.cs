@@ -16,9 +16,11 @@ public sealed class ConsultarProgressoUseCase(IUsuarioRepository usuarios, IIndi
         var calculado = await indicadores.CalcularProgressoAsync(usuario.Id, periodo, ct);
         var dados = calculado.Indicadores;
         return new(dados.QuantidadeRegistros == 0 ? "sem_registros" : "disponivel", periodo, dados,
-            "historico_mensurado_indisponivel", dados.QuantidadeRegistros == 0
+            calculado.Objetivos is null ? "historico_mensurado_indisponivel" : "por_campanha", dados.QuantidadeRegistros == 0
                 ? "Ainda não há registros neste período. Isso não significa que você não realizou atividades."
                 : "Estes indicadores resumem apenas os registros do aplicativo, não sua rotina inteira.",
-            Evolucao: calculado.Evolucao);
+            Evolucao: calculado.Evolucao, Adesao: calculado.Adesao, Objetivos: calculado.Objetivos, ComparacaoSemanal: calculado.ComparacaoSemanal,
+            DiferencaFeitasSemanaAnterior: calculado.ComparacaoSemanal is { PodeCompararSemanaAnterior: true } comparacao
+                ? comparacao.Semana.Concluidas - comparacao.SemanasAnteriores[0].Concluidas : null);
     }
 }

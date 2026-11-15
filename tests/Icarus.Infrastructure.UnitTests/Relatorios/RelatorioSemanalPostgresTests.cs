@@ -41,15 +41,35 @@ public sealed class RelatorioSemanalPostgresTests(BancoLoja banco) : IClassFixtu
         usuario.FusoHorario = "America/Sao_Paulo";
         if (comDados)
         {
-            var missao = new Missao { UsuarioId = id, Titulo = "Título pessoal proibido", Descricao = "Diário ou texto livre proibido",
-                Dificuldade = Dificuldade.Facil, Pontuacao = 30, DataLimite = new(2026, 10, 18), Horario = _relogio.Agora };
+            var missao = new Missao
+            {
+                UsuarioId = id,
+                Titulo = "Título pessoal proibido",
+                Descricao = "Diário ou texto livre proibido",
+                Dificuldade = Dificuldade.Facil,
+                Pontuacao = 30,
+                DataLimite = new(2026, 10, 18),
+                Horario = _relogio.Agora
+            };
             contexto.Missoes.Add(missao);
-            contexto.Ocorrencias.Add(new() { Missao = missao, DataPrevista = new(2026, 10, 18),
-                Status = StatusOcorrencia.Concluida, RealizadaEm = DateTimeOffset.Parse("2026-10-19T02:59:59Z", CultureInfo.InvariantCulture), ConcluidaEm = _relogio.Agora });
+            contexto.Ocorrencias.Add(new()
+            {
+                Missao = missao,
+                DataPrevista = new(2026, 10, 18),
+                Status = StatusOcorrencia.Concluida,
+                RealizadaEm = DateTimeOffset.Parse("2026-10-19T02:59:59Z", CultureInfo.InvariantCulture),
+                ConcluidaEm = _relogio.Agora
+            });
             var fora = new Missao { UsuarioId = id, Titulo = "Fora do período", Dificuldade = Dificuldade.Facil, Horario = _relogio.Agora };
             contexto.Missoes.Add(fora);
-            contexto.Ocorrencias.Add(new() { Missao = fora, DataPrevista = new(2026, 10, 19),
-                Status = StatusOcorrencia.Concluida, RealizadaEm = DateTimeOffset.Parse("2026-10-19T03:00:00Z", CultureInfo.InvariantCulture), ConcluidaEm = _relogio.Agora });
+            contexto.Ocorrencias.Add(new()
+            {
+                Missao = fora,
+                DataPrevista = new(2026, 10, 19),
+                Status = StatusOcorrencia.Concluida,
+                RealizadaEm = DateTimeOffset.Parse("2026-10-19T03:00:00Z", CultureInfo.InvariantCulture),
+                ConcluidaEm = _relogio.Agora
+            });
         }
         await contexto.SaveChangesAsync();
         return id;
@@ -64,7 +84,7 @@ public sealed class RelatorioSemanalPostgresTests(BancoLoja banco) : IClassFixtu
     }
 
     private static ResultadoRelatorioSemanal Resultado(SolicitacaoRelatorioSemanal entrada, string resumo = "Você registrou uma conclusão no período.") =>
-        new(Guid.NewGuid(), entrada.CorrelacaoId, entrada.IdMensagem, "relatorio.semanal.resultado", "1.0.0",
+        new(Guid.NewGuid(), entrada.CorrelacaoId, entrada.IdMensagem, "relatorio.semanal.resultado", entrada.VersaoContrato,
             entrada.CriadaEm.AddSeconds(1), entrada.ExpiraEm, entrada.ChaveIdempotencia, entrada.Periodo, "concluido",
             new("Seus registros da semana", resumo, "Considere revisar o próximo passo do seu planejamento.", "Qual pequeno ajuste faz sentido para você?"),
             null, new("ollama", "modelo-de-teste"));
@@ -106,6 +126,8 @@ public sealed class RelatorioSemanalPostgresTests(BancoLoja banco) : IClassFixtu
         var consulta = await Consulta(leitura).ExecuteAsync(new(id, id), default);
         Assert.Equal("disponivel", consulta.Estado);
         Assert.Equal(resultado.Conteudo!.Resumo, consulta.Relatorio!.Texto.Resumo);
+        Assert.Equal(ContratoRelatorioSemanal.Versao, consulta.Relatorio.VersaoIndicadores);
+        Assert.NotNull(consulta.Relatorio.ComparacaoSemanal);
         Assert.Single(await leitura.Relatorios.Where(r => r.UsuarioId == id).ToListAsync());
         Assert.Equal(2, await leitura.Set<InboxRelatorio>().CountAsync(i => i.TrabalhoId == entrada.CorrelacaoId));
         var repetir = await Solicitacao(leitura).ExecuteAsync(new(id, id, true), default);
@@ -184,5 +206,50 @@ public sealed class RelatorioSemanalPostgresTests(BancoLoja banco) : IClassFixtu
     private sealed class UnidadeComFalha(IcarusDbContext contexto) : IUnitOfWork
     {
         public async Task SalvarAlteracoesAsync(CancellationToken ct) { await contexto.SaveChangesAsync(ct); throw new InvalidOperationException("Falha simulada antes do commit."); }
+    }
+
+    [FatoPostgres]
+    public async Task ResultadoAntigoEmTransitoEPersistidoContinuaLegivelSemNovaGeracao()
+    {
+        var id = await PrepararAsync();
+        await using (var c = banco.NovoContexto()) await Solicitacao(c).ExecuteAsync(new(id, id), default);
+        var entrada = await MensagemAsync(id);
+        await using (var c = banco.NovoContexto())
+        {
+            var trabalho = await c.Set<TrabalhoRelatorioSemanal>().SingleAsync(t => t.UsuarioId == id);
+            var dados = ContratoRelatorioSemanal.LerIndicadores(trabalho.Indicadores).Indicadores;
+            trabalho.Indicadores = JsonSerializer.Serialize(dados, ContratoRelatorioSemanal.Json);
+            await c.SaveChangesAsync();
+            await Persistencia(c).ExecuteAsync(Resultado(entrada) with { VersaoContrato = "1.0.0" }, default);
+            var salvo = await c.Relatorios.SingleAsync(r => r.UsuarioId == id);
+            using var documento = JsonDocument.Parse(salvo.Conteudo);
+            // Reproduz o formato persistido anterior, sem campos opcionais de comparação/versão.
+            salvo.Conteudo = JsonSerializer.Serialize(new
+            {
+                texto = documento.RootElement.GetProperty("texto"),
+                indicadores = documento.RootElement.GetProperty("indicadores"),
+                geracao = documento.RootElement.GetProperty("geracao")
+            });
+            await c.SaveChangesAsync();
+        }
+        await using var leitura = banco.NovoContexto();
+        var original = (await leitura.Relatorios.SingleAsync(r => r.UsuarioId == id)).Conteudo;
+        var consulta = await Solicitacao(leitura).ExecuteAsync(new(id, id, true), default);
+        Assert.Equal("disponivel", consulta.Estado); Assert.Equal("1.0.0", consulta.Relatorio!.VersaoIndicadores);
+        Assert.Null(consulta.Relatorio.ComparacaoSemanal);
+        Assert.Equal(original, (await leitura.Relatorios.AsNoTracking().SingleAsync(r => r.UsuarioId == id)).Conteudo);
+        Assert.Equal(1, await leitura.Set<OutboxRelatorio>().CountAsync(o => o.TrabalhoId == entrada.CorrelacaoId));
+    }
+
+    [FatoPostgres]
+    public async Task ResultadoDeOutraVersaoNaoAplicaIndicadoresNovos()
+    {
+        var id = await PrepararAsync();
+        await using (var c = banco.NovoContexto()) await Solicitacao(c).ExecuteAsync(new(id, id), default);
+        var entrada = await MensagemAsync(id);
+        await using var leitura = banco.NovoContexto();
+        await Persistencia(leitura).ExecuteAsync(Resultado(entrada) with { VersaoContrato = "1.0.0" }, default);
+        Assert.Empty(await leitura.Relatorios.Where(r => r.UsuarioId == id).ToListAsync());
+        Assert.Equal("falha", (await Consulta(leitura).ExecuteAsync(new(id, id), default)).Estado);
     }
 }

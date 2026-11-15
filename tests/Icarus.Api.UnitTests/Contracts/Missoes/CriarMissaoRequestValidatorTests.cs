@@ -9,7 +9,7 @@ public class CriarMissaoRequestValidatorTests
     private readonly CriarMissaoRequestValidator _validator = new();
 
     private static CriarMissaoRequest RequisicaoValida() => new(
-        null, "Caminhada", "descrição", "benefício", Dificuldade.Facil, null, null, null, null, null);
+        null, "Caminhada", "descrição", "benefício", Dificuldade.Facil, 30, null, null, null, null, null);
 
     [Fact(DisplayName = "Requisição válida não gera nenhum erro")]
     public void Validate_DeveAceitarRequisicaoValida()
@@ -67,13 +67,13 @@ public class CriarMissaoRequestValidatorTests
         resultado.ShouldNotHaveAnyValidationErrors();
     }
 
-    [Fact(DisplayName = "DataFimRecorrencia no passado é rejeitada")]
+    [Fact(DisplayName = "Data civil é validada no caso de uso com o fuso do titular")]
     public void Validate_DeveRejeitarDataFimRecorrenciaNoPassado()
     {
         var ontem = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1);
         var resultado = _validator.TestValidate(RequisicaoValida() with { Recorrencia = TipoRecorrencia.Diaria, DataFimRecorrencia = ontem });
 
-        resultado.ShouldHaveValidationErrorFor(r => r.DataFimRecorrencia);
+        resultado.ShouldNotHaveValidationErrorFor(r => r.DataFimRecorrencia);
     }
 
     [Fact(DisplayName = "DataFimRecorrencia de hoje em diante não gera erro")]
@@ -84,4 +84,34 @@ public class CriarMissaoRequestValidatorTests
 
         resultado.ShouldNotHaveAnyValidationErrors();
     }
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(1_000_001)]
+    public void RejeitaRecompensaForaDoIntervalo(int pontuacao)
+    {
+        _validator.TestValidate(RequisicaoValida() with { Pontuacao = pontuacao })
+            .ShouldHaveValidationErrorFor(r => r.Pontuacao);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(137)]
+    [InlineData(1_000_000)]
+    public void AceitaRecompensaIndependenteDaDificuldade(int pontuacao)
+    {
+        _validator.TestValidate(RequisicaoValida() with { Pontuacao = pontuacao, Dificuldade = Dificuldade.Trivial })
+            .ShouldNotHaveAnyValidationErrors();
+    }
+
+    [Fact]
+    public void CorpoSemPontuacaoNaoRecebeValorPelaDificuldade()
+    {
+        var opcoes = new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web);
+        var campos = System.Text.Json.Nodes.JsonNode.Parse(System.Text.Json.JsonSerializer.Serialize(RequisicaoValida(), opcoes))!.AsObject();
+        campos.Remove("pontuacao");
+        var requisicao = System.Text.Json.JsonSerializer.Deserialize<CriarMissaoRequest>(campos.ToJsonString(), opcoes)!;
+        _validator.TestValidate(requisicao).ShouldHaveValidationErrorFor(r => r.Pontuacao);
+    }
+
 }

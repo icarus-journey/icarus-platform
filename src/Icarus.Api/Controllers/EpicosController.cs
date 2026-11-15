@@ -1,3 +1,4 @@
+using Icarus.Application.UseCases.ExcluirEpico;
 using System.Security.Claims;
 using Icarus.Api.Contracts.Epicos;
 using Icarus.Application.UseCases.AtualizarEpico;
@@ -13,6 +14,7 @@ namespace Icarus.Api.Controllers;
 [ApiController]
 [Route("api/usuarios/{usuarioId:guid}/epicos")]
 public class EpicosController(
+    ExcluirEpicoUseCase excluirEpico,
     CriarEpicoUseCase criarEpico,
     AtualizarEpicoUseCase atualizarEpico,
     ListarEpicosUseCase listarEpicos,
@@ -95,6 +97,19 @@ public class EpicosController(
         var resultado = await concluirEpico.ExecuteAsync(command, cancellationToken);
 
         return Ok(new ConcluirEpicoResponse(resultado.Id, resultado.Estado));
+    }
+
+    /// <summary>Exclusão lógica com preservação do histórico e dos pontos. Repetição segura.</summary>
+    [Authorize]
+    [HttpDelete("{epicoId:long}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Excluir(Guid usuarioId, long epicoId, CancellationToken ct)
+    {
+        await excluirEpico.ExecuteAsync(new(ObterUsuarioIdAutenticado(), usuarioId, epicoId), ct);
+        return NoContent();
     }
 
     private Guid ObterUsuarioIdAutenticado() => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);

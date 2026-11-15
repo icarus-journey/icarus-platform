@@ -3,11 +3,28 @@ namespace Icarus.Application.Common;
 public sealed record MedicaoConquista(DateOnly Data, decimal Valor, decimal Alvo, string Unidade, bool Correcao = false);
 
 public sealed record CenarioConquista(bool Disponivel, string Motivo, decimal? RitmoSemanal = null,
-    decimal? Faltante = null, int? SemanasAproximadas = null);
+    decimal? Faltante = null, int? SemanasAproximadas = null, PrazoCenario? Prazo = null);
+
+public sealed record PrazoCenario(DateOnly Referencia, DateOnly ConclusaoEstimada, DateOnly PrazoFim,
+    int DiasAtePrazo, int MargemDias, decimal? RitmoSemanalNecessario, string Situacao);
 
 /// <summary>Cenário aritmético condicional; não estima probabilidade ou efeito de hábitos.</summary>
 public static class CalculadorCenarioConquista
 {
+    public static CenarioConquista RelacionarPrazo(CenarioConquista cenario, DateOnly referencia, DateOnly prazo)
+    {
+        if (!cenario.Disponivel || cenario.SemanasAproximadas is not > 0 || prazo == DateOnly.MinValue) return cenario;
+        var dias = (long)cenario.SemanasAproximadas.Value * 7;
+        if (dias > DateOnly.MaxValue.DayNumber - referencia.DayNumber)
+            return new(false, "projecao_fora_dos_limites");
+        var conclusao = referencia.AddDays((int)dias);
+        var restantes = prazo.DayNumber - referencia.DayNumber;
+        var margem = prazo.DayNumber - conclusao.DayNumber;
+        return cenario with { Prazo = new(referencia, conclusao, prazo, restantes, margem,
+            restantes > 0 ? decimal.Round(cenario.Faltante!.Value * 7 / restantes, 2) : null,
+            margem > 0 ? "antes_do_prazo" : margem == 0 ? "no_prazo" : "depois_do_prazo") };
+    }
+
     public static CenarioConquista Calcular(IEnumerable<MedicaoConquista> historico, DateOnly referencia)
     {
         var medicoes = historico.OrderBy(m => m.Data).ToArray();

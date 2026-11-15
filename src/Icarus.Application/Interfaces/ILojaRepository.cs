@@ -6,6 +6,8 @@ public interface ILojaRepository
 {
     /// <summary>Bloqueia o saldo antes de ler itens; confirma tudo ou reverte tudo.</summary>
     Task ExecutarAsync(Guid usuarioId, Func<Usuario, CancellationToken, Task> operacao, CancellationToken cancelamento);
+    /// <summary>Concilia a proteção sob o mesmo bloqueio antes de montar a consulta, sem repetir após a leitura.</summary>
+    Task ExecutarConsultaAsync(Guid usuarioId, Func<Usuario, CancellationToken, Task> consulta, CancellationToken cancelamento);
     Task<List<Item>> ListarItensAsync(Guid usuarioId, CancellationToken cancelamento);
     Task<List<ResgateItem>> ListarResgatesAsync(Guid usuarioId, CancellationToken cancelamento);
     Task AdicionarItemAsync(Item item, CancellationToken cancelamento);
