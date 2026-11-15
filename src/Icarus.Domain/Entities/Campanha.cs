@@ -9,8 +9,15 @@ public class Campanha : EntidadeBase
     public long Id { get; set; }
     public long EpicoId { get; set; }
     public string Titulo { get; set; } = string.Empty;
-    public int Priorizacao { get; set; }
-    public string Cor { get; set; } = string.Empty;
+
+    /// <summary>Copiada do Épico ao criar — não é escolhida independentemente pela campanha.</summary>
+    public AreaDaVida AreaDaVida { get; set; }
+
+    public Dificuldade Dificuldade { get; set; }
+
+    /// <summary>Calculada a partir de <see cref="Dificuldade"/> (ver MapeadorPontuacao) — nunca atribuída diretamente.</summary>
+    public int Pontuacao { get; set; }
+
     public string? Descricao { get; set; }
     public DateOnly PrazoInicio { get; set; }
     public DateOnly PrazoFim { get; set; }

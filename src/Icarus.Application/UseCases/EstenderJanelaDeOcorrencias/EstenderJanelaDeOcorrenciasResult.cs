@@ -1,0 +1,3 @@
+namespace Icarus.Application.UseCases.EstenderJanelaDeOcorrencias;
+
+public sealed record EstenderJanelaDeOcorrenciasResult(int MissoesProcessadas, int OcorrenciasCriadas, int MissoesInativadasPorFimDaRecorrencia);

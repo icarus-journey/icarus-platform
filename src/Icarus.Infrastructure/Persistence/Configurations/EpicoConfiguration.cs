@@ -8,9 +8,10 @@ public class EpicoConfiguration : IEntityTypeConfiguration<Epico>
 {
     public void Configure(EntityTypeBuilder<Epico> builder)
     {
-        builder.ToTable("epico");
+        builder.ToTable("epico", t => t.HasCheckConstraint("ck_epico_pontuacao_nao_negativa", "pontuacao >= 0"));
 
         builder.HasKey(e => e.Id);
+        builder.Property(e => e.AtualizadoEm).IsConcurrencyToken();
 
         builder.Property(e => e.Titulo)
             .IsRequired()
@@ -18,10 +19,12 @@ public class EpicoConfiguration : IEntityTypeConfiguration<Epico>
 
         builder.Property(e => e.AreaDaVida)
             .IsRequired()
-            .HasMaxLength(100);
+            .HasConversion<string>()
+            .HasMaxLength(30);
 
-        builder.Property(e => e.Cor)
+        builder.Property(e => e.Dificuldade)
             .IsRequired()
+            .HasConversion<string>()
             .HasMaxLength(20);
 
         builder.Property(e => e.Estado)

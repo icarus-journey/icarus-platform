@@ -13,6 +13,22 @@ public class Usuario : EntidadeBase
 
     public DateOnly DataNascimento { get; set; }
 
+    public bool? Estuda { get; set; }
+    public decimal? CargaHorariaEstudoSemanal { get; set; }
+    public bool? Trabalha { get; set; }
+    public decimal? CargaHorariaTrabalhoSemanal { get; set; }
+    public int? SonoHabitualMinutos { get; set; }
+    public int? MetaSonoMinutos { get; set; }
+    public Guid VersaoRelatoSono { get; set; }
+    public DateTimeOffset? SonoInformadoEm { get; set; }
+    public string? FusoHorario { get; set; }
+    public DateTimeOffset ProtecaoAtivadaEm { get; set; }
+    public string? FusoInicioProtecao { get; set; }
+    public DateTimeOffset PlanejamentoVersionadoDesde { get; set; }
+
+    /// <summary>Chave do objeto no MinIO (bucket de fotos de perfil); nula quando o usuário não tem foto.</summary>
+    public string? FotoChave { get; set; }
+
     /// <summary>
     /// Saldo atual, mantido em sincronia com <see cref="MovimentacaoPontos"/> na mesma transação.
     /// </summary>
@@ -28,4 +44,5 @@ public class Usuario : EntidadeBase
     public ICollection<InventarioItem> InventarioItens { get; set; } = new List<InventarioItem>();
     public ICollection<MovimentacaoPontos> MovimentacoesPontos { get; set; } = new List<MovimentacaoPontos>();
     public ICollection<TokenRenovacao> TokensRenovacao { get; set; } = new List<TokenRenovacao>();
+    public ICollection<TrabalhoOnboarding> TrabalhosOnboarding { get; set; } = new List<TrabalhoOnboarding>();
 }

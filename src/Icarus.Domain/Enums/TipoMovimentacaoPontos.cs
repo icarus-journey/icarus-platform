@@ -8,5 +8,6 @@ public enum TipoMovimentacaoPontos
     GanhoMissao,
     Bonus,
     CompraItem,
-    Ajuste
+    Ajuste,
+    EstornoResgate
 }

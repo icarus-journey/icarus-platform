@@ -1,4 +1,5 @@
 using Icarus.Domain.Common;
+using Icarus.Domain.Enums;
 
 namespace Icarus.Domain.Entities;
 
@@ -12,6 +13,8 @@ public class Diario : EntidadeBase
     public DateOnly DataRegistro { get; set; }
 
     public string Texto { get; set; } = string.Empty;
+    public TipoEntradaDiario Tipo { get; set; } = TipoEntradaDiario.Reflexao;
+    public DateTimeOffset? ExcluidaEm { get; set; }
 
     public Usuario Usuario { get; set; } = null!;
 }
