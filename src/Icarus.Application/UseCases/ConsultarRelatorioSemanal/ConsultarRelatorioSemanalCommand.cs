@@ -1,0 +1,2 @@
+namespace Icarus.Application.UseCases.ConsultarRelatorioSemanal;
+public sealed record ConsultarRelatorioSemanalCommand(Guid UsuarioIdAutenticado, Guid UsuarioIdSolicitado);

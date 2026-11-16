@@ -1,0 +1,328 @@
+{
+  "$defs": {
+    "ConclusoesPorArea": {
+      "additionalProperties": false,
+      "properties": {
+        "areaDaVida": {
+          "enum": [
+            "CORPO_E_SAUDE",
+            "SONO_E_RECUPERACAO",
+            "MENTE_E_EMOCOES",
+            "ESTUDOS_E_APRENDIZADO",
+            "TRABALHO_E_CARREIRA",
+            "FINANCAS",
+            "RELACIONAMENTOS_E_COMUNIDADE",
+            "CASA_E_VIDA_PRATICA",
+            "LAZER_E_CRIATIVIDADE",
+            "PROPOSITO_E_ESPIRITUALIDADE"
+          ],
+          "title": "Areadavida",
+          "type": "string"
+        },
+        "concluidas": {
+          "minimum": 0,
+          "title": "Concluidas",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "areaDaVida",
+        "concluidas"
+      ],
+      "title": "ConclusoesPorArea",
+      "type": "object"
+    },
+    "IndicadoresPermitidos": {
+      "additionalProperties": false,
+      "properties": {
+        "sequencia": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Sequencia"
+        },
+        "pontosGanhos": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Pontosganhos"
+        },
+        "pontosUtilizados": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Pontosutilizados"
+        },
+        "previstas": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Previstas"
+        },
+        "concluidas": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Concluidas"
+        },
+        "pendentes": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Pendentes"
+        },
+        "atrasadas": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Atrasadas"
+        },
+        "concluidasComAtraso": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Concluidascomatraso"
+        },
+        "taxaConclusao": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Taxaconclusao"
+        },
+        "distribuicaoPorArea": {
+          "items": {
+            "$ref": "#/$defs/ConclusoesPorArea"
+          },
+          "maxItems": 10,
+          "title": "Distribuicaoporarea",
+          "type": "array"
+        },
+        "maiorAtividadeDeCampanha": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Maioratividadedecampanha"
+        },
+        "progressoManualCampanhas": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Progressomanualcampanhas"
+        },
+        "recompensasResgatadas": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Recompensasresgatadas"
+        },
+        "recompensasUtilizadas": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Recompensasutilizadas"
+        },
+        "historicoInsuficienteComparacao": {
+          "title": "Historicoinsuficientecomparacao",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "sequencia",
+        "pontosGanhos",
+        "pontosUtilizados",
+        "previstas",
+        "concluidas",
+        "pendentes",
+        "atrasadas",
+        "concluidasComAtraso",
+        "taxaConclusao",
+        "distribuicaoPorArea",
+        "maiorAtividadeDeCampanha",
+        "progressoManualCampanhas",
+        "recompensasResgatadas",
+        "recompensasUtilizadas",
+        "historicoInsuficienteComparacao"
+      ],
+      "title": "IndicadoresPermitidos",
+      "type": "object"
+    },
+    "PeriodoSemanal": {
+      "additionalProperties": false,
+      "properties": {
+        "inicio": {
+          "format": "date",
+          "title": "Inicio",
+          "type": "string"
+        },
+        "fim": {
+          "format": "date",
+          "title": "Fim",
+          "type": "string"
+        },
+        "fusoHorario": {
+          "maxLength": 100,
+          "minLength": 1,
+          "title": "Fusohorario",
+          "type": "string"
+        }
+      },
+      "required": [
+        "inicio",
+        "fim",
+        "fusoHorario"
+      ],
+      "title": "PeriodoSemanal",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "idMensagem": {
+      "format": "uuid",
+      "title": "Idmensagem",
+      "type": "string"
+    },
+    "correlacaoId": {
+      "format": "uuid",
+      "title": "Correlacaoid",
+      "type": "string"
+    },
+    "causalidadeId": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Causalidadeid"
+    },
+    "tipo": {
+      "const": "relatorio.semanal.solicitar",
+      "title": "Tipo",
+      "type": "string"
+    },
+    "versaoContrato": {
+      "const": "1.0.0",
+      "title": "Versaocontrato",
+      "type": "string"
+    },
+    "criadaEm": {
+      "format": "date-time",
+      "title": "Criadaem",
+      "type": "string"
+    },
+    "expiraEm": {
+      "format": "date-time",
+      "title": "Expiraem",
+      "type": "string"
+    },
+    "chaveIdempotencia": {
+      "maxLength": 100,
+      "minLength": 1,
+      "title": "Chaveidempotencia",
+      "type": "string"
+    },
+    "periodo": {
+      "$ref": "#/$defs/PeriodoSemanal"
+    },
+    "indicadores": {
+      "$ref": "#/$defs/IndicadoresPermitidos"
+    }
+  },
+  "required": [
+    "idMensagem",
+    "correlacaoId",
+    "causalidadeId",
+    "tipo",
+    "versaoContrato",
+    "criadaEm",
+    "expiraEm",
+    "chaveIdempotencia",
+    "periodo",
+    "indicadores"
+  ],
+  "title": "SolicitacaoRelatorioSemanal",
+  "type": "object"
+}

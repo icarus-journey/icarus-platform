@@ -2,3 +2,243 @@
 
 Contém a API, o processamento assíncrono, as regras de negócio e a persistência
 dos dados transacionais do Icarus.
+
+Loja autenticada: [`05-contrato-da-loja.md`](../icarus-context/docs/implementation-design/platform/05-contrato-da-loja.md)
+(RF-06.1 a RF-06.4). Configure o preço da proteção por `Loja__CustoProtecao`
+(padrão: 500 pontos). O consumo automático diário está integrado no MVP-10, descrito ao final.
+
+Perfil autenticado: [`04-contrato-de-autenticacao.md`](../icarus-context/docs/implementation-design/platform/04-contrato-de-autenticacao.md).
+A consulta existente inclui estudo/trabalho opcionais; `PUT /api/usuarios/{id}/perfil`
+atualiza esses quatro campos e `PUT /api/usuarios/{id}/fuso` mantém o fuso IANA.
+Cadastro e saldo permanecem protegidos por contratos separados.
+
+## Recompensa manual das missões
+
+Criação (`POST /api/usuarios/{id}/missoes`) e edição (`PATCH .../{missaoId}`)
+exigem `pontuacao`, inteiro de 1 a 1.000.000 escolhido pela pessoa, independente
+da dificuldade. Campo omitido/inválido retorna `400`; não há valor automático.
+Em recorrentes, a alteração vale a partir de amanhã, preservando hoje, atrasos,
+conclusões e extrato. Crédito continua único e ocorre somente ao concluir.
+Contrato de escrita [2.0.0, arquitetura 9.10](../icarus-context/docs/implementation-design/platform/01-arquitetura-da-solucao.md#escrita-manual-de-missão--contrato-200-em-revisão):
+publicar junto ao mobile compatível. Leituras/conclusão, onboarding legado e
+consumidor da IA permanecem em seus contratos existentes. Sem migration.
+
+A entidade/tabela histórica `Rotina` é preservada, sem CRUD/tela definida nos
+requisitos atuais. Ela é distinta da manutenção diária das recorrências.
+
+## Histórico de missões
+
+`GET /api/usuarios/{id}/historico/missoes` oferece filtro por data prevista,
+estado e campanha/avulsas, com paginação por cursor protegido. Detalhe por ID de
+ocorrência e opções de campanhas ficam nas rotas filhas. A consulta autenticada
+preserva exclusões, planejamento e crédito efetivo, sem escrever no banco nem
+fabricar metadados do legado. Contrato [HTTP 1.0.0](../icarus-context/docs/implementation-design/platform/11-historico-missoes.md).
+Sem migration própria ou alteração na lista RF-10.
+
+## Histórico dos relatórios
+
+`GET /api/usuarios/{id}/relatorios/semanais` lista resultados persistidos com
+cursor protegido; `/{relatorioId}` abre o resultado original. Não gera novamente,
+recalcula indicadores ou atribui referências atuais ao legado. Fuso ausente é
+explícito; origem e configuração preservadas ficam no detalhe. Contrato
+[HTTP 1.0.0](../icarus-context/docs/implementation-design/platform/13-historico-relatorios.md).
+Sem migration ou mudança no consumidor da IA.
+
+## Extrato de pontos
+
+`GET /api/usuarios/{id}/extrato` e `/{movimentoId}` leem o histórico do titular,
+com período/natureza, cursor protegido e saldo disponível agora. Novos créditos,
+resgates e estornos guardam saldo/título na transação; legado permanece nullable.
+Aplicar migration `20261101194820_PreservarSaldoEOrigemMovimentos` antes de subir
+esta revisão. Contrato [HTTP 1.0.0](../icarus-context/docs/implementation-design/platform/12-extrato-pontos.md).
+
+## Diário autenticado
+
+`/api/usuarios/{usuarioId}/diario` permite listar (`GET`), criar (`POST`),
+editar (`PATCH /{entradaId}`) e excluir logicamente (`DELETE /{entradaId}`).
+Tipo (`reflexao`/`deslize`), data e texto de até 10.000 caracteres compõem a
+entrada. A migration `20261025022507_PersistirEntradasDiario` acrescenta tipo e
+data de exclusão, preservando o texto existente. A autorização ocorre no caso
+de uso e na consulta por titular. Diário não altera pontos nem entra na IA.
+Contrato e limites: [Diário](../icarus-context/docs/implementation-design/platform/08-contrato-do-diario.md).
+
+Os testes de Diário usam `ICARUS_TESTES_POSTGRES` para criar/remover um banco
+isolado; verificam persistência, isolamento, exclusão e concorrência.
+
+## Consumo analítico
+
+O cabeçalho usa `GET /api/usuarios/{id}/jornada` (HTTP 1.1.0): saldo disponível
+e sequência por dias distintos de realização, com fuso histórico preservado,
+sete dias de calendário e recálculo de registros retroativos. Ausência de
+metadados relevante retorna incerteza, sem backfill. Leitura consistente do
+PostgreSQL, sem alterar dados ou consumir proteção. Contrato:
+[sequência diária](../icarus-context/docs/implementation-design/platform/10-sequencia-diaria.md).
+
+Referências públicas Gold 2.0.0 são lidas somente do snapshot PostgreSQL vigente
+em `dados_publicos`; a API não executa ETL. HTTP autenticado e isolado por titular (referências/relatório 1.0.0,
+progresso 1.3.0): `GET /api/usuarios/{id}/referencias-publicas` (área e tipo de dia),
+`GET /api/usuarios/{id}/progresso` (períodos completos) e relatório semanal
+`GET /api/usuarios/{id}/relatorios/semanais/atual`, `POST .../semanais` e
+`POST .../semanais/tentar-novamente`. Consulte os contratos
+[Gold/mobile](../icarus-context/docs/implementation-design/platform/06-consumo-analitico-mobile-api.md)
+e [relatório](../icarus-context/docs/implementation-design/platform/07-relatorio-semanal-v1.md).
+
+A migration `AdicionarRelatorioSemanalConfiavel` cria trabalho, inbox/outbox e
+unicidade por período. RabbitMQ e `icarus-ai` geram a síntese real; consultas
+reutilizam o resultado persistido. Sem fuso ou registros, não geram conteúdo.
+Relatório 1.1.0 separa atividade por realização de planejamento/cumprimento por
+semana. Compara o conjunto previstas, concluídas do planejamento e taxa com a
+semana anterior e a média aritmética das quatro anteriores, no mesmo snapshot.
+Legado/lacunas mantêm ausência; semana sem planejamento não vira taxa zero.
+Sequência e medições manuais continuam fora desta entrada. Relatórios válidos
+e resultados 1.0.0 em trânsito permanecem legíveis, sem nova geração.
+
+[Contratos JSON e exemplos RF-10](contracts/relatorio-semanal/v1.1/) são versionados
+em conjunto com a cópia independente do trabalhador. Os exemplos são massa de
+teste e não conteúdo demonstrativo do aplicativo. Rode `dotnet test`; para as
+integrações PostgreSQL, forneça `ICARUS_TESTES_POSTGRES` com uma conexão local
+capaz de criar bancos temporários. Cada fixture usa banco isolado e o remove.
+
+O progresso 1.1.0 acrescenta `evolucao`: `granularidade` (`dia`, `semana`, `mes`)
+e pontos com `inicio`, `fim`, `concluidas`. Semana usa dias; mês usa blocos de
+sete dias desde o primeiro dia, com último bloco parcial; seis meses usa meses
+civis. Série e total usam o mesmo conjunto de realizações no fuso do titular.
+Sem conclusões, a série é ausente; zeros internos indicam datas sem conclusão
+registrada, sem afirmar ausência de atividade. É extensão apenas da leitura
+pessoal HTTP: a mensagem RF-10 e a lista permitida da IA permanecem 1.0.0.
+
+O progresso 1.2.0 acrescenta `adesao`: planejamento vigente ao fechar o período,
+feitas desse conjunto, pendentes, atrasadas e porcentagem calculada na API.
+Atividade realizada e adesão são conjuntos separados. A migração
+`20261031211015_RegistrarPlanejamentoAnalitico` observa o legado somente na
+implantação e preserva novas versões na transação da mutação; não recompõe o
+passado. Legado, janela incompleta e realização sem data deixam a taxa ausente,
+com registros observados disponíveis. Consulta não cria planejamento.
+A integração dessas métricas ao contrato consumidor RF-10 permanece no MVP-13;
+`CalcularAsync` conserva sua base anterior. Detalhes e fórmulas no contrato
+[analítico 1.3.0](../icarus-context/docs/implementation-design/platform/06-consumo-analitico-mobile-api.md).
+
+## Editar missão recorrente
+
+`GET /api/usuarios/{usuarioId}/missoes/{missaoId}` retorna configuração e versão
+HTTP 1.3.0, com `execucao` calculada no fuso do perfil. O `PATCH` existente permite editar a recorrente ativa, incluindo
+frequência, dias, dia mensal e fim opcional; exige `recorrencia` e `versaoEsperada`.
+As mudanças valem a partir de amanhã no fuso do perfil. Hoje, atrasos e
+conclusões ficam intactos; os créditos usam o planejamento da execução e, na
+repetição de uma conclusão, o valor efetivo do extrato. Sem alterar saldo ao editar.
+
+As migrations `20261031002406_PreservarPlanejamentoRecorrente` e
+`20261031003007_VersionarPlanejamentoRecorrente` acrescentam campos nulos de
+planejamento/versão; não reconstroem conclusões nem criam registros retroativos.
+Mudança de regra recalcula a janela futura com cancelamento lógico, reutiliza
+missão/data sem duplicar e respeita os limites da campanha. Conflito reverte a
+transação; parada/encerrada não é editável. Não há conversão entre única e
+recorrente nem mudança de vínculo. Contrato na arquitetura 9.4/9.11.
+
+Criação, manutenção e parada usam o dia local do perfil (UTC para legado sem
+fuso válido). A janela inclusiva hoje–hoje+30 respeita recorrência e campanha;
+seu fim vencido inativa a recorrente sem apagar atrasos/conclusões. Consulta,
+edição e conclusão também sincronizam o encerramento, sem esperar a rotina.
+`execucao` informa `ocorrenciaId`, `podeConcluir`, `concluida`, `codigoBloqueio`,
+`hoje`, `fusoHorario`, `dataPrevista`, `proximaData`, `concluidaEm`, `atrasada` e
+`pontuacao`. O POST de conclusão aceita `{ "ocorrenciaId": 123 }` opcional para
+vincular o envio à execução mostrada; sem corpo, mantém compatibilidade. Nunca
+antecipa datas nem conclui campanha planejada. Repetição retorna `repetida: true`
+e o crédito efetivo, sem novo lançamento. `409` para execução indisponível;
+`404` para identificador alheio/ausente, `401` sem sessão e `400` para corpo
+inválido.
+
+RF-05.2: conclusão usa transação explícita e bloqueia o saldo antes de consultar
+a execução, na ordem da loja. Missões diferentes e resgates compartilham essa
+coordenação; mesma ocorrência confirmada retorna o resultado original com
+`repetida: true`. Crédito/saldo/contador e conclusão são confirmados ou revertidos
+juntos, inclusive após salvar e antes do commit. Versões dos pais preservam os
+conflitos com edição/exclusão/manutenção. A migration
+`20261031143311_GarantirCreditoUnicoPorOcorrencia` cria o índice parcial de um
+`GanhoMissao` por ocorrência não nula, sem alterar dados anteriores. Violação do
+índice retorna `409 dados_atualizados`. O alvo da idempotência é a ocorrência:
+use o identificador do GET para repetir a mesma execução; sem identificador,
+a seleção vigente pode apontar outra pendência. HTTP 1.3.0 e mobile inalterados.
+
+RF-05.1: omitir os campos de realização mantém **agora**, pelo relógio da API.
+Para outro momento, o POST aceita `dataRealizacao` (`YYYY-MM-DD`) e
+`horarioRealizacao` (`HH:mm:ss`) juntos, no fuso do perfil. Futuro e horário civil
+inexistente/ambíguo retornam `400`; `dataPrevistaEsperada` e `fusoHorarioEsperado`
+protegem mudanças durante a edição (`409`). A realização autodeclarada não muda
+a ocorrência planejada nem contorna os bloqueios anteriores. Atraso usa o dia da
+realização, enquanto `concluidaEm` permanece o registro automático.
+Resposta 1.3.0 acrescenta realização, fuso histórico, ocorrência e data prevista;
+retry devolve os valores originais na precisão do PostgreSQL. A persistência
+impede reescrever realização/registro/fuso depois da conclusão. Migration
+`20261031013518_PreservarFusoRealizacaoMissao` acrescenta somente fuso nullable,
+sem preencher legado. A sequência atual já usa essa origem em `/jornada`;
+reconciliação de proteção e relatório persistido permanecem nas respectivas
+entregas; contrato na arquitetura 9.11.
+
+## Exclusão do planejamento
+
+`DELETE /api/usuarios/{usuarioId}/epicos/{id}`, `campanhas/{id}` e
+`missoes/{id}` retornam `204`, inclusive na repetição pelo titular. Exclusão é
+lógica e atômica: retira a hierarquia das listas operacionais, preservando
+conclusões, medições, lançamentos e saldo. Missão não recorrente concluída
+retorna `409`; recorrente ativa/inativa pode ser excluída e cancela somente
+pendências de hoje em diante no fuso do perfil. Identificador alheio/ausente
+retorna `404`; sem autenticação, `401`. Conflito durante a gravação retorna
+`409` e reverte toda a operação. Não requer alteração de esquema.
+Contrato: [arquitetura, exclusão](../icarus-context/docs/implementation-design/platform/01-arquitetura-da-solucao.md#913-exclusão-lógica-do-planejamento).
+
+O progresso 1.3.0 acrescenta `objetivos`: campanhas/épicos atuais e atividade
+no período, lidos no mesmo snapshot. Destaque deriva das realizações dos últimos
+sete dias locais; empate por título pt-BR e ID. Medições mantêm a unidade e
+separam avanço no período de valor/faltante/cenário atuais; épicos usam contagens.
+Legado sem data não gera falsa inatividade ou destaque. A lista RF-10 permanece
+inalterada; nenhum título é enviado ao trabalhador por esta extensão.
+
+## Ciclo e progresso das campanhas
+
+Campanhas iniciam automaticamente na data local do titular (rotina de um minuto
+com recuperação na subida e nas consultas). Configuração só pode ser editada
+quando planejada; em andamento, use o registro de progresso. Concluir inativa
+recorrentes e cancela seus dias pendentes de hoje em diante, preservando
+conclusões, atrasos anteriores, histórico e pontos. Sem migration adicional.
+
+`GET` e `POST /api/usuarios/{usuarioId}/campanhas/{campanhaId}/progresso`
+consultam e registram o total alcançado pelo titular. A migration
+`20261025190803_RegistrarMedicoesCampanha` acrescenta histórico sem alterar
+valores legados. O registro é atômico, exige versão/tentativa e não altera
+saldo ou conclui a campanha automaticamente. A leitura 1.1.0 acrescenta evolução
+e cenário condicional, calculados sobre medições comparáveis pelo
+`CalculadorCenarioConquista`; pontos/XP, revisões, dados antigos ou base
+insuficiente não liberam estimativa. Sem migration adicional ou IA. Contrato e limites:
+[progresso mensurado](../icarus-context/docs/implementation-design/platform/09-progresso-mensurado-campanhas.md).
+## Acesso local pelo aplicativo
+
+Para testar em Android físico ou iPhone na mesma rede, inicie a API com o perfil
+de desenvolvimento `rede-local`:
+
+```bash
+dotnet run --project src/Icarus.Api --launch-profile rede-local
+```
+
+Configure `EXPO_PUBLIC_API_URL=http://IP_DA_MAQUINA:5138` no `icarus-mobile`.
+O perfil `http` padrão continua ligado apenas a `localhost`. Use o perfil
+`rede-local` somente em uma rede de desenvolvimento confiável; o ambiente
+publicado deverá expor a API por HTTPS pelo proxy.
+
+
+## Proteção automática da sequência — MVP-10
+
+A migration `20261031201138_ProtecaoAutomaticaSequencia` acrescenta fechamento,
+consumo auditado, compensação e outbox; aplique via `dotnet ef database update`
+conforme a configuração local. Não cobra faltas anteriores à ativação. Regras e
+transações ficam em C#; `icarus-ai` coordena ciclos de um minuto e encaminha UUIDs
+opacos em `jornada.fechamento.v1`, sem IA ou dados pessoais nesse fluxo.
+Dia protegido mantém a contagem; sequência zerada poupa estoque. Retroativo
+reconcilia cronologicamente, sem apagar usos nem gerar pontos. Devolução
+excedente aguarda vaga; reposição mantém no máximo três unidades disponíveis.
+A Loja sincroniza o fechamento sob o bloqueio do titular. `/jornada` 1.1.0
+acrescenta `dias[].protegida` e `protecoesPendentes`; a leitura continua isolada e
+sem gravação. `RabbitMq:Vhost` permite separar o transporte em testes (padrão `/`).
+Testes PostgreSQL usam banco exclusivo por fixture e verificam duplicatas,
+concorrência, rollback, fuso, estoque, retroativo e falha de conexão ao broker.
+Contrato: [jornada e transporte operacional](../icarus-context/docs/implementation-design/platform/10-sequencia-diaria.md).

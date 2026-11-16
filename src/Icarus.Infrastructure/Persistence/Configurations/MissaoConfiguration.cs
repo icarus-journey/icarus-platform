@@ -11,10 +11,16 @@ public class MissaoConfiguration : IEntityTypeConfiguration<Missao>
         builder.ToTable("missao", t => t.HasCheckConstraint("ck_missao_pontuacao_nao_negativa", "pontuacao >= 0"));
 
         builder.HasKey(m => m.Id);
+        builder.Property(e => e.AtualizadoEm).IsConcurrencyToken();
 
         builder.Property(m => m.Titulo)
             .IsRequired()
             .HasMaxLength(200);
+
+        builder.Property(m => m.Dificuldade)
+            .IsRequired()
+            .HasConversion<string>()
+            .HasMaxLength(20);
 
         builder.Property(m => m.Status)
             .IsRequired()

@@ -1,0 +1,27 @@
+{
+  "idMensagem": "33333333-3333-4333-8333-333333333333",
+  "correlacaoId": "22222222-2222-4222-8222-222222222222",
+  "causalidadeId": "11111111-1111-4111-8111-111111111111",
+  "tipo": "relatorio.semanal.resultado",
+  "versaoContrato": "1.0.0",
+  "criadaEm": "2026-10-20T12:00:20Z",
+  "expiraEm": "2026-10-20T12:05:00Z",
+  "chaveIdempotencia": "22222222-2222-4222-8222-222222222222:1",
+  "periodo": {
+    "inicio": "2026-10-12",
+    "fim": "2026-10-18",
+    "fusoHorario": "America/Sao_Paulo"
+  },
+  "estado": "concluido",
+  "conteudo": {
+    "titulo": "Seus registros da semana",
+    "resumo": "Você registrou duas conclusões. Sem histórico de previstas, não há taxa de conclusão comparável.",
+    "proximoAjuste": "Considere revisar um próximo passo possível no seu planejamento.",
+    "reflexao": "Qual pequeno ajuste faz sentido para sua próxima semana?"
+  },
+  "falhaCodigo": null,
+  "geracao": {
+    "provedor": "ollama",
+    "modelo": "modelo-apenas-para-exemplo"
+  }
+}

@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
-using Icarus.Application.Abstractions;
+using Icarus.Application.Interfaces;
 using Konscious.Security.Cryptography;
 
 namespace Icarus.Infrastructure.Security;

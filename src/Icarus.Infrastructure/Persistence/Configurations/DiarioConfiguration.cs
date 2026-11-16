@@ -14,13 +14,16 @@ public class DiarioConfiguration : IEntityTypeConfiguration<Diario>
 
         builder.Property(d => d.Texto)
             .IsRequired();
+        builder.Property(d => d.Tipo).HasConversion<string>().HasMaxLength(20)
+            .HasDefaultValue(Icarus.Domain.Enums.TipoEntradaDiario.Reflexao);
+        builder.Property(d => d.AtualizadoEm).IsConcurrencyToken();
 
         builder.HasOne(d => d.Usuario)
             .WithMany(u => u.Diarios)
             .HasForeignKey(d => d.UsuarioId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Sem UNIQUE por enquanto: "mais de uma entrada por dia" ainda é pendência de produto (seção 37 do DER).
+        // O histórico da tela permite entradas independentes no mesmo dia.
         builder.HasIndex(d => new { d.UsuarioId, d.DataRegistro });
     }
 }
