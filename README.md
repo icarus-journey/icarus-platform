@@ -12,6 +12,23 @@ A consulta existente inclui estudo/trabalho opcionais; `PUT /api/usuarios/{id}/p
 atualiza esses quatro campos e `PUT /api/usuarios/{id}/fuso` mantém o fuso IANA.
 Cadastro e saldo permanecem protegidos por contratos separados.
 
+
+## Relatos de suporte
+
+Em **Perfil → Suporte**, o app envia e consulta relatos em `/api/suporte/relatos`.
+A API vincula o protocolo à conta e ao cartão no quadro privado
+[Suporte Icarus](https://trello.com/b/iP2Ytp6q/suporte-icarus). O cartão entra
+em **Novos**. Mova para **Em análise** ou **Resolvidos** para atualizar
+o status na próxima consulta do app. As datas de movimentação vêm do Trello.
+
+Para habilitar a integração, gere uma chave em [Trello Power-Ups](https://trello.com/power-ups/admin)
+e autorize um token com escopos `read,write` em uma conta com acesso ao quadro,
+conforme a [documentação de autorização](https://developer.atlassian.com/cloud/trello/guides/rest-api/authorization/).
+Configure `SuporteTrello:Chave` e `SuporteTrello:Token` nos segredos locais
+do projeto `src/Icarus.Api` em desenvolvimento. Em outros ambientes, use
+`SuporteTrello__Chave` e `SuporteTrello__Token` no gerenciador de segredos da API.
+Os IDs do quadro e das listas ficam em `SuporteTrello` no `appsettings.json`.
+
 ## Recompensa manual das missões
 
 Criação (`POST /api/usuarios/{id}/missoes`) e edição (`PATCH .../{missaoId}`)
