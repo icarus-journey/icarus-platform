@@ -1,3 +1,5 @@
+using Icarus.Api.Contracts.Suporte;
+using Icarus.Infrastructure.Suporte;
 using Icarus.Application.Interfaces;
 using Icarus.Api.Contracts.HistoricoRelatorios;
 using Icarus.Api.Contracts.ExtratoPontos;
@@ -56,6 +58,13 @@ public static class DependencyInjection
         });
 
         services.AddDataProtection();
+        services.AddHttpClient<TrelloSuporte>(client =>
+        {
+            client.BaseAddress = new Uri("https://api.trello.com/1/");
+            client.Timeout = TimeSpan.FromSeconds(5);
+        }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false })
+          .RedactLoggedHeaders(["Authorization"]);
+        services.AddSingleton<IValidator<CriarRelatoRequest>, CriarRelatoRequestValidator>();
         services.AddScoped<ICursorHistoricoRelatorios, CursorHistoricoRelatorios>();
         services.AddSingleton<IValidator<ConsultaHistoricoRelatoriosRequest>, ConsultaHistoricoRelatoriosRequestValidator>();
         services.AddScoped<ICursorExtratoPontos, CursorExtratoPontos>();

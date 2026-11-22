@@ -1031,6 +1031,72 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                     b.ToTable("registro_planejamento_ocorrencia", (string)null);
                 });
 
+            modelBuilder.Entity("Icarus.Domain.Entities.RelatoSuporte", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Assunto")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("assunto");
+
+                    b.Property<string>("CartaoId")
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("cartao_id");
+
+                    b.Property<string>("ChaveEnvio")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("chave_envio");
+
+                    b.Property<DateTimeOffset>("CriadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("criado_em");
+
+                    b.Property<string>("Descricao")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("descricao");
+
+                    b.Property<DateTimeOffset?>("EnvioTentadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("envio_tentado_em");
+
+                    b.Property<Guid>("ReferenciaCartao")
+                        .HasColumnType("uuid")
+                        .HasColumnName("referencia_cartao");
+
+                    b.Property<Guid>("UsuarioId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("usuario_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_relatos_suporte");
+
+                    b.HasIndex("CartaoId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_relatos_suporte_cartao_id");
+
+                    b.HasIndex("UsuarioId", "ChaveEnvio")
+                        .IsUnique()
+                        .HasDatabaseName("ix_relatos_suporte_usuario_id_chave_envio");
+
+                    b.HasIndex("UsuarioId", "CriadoEm", "Id")
+                        .IsDescending(false, true, true)
+                        .HasDatabaseName("ix_relatos_suporte_usuario_id_criado_em_id");
+
+                    b.ToTable("relatos_suporte", (string)null);
+                });
+
             modelBuilder.Entity("Icarus.Domain.Entities.Relatorio", b =>
                 {
                     b.Property<long>("Id")
@@ -1789,6 +1855,16 @@ namespace Icarus.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_registro_planejamento_ocorrencia_ocorrencia_ocorrencia_id");
 
                     b.Navigation("Ocorrencia");
+                });
+
+            modelBuilder.Entity("Icarus.Domain.Entities.RelatoSuporte", b =>
+                {
+                    b.HasOne("Icarus.Domain.Entities.Usuario", null)
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_relatos_suporte_usuarios_usuario_id");
                 });
 
             modelBuilder.Entity("Icarus.Domain.Entities.Relatorio", b =>

@@ -1,3 +1,4 @@
+using Icarus.Application.Suporte;
 using Icarus.Application.Exceptions;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
@@ -16,6 +17,16 @@ public sealed partial class GlobalExceptionHandler(
     {
         var problemDetails = exception switch
         {
+            SuporteIndisponivelException => new ProblemDetails
+            {
+                Status = StatusCodes.Status503ServiceUnavailable,
+                Title = "Suporte temporariamente indisponível"
+            },
+            ChaveEnvioEmUsoException => new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Title = "A tentativa de envio pertence a outro relato"
+            },
             ConsultaHistoricoRelatoriosInvalidaException => new ProblemDetails
             {
                 Status = StatusCodes.Status400BadRequest,

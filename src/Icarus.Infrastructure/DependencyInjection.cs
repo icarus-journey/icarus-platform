@@ -1,3 +1,5 @@
+using Icarus.Application.Suporte;
+using Icarus.Infrastructure.Suporte;
 using Icarus.Application.UseCases.ConsultarLoja;
 using Icarus.Application.Interfaces;
 using Icarus.Infrastructure.Jobs;
@@ -29,6 +31,8 @@ public static class DependencyInjection
             .UseNpgsql(connectionString)
             .UseSnakeCaseNamingConvention());
 
+        services.Configure<TrelloSuporteOptions>(configuration.GetSection(TrelloSuporteOptions.Secao));
+        services.AddScoped<ISuporte, SuporteService>();
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
 
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SecaoConfiguracao));
